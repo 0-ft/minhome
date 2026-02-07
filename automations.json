@@ -1,4 +1,36 @@
 {
-  "automations": []
+  "automations": [
+    {
+      "id": "little-lamp-blink",
+      "name": "Little Lamp Blink (5s)",
+      "enabled": false,
+      "triggers": [
+        {
+          "type": "interval",
+          "every": 10
+        }
+      ],
+      "conditions": [],
+      "actions": [
+        {
+          "type": "device_set",
+          "device": "0x44e2f8fffe194350",
+          "payload": {
+            "state": "ON"
+          }
+        },
+        {
+          "type": "delay",
+          "seconds": 5
+        },
+        {
+          "type": "device_set",
+          "device": "0x44e2f8fffe194350",
+          "payload": {
+            "state": "OFF"
+          }
+        }
+      ]
+    }
+  ]
 }
-

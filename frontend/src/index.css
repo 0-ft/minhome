@@ -134,9 +134,11 @@ input[type="range"]:active::-webkit-slider-thumb {
 .prose-chat > *:first-child { margin-top: 0; }
 .prose-chat > *:last-child  { margin-bottom: 0; }
 .prose-chat p         { margin: 0.35em 0; }
-.prose-chat ul,
-.prose-chat ol        { margin: 0.35em 0; padding-left: 1.25em; }
-.prose-chat li        { margin: 0.15em 0; }
+.prose-chat ul        { margin: 0.35em 0; padding-left: 1.25em; list-style-type: disc; }
+.prose-chat ol        { margin: 0.35em 0; padding-left: 1.25em; list-style-type: decimal; }
+.prose-chat ul ul     { list-style-type: circle; }
+.prose-chat ul ul ul  { list-style-type: square; }
+.prose-chat li        { margin: 0.15em 0; display: list-item; }
 .prose-chat code {
   font-family: var(--font-mono);
   font-size: 0.8em;
@@ -191,4 +193,151 @@ input[type="range"]:active::-webkit-slider-thumb {
 .prose-chat th {
   font-weight: 600;
   background: rgba(0, 0, 0, 0.04);
+}
+
+/* ── Float-in animation ──────────────────── */
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+.animate-float-in {
+  animation: float-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Scrollbar hide ──────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Auto-hiding thin scrollbar (floating chat) ── */
+.scrollbar-float {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s;
+}
+.scrollbar-float:hover {
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.scrollbar-float::-webkit-scrollbar {
+  width: 5px;
+}
+.scrollbar-float::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-float::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0);
+  border-radius: 9999px;
+  transition: background 0.3s;
+}
+.scrollbar-float:hover::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+}
+.scrollbar-float::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}
+.scrollbar-float::-webkit-scrollbar-thumb:active {
+  background: rgba(255,255,255,0.35);
+}
+
+/* ── Floating chat prose (light on dark) ─── */
+.prose-float {
+  color: #e7d7c1;
+  font-size: 0.9375rem; /* 15px */
+  line-height: 1.625;
+  word-break: break-word;
+}
+.prose-float > *:first-child { margin-top: 0; }
+.prose-float > *:last-child  { margin-bottom: 0; }
+.prose-float p         { margin: 0.35em 0; }
+.prose-float ul        { margin: 0.35em 0; padding-left: 1.25em; list-style-type: disc; }
+.prose-float ol        { margin: 0.35em 0; padding-left: 1.25em; list-style-type: decimal; }
+.prose-float ul ul     { list-style-type: circle; }
+.prose-float ul ul ul  { list-style-type: square; }
+.prose-float li        { margin: 0.15em 0; display: list-item; }
+.prose-float code {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+}
+.prose-float pre {
+  margin: 0.5em 0;
+  padding: 0.6em 0.8em;
+  border-radius: 0.375rem;
+  background: rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+  font-size: 0.8em;
+}
+.prose-float pre code {
+  background: none;
+  padding: 0;
+}
+.prose-float blockquote {
+  margin: 0.5em 0;
+  padding-left: 0.75em;
+  border-left: 3px solid rgba(255, 255, 255, 0.15);
+  opacity: 0.8;
+}
+.prose-float h1, .prose-float h2, .prose-float h3,
+.prose-float h4, .prose-float h5, .prose-float h6 {
+  font-weight: 600;
+  color: #faf6f1;
+  margin: 0.5em 0 0.25em;
+}
+.prose-float h1 { font-size: 1.15em; }
+.prose-float h2 { font-size: 1.05em; }
+.prose-float h3 { font-size: 1em; }
+.prose-float a {
+  color: #5fc4b3;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-float strong { color: #faf6f1; }
+.prose-float hr {
+  margin: 0.75em 0;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.prose-float table {
+  margin: 0.5em 0;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.prose-float th, .prose-float td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.3em 0.6em;
+}
+.prose-float th {
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  color: #faf6f1;
+}
+
+/* Badge overrides inside floating chat */
+.prose-float .device-badge,
+.prose-float .entity-badge,
+.prose-float .automation-badge {
+  vertical-align: baseline !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  padding: 0.05em 0.4em !important;
+  border: none !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  text-shadow: none !important;
+}
+.prose-float .device-badge {
+  color: #5fc4b3 !important;
+}
+.prose-float .entity-badge {
+  color: #cfc0ab !important;
+}
+.prose-float .automation-badge {
+  color: #fbbf24 !important;
 }

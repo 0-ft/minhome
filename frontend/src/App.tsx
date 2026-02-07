@@ -4,6 +4,7 @@ import { useRealtimeUpdates } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { RoomView } from "./components/RoomView.js";
+import { RoomFullView } from "./components/RoomFullView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { MessageSquare } from "lucide-react";
 
@@ -16,6 +17,16 @@ const DEFAULT_CHAT_WIDTH = 440;
 
 export function App() {
   useRealtimeUpdates();
+
+  return (
+    <Routes>
+      <Route path="/room-full" element={<RoomFullView />} />
+      <Route path="/*" element={<MainLayout />} />
+    </Routes>
+  );
+}
+
+function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const tab = (TABS.find((t) => location.pathname === `/${t}`) ?? "devices") as Tab;

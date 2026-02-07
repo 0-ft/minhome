@@ -6,82 +6,82 @@ import type { MqttBridge, DeviceState } from "./mqtt.js";
 // --- Zod schemas ---
 
 const TriggerDeviceState = z.object({
-  type: z.literal("device_state"),
-  device: z.string(),
-  property: z.string(),
-  to: z.unknown().optional(),
-  from: z.unknown().optional(),
-});
+  type: z.literal("device_state").describe("Trigger type: fires when a device's state property changes"),
+  device: z.string().describe("IEEE address of the device to watch, e.g. '0xa4c138d2b1cf1389'"),
+  property: z.string().describe("State property name to monitor, e.g. 'state', 'brightness', 'temperature'"),
+  to: z.unknown().optional().describe("Value the property must change TO for the trigger to fire (omit to match any new value)"),
+  from: z.unknown().optional().describe("Value the property must change FROM for the trigger to fire (omit to match any previous value)"),
+}).describe("Trigger that fires when a device's state property changes");
 
 const TriggerMqtt = z.object({
-  type: z.literal("mqtt"),
-  topic: z.string(),
-  payload_contains: z.string().optional(),
-});
+  type: z.literal("mqtt").describe("Trigger type: fires on a raw MQTT message"),
+  topic: z.string().describe("MQTT topic to subscribe to; supports '+' (single-level) and '#' (multi-level) wildcards"),
+  payload_contains: z.string().optional().describe("Optional substring the MQTT payload must contain for the trigger to fire"),
+}).describe("Trigger that fires when an MQTT message matching the topic (and optional payload filter) is received");
 
 const TriggerCron = z.object({
-  type: z.literal("cron"),
-  expression: z.string(),
-});
+  type: z.literal("cron").describe("Trigger type: fires on a cron schedule"),
+  expression: z.string().describe("Cron expression, e.g. '0 8 * * *' for every day at 08:00, '*/5 * * * *' for every 5 minutes"),
+}).describe("Trigger that fires on a cron schedule");
 
 const TriggerTime = z.object({
-  type: z.literal("time"),
-  at: z.string().regex(/^\d{2}:\d{2}$/),
-});
+  type: z.literal("time").describe("Trigger type: fires at a specific time of day"),
+  at: z.string().regex(/^\d{2}:\d{2}$/).describe("Time of day in HH:MM 24-hour format, e.g. '08:30', '22:00'"),
+}).describe("Trigger that fires once per day at a specific time");
 
 const TriggerInterval = z.object({
-  type: z.literal("interval"),
-  every: z.number().positive(),
-});
+  type: z.literal("interval").describe("Trigger type: fires at a recurring interval"),
+  every: z.number().positive().describe("Interval in seconds between each firing, e.g. 300 for every 5 minutes"),
+}).describe("Trigger that fires repeatedly at a fixed interval");
 
-const TriggerSchema = z.discriminatedUnion("type", [
+export const TriggerSchema = z.discriminatedUnion("type", [
   TriggerDeviceState,
   TriggerMqtt,
   TriggerCron,
   TriggerTime,
   TriggerInterval,
-]);
+]).describe("A trigger that causes the automation to fire. Set 'type' to one of: 'device_state', 'mqtt', 'cron', 'time', 'interval'");
 
 const ConditionTimeRange = z.object({
-  type: z.literal("time_range"),
-  after: z.string().regex(/^\d{2}:\d{2}$/),
-  before: z.string().regex(/^\d{2}:\d{2}$/),
-});
+  type: z.literal("time_range").describe("Condition type: passes only during a time-of-day window"),
+  after: z.string().regex(/^\d{2}:\d{2}$/).describe("Start of the allowed time window in HH:MM 24-hour format"),
+  before: z.string().regex(/^\d{2}:\d{2}$/).describe("End of the allowed time window in HH:MM 24-hour format (supports midnight wrap-around)"),
+}).describe("Condition that passes only if the current time is within the given range");
 
 const ConditionDayOfWeek = z.object({
-  type: z.literal("day_of_week"),
-  days: z.array(z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])),
-});
+  type: z.literal("day_of_week").describe("Condition type: passes only on certain days of the week"),
+  days: z.array(z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])).describe("List of days when the automation is allowed to fire, e.g. ['mon','tue','wed','thu','fri'] for weekdays"),
+}).describe("Condition that passes only on the specified days of the week");
 
 const ConditionDeviceState = z.object({
-  type: z.literal("device_state"),
-  device: z.string(),
-  property: z.string(),
-  equals: z.unknown(),
-});
+  type: z.literal("device_state").describe("Condition type: passes only when a device property has a specific value"),
+  device: z.string().describe("IEEE address of the device to check"),
+  property: z.string().describe("State property name to check, e.g. 'state', 'brightness'"),
+  equals: z.unknown().describe("Required value of the property for the condition to pass, e.g. 'ON', 255"),
+}).describe("Condition that passes only when a device's state property equals a specific value");
 
-const ConditionSchema = z.discriminatedUnion("type", [
+export const ConditionSchema = z.discriminatedUnion("type", [
   ConditionTimeRange,
   ConditionDayOfWeek,
   ConditionDeviceState,
-]);
+]).describe("A condition that must be true for the automation to proceed. Set 'type' to one of: 'time_range', 'day_of_week', 'device_state'");
 
 const ActionDeviceSet = z.object({
-  type: z.literal("device_set"),
-  device: z.string(),
-  payload: z.record(z.string(), z.unknown()),
-});
+  type: z.literal("device_set").describe("Action type: send a state command to a device"),
+  device: z.string().describe("IEEE address of the target device"),
+  payload: z.looseObject({}).describe("Key-value payload to send to the device, e.g. {\"state\":\"ON\",\"brightness\":200,\"color_temp\":350}"),
+}).describe("Action that sends a state command to a Zigbee device");
 
 const ActionMqttPublish = z.object({
-  type: z.literal("mqtt_publish"),
-  topic: z.string(),
-  payload: z.string(),
-});
+  type: z.literal("mqtt_publish").describe("Action type: publish a raw MQTT message"),
+  topic: z.string().describe("MQTT topic to publish to"),
+  payload: z.string().describe("String payload to publish"),
+}).describe("Action that publishes a raw MQTT message");
 
 const ActionDelay = z.object({
-  type: z.literal("delay"),
-  seconds: z.number().positive(),
-});
+  type: z.literal("delay").describe("Action type: pause before the next action"),
+  seconds: z.number().positive().describe("Number of seconds to wait before executing the next action"),
+}).describe("Action that introduces a delay between subsequent actions");
 
 type Action = z.infer<typeof ActionDeviceSet> | z.infer<typeof ActionMqttPublish> | z.infer<typeof ActionDelay> | ConditionalAction;
 
@@ -92,28 +92,28 @@ interface ConditionalAction {
   else?: Action[];
 }
 
-const ActionSchema: z.ZodType<Action> = z.lazy(() =>
+export const ActionSchema: z.ZodType<Action> = z.lazy(() =>
   z.discriminatedUnion("type", [
     ActionDeviceSet,
     ActionMqttPublish,
     ActionDelay,
     z.object({
-      type: z.literal("conditional"),
-      condition: ConditionSchema,
-      then: z.array(ActionSchema),
-      else: z.array(ActionSchema).optional(),
-    }),
+      type: z.literal("conditional").describe("Action type: conditionally execute different action branches"),
+      condition: ConditionSchema.describe("Condition to evaluate at runtime"),
+      then: z.array(ActionSchema).describe("Actions to execute if the condition is true"),
+      else: z.array(ActionSchema).optional().describe("Actions to execute if the condition is false (optional)"),
+    }).describe("Action that branches based on a runtime condition"),
   ])
-);
+).describe("An action to execute. Set 'type' to one of: 'device_set', 'mqtt_publish', 'delay', 'conditional'");
 
 export const AutomationSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  enabled: z.boolean().default(true),
-  triggers: z.array(TriggerSchema).min(1),
-  conditions: z.array(ConditionSchema).default([]),
-  actions: z.array(ActionSchema).min(1),
-});
+  id: z.string().describe("Unique identifier for this automation (use a short slug, e.g. 'morning-lights')"),
+  name: z.string().describe("Human-readable name for this automation, e.g. 'Turn on morning lights'"),
+  enabled: z.boolean().default(true).describe("Whether this automation is active (defaults to true)"),
+  triggers: z.array(TriggerSchema).min(1).describe("One or more triggers that can cause this automation to fire (OR logic: any trigger can fire it)"),
+  conditions: z.array(ConditionSchema).default([]).describe("Optional conditions that must ALL be true for the automation to proceed (AND logic). Defaults to no conditions."),
+  actions: z.array(ActionSchema).min(1).describe("Ordered list of actions to execute when the automation fires"),
+}).describe("A complete automation rule with triggers, conditions, and actions");
 
 export const AutomationsFileSchema = z.object({
   automations: z.array(AutomationSchema),

@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { hc } from "hono/client";
 import type { AppType } from "./app.js";
+import { AutomationSchema } from "./automations.js";
 
 const BASE_URL = process.env.MINHOME_URL ?? "http://localhost:3111";
 const api = hc<AppType>(BASE_URL);
@@ -37,11 +38,10 @@ server.tool(
   'Send a command to a device (e.g. turn on/off, set brightness, change color)',
   {
     id: z.string().describe("Device IEEE address"),
-    payload: z.string().describe('JSON payload, e.g. {"state":"ON","brightness":200}'),
+    payload: z.record(z.string(), z.unknown()).describe('Command payload, e.g. {"state":"ON","brightness":200}'),
   },
   async ({ id, payload }) => {
-    const parsed = JSON.parse(payload);
-    const res = await api.api.devices[":id"].set.$post({ param: { id }, json: parsed });
+    const res = await api.api.devices[":id"].set.$post({ param: { id }, json: payload });
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },
@@ -88,10 +88,9 @@ server.tool("list_automations", "List all automation rules", {}, async () => {
 server.tool(
   "create_automation",
   "Create a new automation rule",
-  { automation: z.string().describe("Full automation JSON object") },
-  async ({ automation }) => {
-    const parsed = JSON.parse(automation);
-    const res = await api.api.automations.$post({ json: parsed });
+  AutomationSchema.shape,
+  async (automation) => {
+    const res = await api.api.automations.$post({ json: automation });
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
   },
@@ -99,14 +98,13 @@ server.tool(
 
 server.tool(
   "update_automation",
-  "Update an existing automation rule",
+  "Update an existing automation rule. Provide the automation ID and any fields to change.",
   {
-    id: z.string().describe("Automation ID"),
-    patch: z.string().describe("JSON patch object with fields to update"),
+    id: z.string().describe("ID of the automation to update"),
+    ...AutomationSchema.omit({ id: true }).partial().shape,
   },
-  async ({ id, patch }) => {
-    const parsed = JSON.parse(patch);
-    const res = await api.api.automations[":id"].$put({ param: { id }, json: parsed });
+  async ({ id, ...patch }) => {
+    const res = await api.api.automations[":id"].$put({ param: { id }, json: patch });
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
   },

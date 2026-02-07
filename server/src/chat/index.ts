@@ -5,6 +5,7 @@ import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport as StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import type { MqttBridge } from "../mqtt.js";
 import type { ConfigStore } from "../config.js";
+import type { AutomationEngine } from "../automations.js";
 import { buildSystemPrompt } from "./context.js";
 import { resolve } from "path";
 
@@ -45,7 +46,7 @@ const modelId = process.env.AI_MODEL ?? "gpt-4o";
 
 // ── Chat route ────────────────────────────────────────────
 
-export function createChatRoute(bridge: MqttBridge, config: ConfigStore) {
+export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
   const chat = new Hono();
 
   chat.get("/api/chat/info", (c) => {
@@ -68,7 +69,7 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore) {
     const { messages } = body;
 
     const tools = await mcpClient.tools();
-    const system = buildSystemPrompt(bridge, config);
+    const system = buildSystemPrompt(bridge, config, automations);
     const modelMessages = await convertToModelMessages(messages);
 
     const result = streamText({

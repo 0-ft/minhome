@@ -1,5 +1,5 @@
-import { Lightbulb, Plug } from "lucide-react";
-import { useDevices } from "../api.js";
+import { Lightbulb, Plug, Zap } from "lucide-react";
+import { useDevices, useAutomations } from "../api.js";
 import { extractControls } from "../types.js";
 import type { DeviceData } from "../types.js";
 import type { ReactNode } from "react";
@@ -24,7 +24,7 @@ export function DeviceBadge({ id, children }: { id?: string; children?: ReactNod
 
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium
+      className="device-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium
         bg-teal-100 text-teal-700 border border-teal-200 align-baseline whitespace-nowrap"
       title={id ?? undefined}
     >
@@ -43,12 +43,32 @@ export function EntityBadge({ id, device: deviceId, children }: { id?: string; d
 
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium
+      className="entity-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium
         bg-sand-200 text-sand-700 border border-sand-300 align-baseline whitespace-nowrap"
       title={id && deviceId ? `${id}@${deviceId}` : undefined}
     >
       <Icon className="h-3 w-3 shrink-0" />
       <span>{children}</span>
+    </span>
+  );
+}
+
+// ── AutomationBadge ─────────────────────────────────────
+
+export function AutomationBadge({ id, children }: { id?: string; children?: ReactNode }) {
+  const { data: automations } = useAutomations();
+  const automation = id && Array.isArray(automations)
+    ? (automations as { id: string; name: string }[]).find((a) => a.id === id)
+    : undefined;
+
+  return (
+    <span
+      className="automation-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium
+        bg-amber-100 text-amber-700 border border-amber-200 align-baseline whitespace-nowrap"
+      title={id ?? undefined}
+    >
+      <Zap className="h-3 w-3 shrink-0" />
+      <span>{children ?? automation?.name ?? id}</span>
     </span>
   );
 }

@@ -13,7 +13,7 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
   // --- AI Chat ---
-  app.route("/", createChatRoute(bridge, config));
+  app.route("/", createChatRoute(bridge, config, automations));
 
   app
 

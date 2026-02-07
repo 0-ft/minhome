@@ -7,9 +7,9 @@ import type { DeviceData } from "../types.js";
 import { extractControls } from "../types.js";
 
 // ── Room dimensions ──────────────────────────────────────
-const ROOM_W = 5.4;
+export const ROOM_W = 5.4;
 const ROOM_H = 2.5;
-const ROOM_D = 3;
+export const ROOM_D = 3;
 // ── Palette (muted earth tones) ─────────────────────────
 const C = {
   floor: "#cdc0ae",
@@ -22,7 +22,7 @@ const C = {
   lightOff: "#666",
 };
 
-interface RoomLightDef {
+export interface RoomLightDef {
   deviceId: string;
   entityId?: string;
   position: [number, number, number];
@@ -252,14 +252,16 @@ function LightOrb({
 }
 
 // ── Scene (inside Canvas) ───────────────────────────────
-function Scene({
+export function Scene({
   roomLights,
   deviceMap,
   onToggle,
+  orbitTarget,
 }: {
   roomLights: RoomLightDef[];
   deviceMap: Map<string, DeviceData>;
   onToggle: (deviceId: string, stateProperty: string, isOn: boolean) => void;
+  orbitTarget?: [number, number, number];
 }) {
   return (
     <>
@@ -280,7 +282,7 @@ function Scene({
       ))}
 
       <OrbitControls
-        target={[ROOM_W / 2, 0.5, ROOM_D / 2]}
+        target={orbitTarget ?? [ROOM_W / 2, 0.5, ROOM_D / 2]}
         maxPolarAngle={Math.PI / 2.05}
         minDistance={2}
         maxDistance={14}

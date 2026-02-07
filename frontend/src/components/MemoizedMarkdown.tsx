@@ -2,7 +2,7 @@ import { marked } from "marked";
 import { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
-import { DeviceBadge, EntityBadge } from "./DeviceBadge.js";
+import { DeviceBadge, EntityBadge, AutomationBadge } from "./DeviceBadge.js";
 
 function parseMarkdownIntoBlocks(markdown: string): string[] {
   const tokens = marked.lexer(markdown);
@@ -12,6 +12,7 @@ function parseMarkdownIntoBlocks(markdown: string): string[] {
 const markdownComponents = {
   device: DeviceBadge,
   entity: EntityBadge,
+  automation: AutomationBadge,
 } as Record<string, React.ComponentType<Record<string, unknown>>>;
 
 const MemoizedMarkdownBlock = memo(
