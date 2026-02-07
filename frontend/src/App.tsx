@@ -1,9 +1,14 @@
 import { useState, useCallback, useRef } from "react";
+import { useLocation, useNavigate, Routes, Route, Navigate } from "react-router-dom";
 import { useRealtimeUpdates } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
+import { RoomView } from "./components/RoomView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { MessageSquare } from "lucide-react";
+
+const TABS = ["devices", "automations", "room"] as const;
+type Tab = (typeof TABS)[number];
 
 const MIN_CHAT_WIDTH = 300;
 const MAX_CHAT_WIDTH = 700;
@@ -11,7 +16,9 @@ const DEFAULT_CHAT_WIDTH = 440;
 
 export function App() {
   useRealtimeUpdates();
-  const [tab, setTab] = useState<"devices" | "automations">("devices");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = (TABS.find((t) => location.pathname === `/${t}`) ?? "devices") as Tab;
   const [chatOpen, setChatOpen] = useState(
     () => window.matchMedia("(min-width: 768px)").matches,
   );
@@ -58,10 +65,10 @@ export function App() {
 
           <div className="flex items-center gap-2">
             <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
-              {(["devices", "automations"] as const).map((t) => (
+              {TABS.map((t) => (
                 <button
                   key={t}
-                  onClick={() => setTab(t)}
+                  onClick={() => navigate(`/${t}`)}
                   className={`px-3.5 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all cursor-pointer ${
                     tab === t
                       ? "bg-sand-50/90 text-blood-600"
@@ -102,9 +109,12 @@ export function App() {
         )}
 
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-6 py-8">
-            {tab === "devices" ? <DevicesView /> : <AutomationsView />}
-          </div>
+          <Routes>
+            <Route path="/devices" element={<div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div>} />
+            <Route path="/automations" element={<div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div>} />
+            <Route path="/room" element={<div className="h-full p-4"><RoomView /></div>} />
+            <Route path="*" element={<Navigate to="/devices" replace />} />
+          </Routes>
         </main>
       </div>
     </div>

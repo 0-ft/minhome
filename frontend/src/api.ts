@@ -85,6 +85,16 @@ export function useRenameEntity() {
   });
 }
 
+export function useConfig() {
+  return useQuery({
+    queryKey: ["config"],
+    queryFn: async () => {
+      const res = await api.api.config.$get();
+      return res.json();
+    },
+  });
+}
+
 export function useAutomations() {
   return useQuery({
     queryKey: ["automations"],
