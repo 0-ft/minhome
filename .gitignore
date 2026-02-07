@@ -6,3 +6,4 @@ __pycache__/
 mosquitto/data/
 mosquitto/log/
 z2m-data/
+.env

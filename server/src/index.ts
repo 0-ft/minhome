@@ -4,6 +4,7 @@ import { createApp } from "./app.js";
 import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config.js";
 import { AutomationEngine } from "./automations.js";
+import { initMCPClient, destroyMCPClient } from "./chat.js";
 import { resolve, join } from "path";
 import { existsSync } from "fs";
 
@@ -41,9 +42,19 @@ const server = serve({ fetch: app.fetch, port: PORT }, (info) => {
 
 injectWebSocket(server);
 
+// Initialize AI chat MCP client (non-blocking; chat will 503 until ready)
+if (process.env.AI_API_KEY) {
+  initMCPClient().catch((err) => {
+    console.error("[chat] Failed to initialize MCP client:", err);
+  });
+} else {
+  console.log("[server] AI_API_KEY not set — AI chat disabled");
+}
+
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("[server] Shutting down...");
+  await destroyMCPClient();
   automationEngine.destroy();
   await bridge.destroy();
   process.exit(0);

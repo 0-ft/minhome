@@ -40,5 +40,8 @@ services:
     environment:
       - MQTT_URL=mqtt://mqtt:1883
       - DATA_DIR=/app
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_BASE_URL=${AI_BASE_URL:-}
+      - AI_MODEL=${AI_MODEL:-}
     depends_on:
       - mqtt
