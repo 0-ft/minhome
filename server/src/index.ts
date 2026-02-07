@@ -4,7 +4,7 @@ import { createApp } from "./app.js";
 import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config.js";
 import { AutomationEngine } from "./automations.js";
-import { initMCPClient, destroyMCPClient } from "./chat.js";
+import { initMCPClient, destroyMCPClient } from "./chat/index.js";
 import { resolve, join } from "path";
 import { existsSync } from "fs";
 

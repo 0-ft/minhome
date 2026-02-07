@@ -2,6 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { useState, useRef, useEffect } from "react";
 import { Send, X, Loader2, Wrench, ChevronDown } from "lucide-react";
 import type { UIMessage } from "ai";
+import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
 
 export function ChatPane({ onClose }: { onClose: () => void }) {
   const { messages, sendMessage, status, stop, error, setMessages } = useChat();
@@ -142,10 +143,17 @@ function MessageBubble({ message }: { message: UIMessage }) {
       >
         {message.parts.map((part, i) => {
           if (part.type === "text") {
+            if (isUser) {
+              return (
+                <span key={i} className="whitespace-pre-wrap break-words">
+                  {part.text}
+                </span>
+              );
+            }
             return (
-              <span key={i} className="whitespace-pre-wrap break-words">
-                {part.text}
-              </span>
+              <div key={i} className="prose-chat">
+                <MemoizedMarkdown content={part.text} id={`${message.id}-${i}`} />
+              </div>
             );
           }
 

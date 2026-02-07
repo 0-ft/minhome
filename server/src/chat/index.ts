@@ -3,8 +3,9 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 
 import { createOpenAI } from "@ai-sdk/openai";
 import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport as StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
-import type { MqttBridge } from "./mqtt.js";
-import type { ConfigStore } from "./config.js";
+import type { MqttBridge } from "../mqtt.js";
+import type { ConfigStore } from "../config.js";
+import { buildSystemPrompt } from "./context.js";
 import { resolve } from "path";
 
 // ── MCP client singleton ──────────────────────────────────
@@ -12,7 +13,7 @@ import { resolve } from "path";
 let mcpClient: MCPClient | null = null;
 
 export async function initMCPClient(): Promise<void> {
-  const mcpScript = resolve(import.meta.dirname, "mcp.ts");
+  const mcpScript = resolve(import.meta.dirname, "../mcp.ts");
   mcpClient = await createMCPClient({
     transport: new StdioMCPTransport({
       command: "tsx",
@@ -42,41 +43,6 @@ const openai = createOpenAI({
 
 const modelId = process.env.AI_MODEL ?? "gpt-4o";
 
-// ── System prompt builder ─────────────────────────────────
-
-function buildSystemPrompt(bridge: MqttBridge, config: ConfigStore): string {
-  const devices = [...bridge.devices.values()]
-    .filter((d) => d.type !== "Coordinator")
-    .map((d) => {
-      const custom = config.getDevice(d.ieee_address);
-      const state = bridge.states.get(d.ieee_address);
-      return {
-        id: d.ieee_address,
-        name: custom?.name ?? d.friendly_name,
-        entities: custom?.entities ?? {},
-        type: d.type,
-        vendor: d.definition?.vendor ?? null,
-        model: d.definition?.model ?? null,
-        description: d.definition?.description ?? null,
-        state: state ?? {},
-      };
-    });
-
-  return `You are a smart home assistant for minhome, a Zigbee-based room control system.
-You can view and control smart home devices using the tools available to you.
-
-Current devices and their state:
-${JSON.stringify(devices, null, 2)}
-
-Guidelines:
-- Be concise and helpful.
-- When asked to control devices, use the appropriate tool calls.
-- Refer to devices by their friendly name, not their IEEE address.
-- If a device has named entities (e.g. individual sockets on a multi-plug), refer to them by their entity name.
-- After performing an action, briefly confirm what you did.
-- If you're unsure about a device or action, ask for clarification.`;
-}
-
 // ── Chat route ────────────────────────────────────────────
 
 export function createChatRoute(bridge: MqttBridge, config: ConfigStore) {
@@ -99,7 +65,7 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore) {
     const modelMessages = await convertToModelMessages(messages);
 
     const result = streamText({
-      model: openai(modelId),
+      model: openai.chat(modelId),
       system,
       messages: modelMessages,
       tools,

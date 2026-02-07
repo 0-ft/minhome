@@ -6,7 +6,7 @@ import type { ConfigStore } from "./config.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
-import { createChatRoute } from "./chat.js";
+import { createChatRoute } from "./chat/index.js";
 
 export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
   const app = new Hono();

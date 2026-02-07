@@ -8,12 +8,14 @@ import { MessageSquare } from "lucide-react";
 export function App() {
   useRealtimeUpdates();
   const [tab, setTab] = useState<"devices" | "automations">("devices");
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(
+    () => window.matchMedia("(min-width: 768px)").matches,
+  );
 
   return (
-    <div className="min-h-screen bg-sand-100">
-      {/* Header — fixed, frosted blood-300 */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-blood-300/80 backdrop-blur-lg">
+    <div className="h-screen flex flex-col bg-sand-100">
+      {/* Header */}
+      <header className="shrink-0 bg-blood-300/80 backdrop-blur-lg">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-end justify-between">
           <div>
             <h1 className="text-lg font-semibold tracking-tight text-sand-50">
@@ -54,21 +56,20 @@ export function App() {
         </div>
       </header>
 
-      {/* Content — top padding to clear fixed header */}
-      <main
-        className={`max-w-5xl mx-auto px-6 pt-24 pb-8 transition-all duration-300 ${
-          chatOpen ? "mr-[380px]" : ""
-        }`}
-      >
-        {tab === "devices" ? <DevicesView /> : <AutomationsView />}
-      </main>
+      {/* Body: optional chat pane + scrollable main content */}
+      <div className="flex-1 flex min-h-0">
+        {chatOpen && (
+          <aside className="shrink-0 w-[380px] border-r border-sand-300 shadow-lg">
+            <ChatPane onClose={() => setChatOpen(false)} />
+          </aside>
+        )}
 
-      {/* Chat Pane — fixed right panel */}
-      {chatOpen && (
-        <aside className="fixed top-0 right-0 bottom-0 w-[380px] z-40 shadow-xl">
-          <ChatPane onClose={() => setChatOpen(false)} />
-        </aside>
-      )}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-6 py-8">
+            {tab === "devices" ? <DevicesView /> : <AutomationsView />}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
