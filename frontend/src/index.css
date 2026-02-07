@@ -40,21 +40,21 @@
   /* ── Semantic aliases ──────────────────── */
   --color-background:           var(--color-sand-100);
   --color-foreground:           var(--color-sand-900);
-  --color-card:                 var(--color-sand-50);
-  --color-card-foreground:      var(--color-sand-900);
-  --color-primary:              var(--color-blood-600);
-  --color-primary-foreground:   var(--color-sand-100);
-  --color-secondary:            var(--color-sand-200);
-  --color-secondary-foreground: var(--color-sand-800);
-  --color-muted:                var(--color-sand-300);
-  --color-muted-foreground:     var(--color-sand-600);
-  --color-accent:               var(--color-blood-400);
-  --color-accent-foreground:    var(--color-sand-100);
-  --color-destructive:          var(--color-blood-400);
-  --color-destructive-foreground: var(--color-sand-100);
-  --color-border:               var(--color-sand-300);
-  --color-input:                var(--color-sand-300);
-  --color-ring:                 var(--color-blood-600);
+  --color-card:                 var(--color-blood-400);
+  --color-card-foreground:      var(--color-sand-50);
+  --color-primary:              var(--color-sand-50);
+  --color-primary-foreground:   var(--color-blood-600);
+  --color-secondary:            var(--color-blood-500);
+  --color-secondary-foreground: var(--color-blood-100);
+  --color-muted:                var(--color-blood-600);
+  --color-muted-foreground:     var(--color-blood-200);
+  --color-accent:               var(--color-teal-400);
+  --color-accent-foreground:    var(--color-teal-900);
+  --color-destructive:          var(--color-blood-700);
+  --color-destructive-foreground: var(--color-blood-100);
+  --color-border:               var(--color-blood-500);
+  --color-input:                var(--color-blood-600);
+  --color-ring:                 var(--color-teal-300);
   --color-success:              var(--color-teal-400);
   --color-success-foreground:   var(--color-sand-50);
 
@@ -91,35 +91,35 @@ input[type="range"] {
   cursor: pointer;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
+  height: 6px;
   border-radius: 9999px;
-  background: #cfc0ab;
+  background: rgba(0, 0, 0, 0.12);
 }
 input[type="range"]::-moz-range-track {
-  height: 4px;
+  height: 6px;
   border-radius: 9999px;
-  background: #cfc0ab;
+  background: rgba(0, 0, 0, 0.12);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #8c1c13;
+  background: #2a9d8f; /* teal-400 accent */
   border: 2px solid #fefcf9;
-  margin-top: -5px;
+  margin-top: -4px;
   cursor: pointer;
   transition: transform 0.1s ease;
-  box-shadow: 0 1px 3px rgb(58 37 32 / 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #8c1c13;
+  background: #2a9d8f;
   border: 2px solid #fefcf9;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgb(58 37 32 / 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 input[type="range"]:active::-webkit-slider-thumb {
   transform: scale(1.25);

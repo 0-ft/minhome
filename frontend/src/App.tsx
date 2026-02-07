@@ -77,25 +77,25 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-sand-100">
-      {/* Header */}
-      <header className="bg-sand-50">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-end justify-between">
+      {/* Header — fixed, frosted blood-300 */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-blood-300/80 backdrop-blur-lg">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-end justify-between">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-sand-900">
+            <h1 className="text-lg font-semibold tracking-tight text-sand-50">
               minhome
             </h1>
-            <p className="text-[11px] font-mono text-sand-500 mt-0.5">smart room control</p>
+            <p className="text-[11px] font-mono text-blood-100 mt-0.5">smart room control</p>
           </div>
 
-          <nav className="flex gap-0.5 bg-sand-200 rounded-lg p-0.5">
+          <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
             {(["devices", "automations"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={`px-3.5 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all cursor-pointer ${
                   tab === t
-                    ? "bg-blood-600 text-sand-50"
-                    : "text-sand-600 hover:text-sand-800 hover:bg-sand-300"
+                    ? "bg-sand-50/90 text-blood-600"
+                    : "text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
                 }`}
               >
                 {t}
@@ -105,8 +105,8 @@ export function App() {
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      {/* Content — top padding to clear fixed header */}
+      <main className="max-w-5xl mx-auto px-6 pt-24 pb-8">
         {tab === "devices" ? <DevicesView /> : <AutomationsView />}
       </main>
     </div>
@@ -132,7 +132,7 @@ function DevicesView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-sand-500 py-12 justify-center">
+      <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading devices…
       </div>
@@ -142,8 +142,8 @@ function DevicesView() {
   if (!devices || !Array.isArray(devices) || devices.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-sm text-sand-600">No devices found.</p>
-        <p className="text-xs font-mono text-sand-400 mt-1">Pair Zigbee devices via Z2M to get started.</p>
+        <p className="text-sm text-sand-700">No devices found.</p>
+        <p className="text-xs font-mono text-sand-500 mt-1">Pair Zigbee devices via Z2M to get started.</p>
       </div>
     );
   }
@@ -174,19 +174,16 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
   const [nameInput, setNameInput] = useState(device.name);
   const [showRaw, setShowRaw] = useState(false);
 
-  const anyOn = controls.some(c => device.state?.[c.stateProperty] === "ON");
   const isLight = controls.some(c => c.type === "light");
   const DeviceIcon = isLight ? Lightbulb : Plug;
 
   return (
-    <Card className={`transition-all duration-200 ${anyOn ? "bg-sand-50 ring-2 ring-teal-200" : ""}`}>
+    <Card className="transition-all duration-200">
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             {/* Icon */}
-            <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-              anyOn ? "bg-teal-100 text-teal-600" : "bg-sand-200 text-sand-600"
-            }`}>
+            <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 bg-blood-500/50 text-blood-200">
               <DeviceIcon className="h-4 w-4" />
             </div>
 
@@ -213,7 +210,7 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
                 </form>
               ) : (
                 <CardTitle
-                  className="cursor-pointer hover:text-blood-600 transition-colors truncate"
+                  className="cursor-pointer hover:text-teal-200 transition-colors truncate"
                   onClick={() => { setEditing(true); setNameInput(device.name); }}
                   title="Click to rename"
                 >
@@ -226,7 +223,7 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
             </div>
           </div>
 
-          <Badge variant={anyOn ? "success" : "muted"}>
+          <Badge variant="muted">
             {device.type}
           </Badge>
         </div>
@@ -247,7 +244,7 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
             ))}
           </div>
         ) : (
-          <p className="text-xs font-mono text-sand-500">No controls</p>
+          <p className="text-xs font-mono text-blood-200">No controls</p>
         )}
 
         {/* Raw state */}
@@ -255,17 +252,17 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
           <div className="mt-4">
             <button
               onClick={() => setShowRaw(!showRaw)}
-              className="flex items-center gap-1 text-[10px] font-mono text-sand-500 hover:text-sand-700 transition-colors cursor-pointer uppercase tracking-wider"
+              className="flex items-center gap-1 text-[10px] font-mono text-blood-200 hover:text-blood-100 transition-colors cursor-pointer uppercase tracking-wider"
             >
               <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${showRaw ? "rotate-90" : ""}`} />
               raw state
             </button>
             {showRaw && (
-              <div className="mt-2 p-3 rounded-lg bg-sand-100 font-mono text-[10px] leading-relaxed">
+              <div className="mt-2 p-3 rounded-lg bg-blood-600/40 font-mono text-[10px] leading-relaxed">
                 {Object.entries(device.state).map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-3">
-                    <span className="text-sand-500">{k}</span>
-                    <span className="text-sand-800 font-medium">{String(v)}</span>
+                    <span className="text-blood-200">{k}</span>
+                    <span className="text-sand-50 font-medium">{String(v)}</span>
                   </div>
                 ))}
               </div>
@@ -291,9 +288,30 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
   const [editingEntity, setEditingEntity] = useState(false);
   const [entityInput, setEntityInput] = useState(entityLabel ?? "");
 
+  // Lift slider values so we can bundle them into the ON command
+  const serverBrightness = ctrl.brightnessProperty && typeof device.state?.[ctrl.brightnessProperty] === "number"
+    ? device.state[ctrl.brightnessProperty] as number : 127;
+  const serverColorTemp = ctrl.colorTempProperty && typeof device.state?.[ctrl.colorTempProperty] === "number"
+    ? device.state[ctrl.colorTempProperty] as number : 370;
+  const [brightness, setBrightness] = useState(serverBrightness);
+  const [colorTemp, setColorTemp] = useState(serverColorTemp);
+
+  const handleToggle = () => {
+    if (isOn) {
+      onSet({ [ctrl.stateProperty]: "OFF" });
+    } else {
+      // Bundle current slider values so the device turns on at the visible position
+      onSet({
+        [ctrl.stateProperty]: "ON",
+        ...(ctrl.brightnessProperty && { [ctrl.brightnessProperty]: brightness }),
+        ...(ctrl.colorTempProperty && { [ctrl.colorTempProperty]: colorTemp }),
+      });
+    }
+  };
+
   return (
     <div className={`flex flex-col gap-2 rounded-lg p-3 transition-colors ${
-      isOn ? "bg-teal-50" : "bg-sand-100"
+      isOn ? "bg-sand-200 text-sand-800" : "bg-blood-500/40 text-blood-100"
     }`}>
       <div className="flex items-center gap-2.5">
         {/* Entity label */}
@@ -306,18 +324,20 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
               <Input
                 value={entityInput}
                 onChange={e => setEntityInput(e.target.value)}
-                className="h-5 text-[10px] w-20 px-1 font-mono"
+                className={`h-5 text-[10px] w-20 px-1 font-mono ${isOn ? "bg-sand-300 text-sand-800 placeholder:text-sand-500" : ""}`}
                 autoFocus
                 onBlur={() => setEditingEntity(false)}
                 onKeyDown={(e) => { if (e.key === "Escape") setEditingEntity(false); }}
               />
-              <Button type="submit" size="icon" variant="ghost" className="h-5 w-5">
+              <Button type="submit" size="icon" variant="ghost" className={`h-5 w-5 ${isOn ? "text-sand-600 hover:bg-sand-300" : ""}`}>
                 <Check className="h-2.5 w-2.5" />
               </Button>
             </form>
           ) : (
             <span
-              className="text-[10px] font-mono font-medium text-sand-700 uppercase tracking-wider min-w-8 cursor-pointer hover:text-blood-600 transition-colors"
+              className={`text-[10px] font-mono font-medium uppercase tracking-wider min-w-8 cursor-pointer transition-colors ${
+                isOn ? "text-teal-600 hover:text-teal-700" : "text-blood-200 hover:text-sand-50"
+              }`}
               onClick={() => { setEntityInput(entityLabel ?? endpoint); setEditingEntity(true); }}
               title="Click to rename"
             >
@@ -330,7 +350,7 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
         <Button
           variant={isOn ? "success" : "secondary"}
           size="sm"
-          onClick={() => onSet({ [ctrl.stateProperty]: isOn ? "OFF" : "ON" })}
+          onClick={handleToggle}
           className="gap-1.5"
         >
           <Power className="h-3 w-3" />
@@ -338,25 +358,29 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
         </Button>
 
         {/* Status dot */}
-        <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-sand-400"}`} />
+        <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-blood-300"}`} />
       </div>
 
       {/* Sliders */}
       {ctrl.brightnessProperty && (
         <DebouncedSlider
           min={1} max={254}
-          serverValue={typeof device.state?.[ctrl.brightnessProperty] === "number" ? device.state[ctrl.brightnessProperty] as number : 127}
+          serverValue={serverBrightness}
+          value={brightness}
+          onValueChange={setBrightness}
           onCommit={(val) => onSet({ [ctrl.brightnessProperty!]: val })}
-          label={<Sun className="h-3.5 w-3.5 text-sand-500" />}
+          label={<Sun className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
         />
       )}
 
       {ctrl.colorTempProperty && (
         <DebouncedSlider
           min={142} max={500}
-          serverValue={typeof device.state?.[ctrl.colorTempProperty] === "number" ? device.state[ctrl.colorTempProperty] as number : 370}
+          serverValue={serverColorTemp}
+          value={colorTemp}
+          onValueChange={setColorTemp}
           onCommit={(val) => onSet({ [ctrl.colorTempProperty!]: val })}
-          label={<Thermometer className="h-3.5 w-3.5 text-sand-500" />}
+          label={<Thermometer className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
         />
       )}
     </div>
@@ -371,7 +395,7 @@ function AutomationsView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-sand-500 py-12 justify-center">
+      <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading automations…
       </div>
@@ -381,8 +405,8 @@ function AutomationsView() {
   if (!automations || !Array.isArray(automations) || automations.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-sm text-sand-600">No automations configured.</p>
-        <p className="text-xs font-mono text-sand-400 mt-1">Use the CLI or API to create one.</p>
+        <p className="text-sm text-sand-700">No automations configured.</p>
+        <p className="text-xs font-mono text-sand-500 mt-1">Use the CLI or API to create one.</p>
       </div>
     );
   }
@@ -390,38 +414,39 @@ function AutomationsView() {
   return (
     <div className="flex flex-col gap-3">
       {automations.map((a) => (
-        <Card key={a.id} className={a.enabled ? "" : "opacity-40"}>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {/* Status dot */}
-                <div className={`h-2 w-2 rounded-full ${a.enabled ? "bg-teal-400" : "bg-sand-400"}`} />
-                <span className="text-sm font-medium text-sand-900">{a.name}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={a.enabled ? "success" : "muted"}>
-                  {a.enabled ? "Active" : "Off"}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-blood-300 hover:text-blood-600"
-                  onClick={() => deleteAuto.mutate(a.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+        <div
+          key={a.id}
+          className={`rounded-xl bg-sand-50 px-5 py-4 transition-opacity ${a.enabled ? "" : "opacity-40"}`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Status dot */}
+              <div className={`h-2 w-2 rounded-full ${a.enabled ? "bg-teal-400" : "bg-sand-400"}`} />
+              <span className="text-sm font-medium text-sand-900">{a.name}</span>
             </div>
-            <div className="flex gap-4 mt-2 ml-5">
-              <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
-                triggers: {a.triggers.map((t: { type: string }) => t.type).join(", ")}
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wider ${
+                a.enabled ? "bg-teal-50 text-teal-600" : "bg-sand-200 text-sand-500"
+              }`}>
+                {a.enabled ? "Active" : "Off"}
               </span>
-              <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
-                actions: {a.actions.map((act: { type: string }) => act.type).join(", ")}
-              </span>
+              <button
+                className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blood-300 hover:text-blood-500 hover:bg-sand-200 transition-colors cursor-pointer"
+                onClick={() => deleteAuto.mutate(a.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="flex gap-4 mt-2 ml-5">
+            <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
+              triggers: {a.triggers.map((t: { type: string }) => t.type).join(", ")}
+            </span>
+            <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
+              actions: {a.actions.map((act: { type: string }) => act.type).join(", ")}
+            </span>
+          </div>
+        </div>
       ))}
     </div>
   );
