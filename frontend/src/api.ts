@@ -105,6 +105,19 @@ export function useAutomations() {
   });
 }
 
+export function useUpdateAutomation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
+      const res = await api.api.automations[":id"].$put({ param: { id }, json: patch });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["automations"] });
+    },
+  });
+}
+
 export function useDeleteAutomation() {
   const qc = useQueryClient();
   return useMutation({

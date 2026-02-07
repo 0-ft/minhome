@@ -327,7 +327,7 @@ input[type="range"]:active::-webkit-slider-thumb {
   vertical-align: baseline !important;
   font-size: inherit !important;
   line-height: inherit !important;
-  padding: 0.05em 0.4em !important;
+  padding: 0 0.2em !important;
   border: none !important;
   background: rgba(255, 255, 255, 0.06) !important;
   text-shadow: none !important;

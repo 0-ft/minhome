@@ -122,6 +122,7 @@ export const AutomationsFileSchema = z.object({
 export type Automation = z.infer<typeof AutomationSchema>;
 export type Trigger = z.infer<typeof TriggerSchema>;
 export type Condition = z.infer<typeof ConditionSchema>;
+export type { Action };
 
 // --- Engine ---
 

@@ -19,7 +19,7 @@ const C = {
   desk: "#a69880",
   shelving: "#7d6f5c",
   drawers: "#9b8c76",
-  lightOff: "#666",
+  lightOff: "#3a3530",
 };
 
 export interface RoomLightDef {
@@ -179,26 +179,53 @@ function LightOrb({
     return { isOn: on, brightness: br, colorTemp: ct, stateProperty: ctrl.stateProperty };
   }, [device, light.entityId]);
 
-  const lightColor = useMemo(() => miredToColor(colorTemp), [colorTemp]);
+  const targetColor = useMemo(() => miredToColor(colorTemp), [colorTemp]);
   const normalizedBr = brightness / 254;
-  const intensity = isOn ? normalizedBr * 3 : 0;
-  const emissiveStr = isOn ? 0.6 + normalizedBr * 1.4 : 0;
+  const targetIntensity = isOn ? normalizedBr * 3 : 0;
+  const targetEmissive = isOn ? 0.6 + normalizedBr * 1.4 : 0;
+  const targetOpacity = isOn ? 0.92 : 0.55;
   const radius = light.type === "ceiling" ? 0.1 : 0.06;
 
-  // Gentle pulse when on + hover expand
+  // Smooth transition refs — lerp toward targets each frame (~150ms at 60fps)
+  const pointLightRef = useRef<THREE.PointLight>(null);
+  const curColor = useRef(isOn ? targetColor.clone() : new THREE.Color(C.lightOff));
+  const curIntensity = useRef(targetIntensity);
+  const curEmissive = useRef(targetEmissive);
+  const curOpacity = useRef(targetOpacity);
+  const LERP = 0.18;
+
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-    if (isOn) {
+
+    // Lerp color, intensity, emissive, opacity toward targets
+    const tgtCol = isOn ? targetColor : new THREE.Color(C.lightOff);
+    curColor.current.lerp(tgtCol, LERP);
+    curIntensity.current = THREE.MathUtils.lerp(curIntensity.current, targetIntensity, LERP);
+    curEmissive.current = THREE.MathUtils.lerp(curEmissive.current, targetEmissive, LERP);
+    curOpacity.current = THREE.MathUtils.lerp(curOpacity.current, targetOpacity, LERP);
+
+    // Apply to orb material
+    mat.color.copy(curColor.current);
+    if (curEmissive.current > 0.01) {
+      mat.emissive.copy(curColor.current);
       const pulse = 1 + Math.sin(clock.getElapsedTime() * 2) * 0.08;
-      mat.emissiveIntensity = emissiveStr * pulse;
+      mat.emissiveIntensity = curEmissive.current * pulse;
     } else {
+      mat.emissive.setScalar(0);
       mat.emissiveIntensity = 0;
     }
+    mat.opacity = curOpacity.current;
+
+    // Apply to point light
+    if (pointLightRef.current) {
+      pointLightRef.current.color.copy(curColor.current);
+      pointLightRef.current.intensity = curIntensity.current;
+    }
+
+    // Hover scale
     const targetScale = hovered.current ? 1.35 : 1;
-    const s = meshRef.current.scale.x;
-    const next = THREE.MathUtils.lerp(s, targetScale, 0.15);
-    meshRef.current.scale.setScalar(next);
+    meshRef.current.scale.setScalar(THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale, 0.15));
   });
 
   return (
@@ -211,13 +238,7 @@ function LightOrb({
         onPointerOut={() => { hovered.current = false; setShowLabel(false); document.body.style.cursor = ""; }}
       >
         <sphereGeometry args={[radius, 16, 16]} />
-        <meshStandardMaterial
-          color={isOn ? lightColor : C.lightOff}
-          emissive={isOn ? lightColor : new THREE.Color(0, 0, 0)}
-          emissiveIntensity={emissiveStr}
-          transparent
-          opacity={isOn ? 0.92 : 0.35}
-        />
+        <meshStandardMaterial transparent />
       </mesh>
 
       {/* Name label on hover */}
@@ -231,22 +252,20 @@ function LightOrb({
         </div>
       </Html>
 
-      {/* Point light */}
-      {isOn && (
-        <pointLight
-          color={lightColor}
-          intensity={intensity}
-          distance={light.type === "ceiling" ? 8 : 3.5}
-          decay={2}
-          castShadow
-          shadow-mapSize-width={512}
-          shadow-mapSize-height={512}
-          shadow-camera-near={0.1}
-          shadow-camera-far={10}
-          shadow-radius={8}
-          shadow-blurSamples={25}
-        />
-      )}
+      {/* Point light — always mounted so intensity can fade smoothly */}
+      <pointLight
+        ref={pointLightRef}
+        intensity={0}
+        distance={light.type === "ceiling" ? 8 : 3.5}
+        decay={2}
+        castShadow
+        shadow-mapSize-width={512}
+        shadow-mapSize-height={512}
+        shadow-camera-near={0.1}
+        shadow-camera-far={10}
+        shadow-radius={8}
+        shadow-blurSamples={25}
+      />
     </group>
   );
 }

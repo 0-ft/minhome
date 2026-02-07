@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { useChat } from "@ai-sdk/react";
-import { Send, X, Home, Loader2 } from "lucide-react";
+import { Send, X, Home, Loader2, Check } from "lucide-react";
 import type { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
 import { ToolCallPart } from "./ToolCallDisplay.js";
@@ -48,13 +48,24 @@ function FloatingMessage({ message }: { message: UIMessage }) {
             }
 
             if (part.type === "dynamic-tool") {
+              const tp = part as ToolPart;
+              const done = tp.state === "output-available";
+              const errored = tp.state === "output-error";
               return (
                 <div
                   key={i}
-                  className="flex items-center gap-1.5 text-xs text-sand-400/60 py-0.5 font-mono"
+                  className={`flex items-center gap-1.5 text-[12px] py-0.5 font-mono transition-opacity duration-300 ${
+                    done ? "text-sand-500/30" : errored ? "text-blood-400/70" : "text-sand-400/60"
+                  }`}
                 >
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-400/40 animate-pulse" />
-                  <span>{(part as ToolPart).toolName}</span>
+                  {done ? (
+                    <Check className="h-3 w-3 text-teal-400/50" />
+                  ) : errored ? (
+                    <X className="h-3 w-3 text-blood-400/70" />
+                  ) : (
+                    <Loader2 className="h-3 w-3 animate-spin text-teal-400/40" />
+                  )}
+                  <span>{tp.toolName}</span>
                 </div>
               );
             }

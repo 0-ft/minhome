@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    "./app": "./src/app.ts"
+    "./app": "./src/app.ts",
+    "./automations": "./src/automations.ts"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
