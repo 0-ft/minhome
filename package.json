@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @minhome/server --filter @minhome/frontend --parallel dev",
+    "dev:server": "pnpm --filter @minhome/server dev",
+    "dev:frontend": "pnpm --filter @minhome/frontend dev",
+    "build": "pnpm --filter @minhome/server build && pnpm --filter @minhome/frontend build",
+    "up": "docker compose up -d",
+    "up:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f"
+  }
+}
+

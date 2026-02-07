@@ -1,0 +1,21 @@
+{
+  "name": "@minhome/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "minhome": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@minhome/server": "workspace:*",
+    "commander": "^14.0.3",
+    "hono": "^4.11.8"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

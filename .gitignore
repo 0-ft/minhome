@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.venv/
+__pycache__/
+mosquitto/data/
+mosquitto/log/
+z2m-data/
