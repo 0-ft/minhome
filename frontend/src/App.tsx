@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRealtimeUpdates } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { MessageSquare } from "lucide-react";
+
+const MIN_CHAT_WIDTH = 300;
+const MAX_CHAT_WIDTH = 700;
+const DEFAULT_CHAT_WIDTH = 440;
 
 export function App() {
   useRealtimeUpdates();
@@ -11,6 +15,34 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(
     () => window.matchMedia("(min-width: 768px)").matches,
   );
+  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
+  const dragging = useRef(false);
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    const startX = e.clientX;
+    const startWidth = chatWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const delta = ev.clientX - startX;
+      setChatWidth(Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, startWidth + delta)));
+    };
+
+    const onUp = () => {
+      dragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [chatWidth]);
 
   return (
     <div className="h-screen flex flex-col bg-sand-100">
@@ -59,8 +91,13 @@ export function App() {
       {/* Body: optional chat pane + scrollable main content */}
       <div className="flex-1 flex min-h-0">
         {chatOpen && (
-          <aside className="shrink-0 w-[380px] border-r border-sand-300 shadow-lg">
+          <aside className="shrink-0 relative border-r border-sand-300 shadow-lg" style={{ width: chatWidth }}>
             <ChatPane onClose={() => setChatOpen(false)} />
+            {/* Resize handle */}
+            <div
+              onMouseDown={onResizeStart}
+              className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-teal-300/40 active:bg-teal-300/60 transition-colors z-10"
+            />
           </aside>
         )}
 

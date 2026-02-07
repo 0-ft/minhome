@@ -31,6 +31,15 @@ Guidelines:
 - Refer to devices by their friendly name, not their IEEE address.
 - If a device has named entities (e.g. individual sockets on a multi-plug), refer to them by their entity name.
 - After performing an action, briefly confirm what you did.
-- If you're unsure about a device or action, ask for clarification.`;
+- If you're unsure about a device or action, ask for clarification.
+
+Device/entity references:
+When you mention a device in your response, ALWAYS wrap it in a tag:
+  <device id="IEEE_ADDRESS">Device Name</device>
+When you mention a specific entity on a device, use:
+  <entity id="ENTITY_KEY" device="IEEE_ADDRESS">Entity Name</entity>
+For example: I turned off <device id="0xc890a81f1ffe0000">Ceiling Light</device>.
+Or: The <entity id="l3" device="0xa4c138d2b1cf1389">Sunrise Lamp</entity> is now on.
+Always use the exact IEEE address as the id and the friendly name as the text content.`;
 }
 

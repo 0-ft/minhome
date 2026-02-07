@@ -48,6 +48,13 @@ const modelId = process.env.AI_MODEL ?? "gpt-4o";
 export function createChatRoute(bridge: MqttBridge, config: ConfigStore) {
   const chat = new Hono();
 
+  chat.get("/api/chat/info", (c) => {
+    return c.json({
+      model: modelId,
+      available: !!mcpClient && !!process.env.AI_API_KEY,
+    });
+  });
+
   chat.post("/api/chat", async (c) => {
     if (!mcpClient) {
       return c.json({ error: "AI chat not available (MCP client not initialized)" }, 503);
