@@ -35,7 +35,7 @@ export function DebouncedSlider({ min, max, serverValue, onCommit, label, classN
   }, [localValue, onCommit]);
 
   return (
-    <div className={cn("flex items-center gap-2 flex-1", className)}>
+    <div className={cn("flex items-center gap-2.5 flex-1", className)}>
       {label && <span className="shrink-0 flex items-center">{label}</span>}
       <input
         type="range" min={min} max={max}
@@ -43,12 +43,9 @@ export function DebouncedSlider({ min, max, serverValue, onCommit, label, classN
         onChange={handleChange}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="flex-1 h-1.5 accent-primary bg-secondary rounded-full appearance-none cursor-pointer
-          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5
-          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-sm
-          [&::-webkit-slider-thumb]:cursor-pointer"
+        className="flex-1 cursor-pointer"
       />
-      <span className="text-[10px] text-muted-foreground tabular-nums w-6 text-right">{localValue}</span>
+      <span className="text-[10px] font-mono text-sand-500 tabular-nums w-7 text-right">{localValue}</span>
     </div>
   );
 }

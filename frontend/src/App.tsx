@@ -5,9 +5,9 @@ import { Button } from "./components/ui/button.js";
 import { Badge } from "./components/ui/badge.js";
 import { DebouncedSlider } from "./components/ui/slider.js";
 import { Input } from "./components/ui/input.js";
-import { Lightbulb, Plug, Power, Pencil, Check, Trash2, Thermometer, Sun, ChevronDown, Zap, Clock } from "lucide-react";
+import { Lightbulb, Plug, Power, Check, Trash2, Thermometer, Sun, ChevronRight, X } from "lucide-react";
 
-// --- Types for Z2M exposes ---
+// ── Types for Z2M exposes ───────────────────────────────
 
 interface Feature {
   access: number;
@@ -69,51 +69,51 @@ function extractControls(exposes: Expose[]): Control[] {
   return controls;
 }
 
-// --- App ---
+// ── App ─────────────────────────────────────────────────
 
 export function App() {
   useRealtimeUpdates();
   const [tab, setTab] = useState<"devices" | "automations">("devices");
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <header className="mb-8">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center">
-              <Zap className="h-4 w-4 text-primary" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight">Minhome</h1>
+    <div className="min-h-screen bg-sand-100">
+      {/* Header */}
+      <header className="bg-sand-50">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex items-end justify-between">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-sand-900">
+              minhome
+            </h1>
+            <p className="text-[11px] font-mono text-sand-500 mt-0.5">smart room control</p>
           </div>
-          <p className="text-xs text-muted-foreground ml-11">Smart room control</p>
 
-          <nav className="flex gap-1 mt-5 bg-secondary/50 rounded-lg p-1 w-fit">
-            <button
-              onClick={() => setTab("devices")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                tab === "devices" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Devices
-            </button>
-            <button
-              onClick={() => setTab("automations")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                tab === "automations" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Automations
-            </button>
+          <nav className="flex gap-0.5 bg-sand-200 rounded-lg p-0.5">
+            {(["devices", "automations"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-3.5 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                  tab === t
+                    ? "bg-blood-600 text-sand-50"
+                    : "text-sand-600 hover:text-sand-800 hover:bg-sand-300"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
           </nav>
-        </header>
+        </div>
+      </header>
 
+      {/* Content */}
+      <main className="max-w-5xl mx-auto px-6 py-8">
         {tab === "devices" ? <DevicesView /> : <AutomationsView />}
-      </div>
+      </main>
     </div>
   );
 }
 
-// --- Devices ---
+// ── Devices ─────────────────────────────────────────────
 
 function DevicesView() {
   const { data: devices, isLoading } = useDevices();
@@ -130,13 +130,26 @@ function DevicesView() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading devices...</p>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-sand-500 py-12 justify-center">
+        <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
+        Loading devices…
+      </div>
+    );
+  }
+
   if (!devices || !Array.isArray(devices) || devices.length === 0) {
-    return <p className="text-sm text-muted-foreground">No devices found.</p>;
+    return (
+      <div className="text-center py-16">
+        <p className="text-sm text-sand-600">No devices found.</p>
+        <p className="text-xs font-mono text-sand-400 mt-1">Pair Zigbee devices via Z2M to get started.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
       {(devices as DeviceData[]).map((d) => (
         <DeviceCard
           key={d.id}
@@ -166,53 +179,61 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
   const DeviceIcon = isLight ? Lightbulb : Plug;
 
   return (
-    <Card className={`transition-all ${anyOn ? "border-primary/30 shadow-primary/5 shadow-lg" : ""}`}>
+    <Card className={`transition-all duration-200 ${anyOn ? "bg-sand-50 ring-2 ring-teal-200" : ""}`}>
       <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-              anyOn ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Icon */}
+            <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+              anyOn ? "bg-teal-100 text-teal-600" : "bg-sand-200 text-sand-600"
             }`}>
               <DeviceIcon className="h-4 w-4" />
             </div>
+
+            {/* Name */}
             <div className="min-w-0">
               {editing ? (
                 <form
                   onSubmit={(e) => { e.preventDefault(); onRename(nameInput); setEditing(false); }}
-                  className="flex gap-1.5"
+                  className="flex gap-1.5 items-center"
                 >
                   <Input
                     value={nameInput}
                     onChange={e => setNameInput(e.target.value)}
-                    className="h-6 text-xs w-28"
+                    className="h-6 text-xs w-28 px-1.5"
                     autoFocus
+                    onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }}
                   />
                   <Button type="submit" size="icon" variant="ghost" className="h-6 w-6">
                     <Check className="h-3 w-3" />
                   </Button>
+                  <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditing(false)}>
+                    <X className="h-3 w-3" />
+                  </Button>
                 </form>
               ) : (
                 <CardTitle
-                  className="cursor-pointer hover:text-primary transition-colors truncate"
+                  className="cursor-pointer hover:text-blood-600 transition-colors truncate"
                   onClick={() => { setEditing(true); setNameInput(device.name); }}
                   title="Click to rename"
                 >
                   {device.name}
-                  <Pencil className="inline ml-1.5 h-2.5 w-2.5 opacity-0 group-hover:opacity-100 text-muted-foreground" />
                 </CardTitle>
               )}
-              <CardDescription className="truncate">
-                {device.vendor && device.model ? `${device.vendor} ${device.model}` : device.id}
+              <CardDescription>
+                {device.vendor && device.model ? `${device.vendor} · ${device.model}` : device.id}
               </CardDescription>
             </div>
           </div>
-          <Badge variant={anyOn ? "success" : "muted"} className="shrink-0 text-[10px]">
+
+          <Badge variant={anyOn ? "success" : "muted"}>
             {device.type}
           </Badge>
         </div>
       </CardHeader>
 
       <CardContent>
+        {/* Controls */}
         {controls.length > 0 ? (
           <div className="flex flex-col gap-2">
             {controls.map((ctrl) => (
@@ -226,25 +247,26 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">No controls available</p>
+          <p className="text-xs font-mono text-sand-500">No controls</p>
         )}
 
-        {/* Raw state collapsible */}
+        {/* Raw state */}
         {device.state && Object.keys(device.state).length > 0 && (
-          <div className="mt-3 pt-2 border-t border-border/50">
+          <div className="mt-4">
             <button
               onClick={() => setShowRaw(!showRaw)}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-[10px] font-mono text-sand-500 hover:text-sand-700 transition-colors cursor-pointer uppercase tracking-wider"
             >
-              <ChevronDown className={`h-3 w-3 transition-transform ${showRaw ? "rotate-180" : ""}`} />
-              Raw state
+              <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${showRaw ? "rotate-90" : ""}`} />
+              raw state
             </button>
             {showRaw && (
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+              <div className="mt-2 p-3 rounded-lg bg-sand-100 font-mono text-[10px] leading-relaxed">
                 {Object.entries(device.state).map(([k, v]) => (
-                  <span key={k} className="text-[10px] text-muted-foreground">
-                    {k}: <span className="text-foreground/80 font-medium">{String(v)}</span>
-                  </span>
+                  <div key={k} className="flex justify-between gap-3">
+                    <span className="text-sand-500">{k}</span>
+                    <span className="text-sand-800 font-medium">{String(v)}</span>
+                  </div>
                 ))}
               </div>
             )}
@@ -254,6 +276,8 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
     </Card>
   );
 }
+
+// ── Control Row ─────────────────────────────────────────
 
 function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
   ctrl: Control;
@@ -268,8 +292,11 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
   const [entityInput, setEntityInput] = useState(entityLabel ?? "");
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg bg-secondary/40 p-2.5">
-      <div className="flex items-center gap-2">
+    <div className={`flex flex-col gap-2 rounded-lg p-3 transition-colors ${
+      isOn ? "bg-teal-50" : "bg-sand-100"
+    }`}>
+      <div className="flex items-center gap-2.5">
+        {/* Entity label */}
         {endpoint && (
           editingEntity ? (
             <form
@@ -279,7 +306,7 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
               <Input
                 value={entityInput}
                 onChange={e => setEntityInput(e.target.value)}
-                className="h-5 text-[10px] w-20 px-1"
+                className="h-5 text-[10px] w-20 px-1 font-mono"
                 autoFocus
                 onBlur={() => setEditingEntity(false)}
                 onKeyDown={(e) => { if (e.key === "Escape") setEditingEntity(false); }}
@@ -290,7 +317,7 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
             </form>
           ) : (
             <span
-              className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider min-w-8 cursor-pointer hover:text-foreground transition-colors"
+              className="text-[10px] font-mono font-medium text-sand-700 uppercase tracking-wider min-w-8 cursor-pointer hover:text-blood-600 transition-colors"
               onClick={() => { setEntityInput(entityLabel ?? endpoint); setEditingEntity(true); }}
               title="Click to rename"
             >
@@ -298,6 +325,8 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
             </span>
           )
         )}
+
+        {/* Power toggle */}
         <Button
           variant={isOn ? "success" : "secondary"}
           size="sm"
@@ -305,16 +334,20 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
           className="gap-1.5"
         >
           <Power className="h-3 w-3" />
-          {isOn ? "ON" : "OFF"}
+          <span className="font-mono text-[10px] uppercase">{isOn ? "on" : "off"}</span>
         </Button>
+
+        {/* Status dot */}
+        <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-sand-400"}`} />
       </div>
 
+      {/* Sliders */}
       {ctrl.brightnessProperty && (
         <DebouncedSlider
           min={1} max={254}
           serverValue={typeof device.state?.[ctrl.brightnessProperty] === "number" ? device.state[ctrl.brightnessProperty] as number : 127}
           onCommit={(val) => onSet({ [ctrl.brightnessProperty!]: val })}
-          label={<Sun className="h-3 w-3 text-muted-foreground" />}
+          label={<Sun className="h-3.5 w-3.5 text-sand-500" />}
         />
       )}
 
@@ -323,62 +356,68 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
           min={142} max={500}
           serverValue={typeof device.state?.[ctrl.colorTempProperty] === "number" ? device.state[ctrl.colorTempProperty] as number : 370}
           onCommit={(val) => onSet({ [ctrl.colorTempProperty!]: val })}
-          label={<Thermometer className="h-3 w-3 text-muted-foreground" />}
+          label={<Thermometer className="h-3.5 w-3.5 text-sand-500" />}
         />
       )}
     </div>
   );
 }
 
-// --- Automations ---
+// ── Automations ─────────────────────────────────────────
 
 function AutomationsView() {
   const { data: automations, isLoading } = useAutomations();
   const deleteAuto = useDeleteAutomation();
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading automations...</p>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-sand-500 py-12 justify-center">
+        <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
+        Loading automations…
+      </div>
+    );
+  }
+
   if (!automations || !Array.isArray(automations) || automations.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-8 text-center">
-          <Clock className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">No automations configured.</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">Use the CLI or API to create one.</p>
-        </CardContent>
-      </Card>
+      <div className="text-center py-16">
+        <p className="text-sm text-sand-600">No automations configured.</p>
+        <p className="text-xs font-mono text-sand-400 mt-1">Use the CLI or API to create one.</p>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
       {automations.map((a) => (
-        <Card key={a.id} className={a.enabled ? "" : "opacity-50"}>
-          <CardContent className="py-3">
+        <Card key={a.id} className={a.enabled ? "" : "opacity-40"}>
+          <CardContent className="py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className={`h-2 w-2 rounded-full ${a.enabled ? "bg-success" : "bg-muted-foreground"}`} />
-                <span className="text-sm font-medium">{a.name}</span>
+              <div className="flex items-center gap-3">
+                {/* Status dot */}
+                <div className={`h-2 w-2 rounded-full ${a.enabled ? "bg-teal-400" : "bg-sand-400"}`} />
+                <span className="text-sm font-medium text-sand-900">{a.name}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={a.enabled ? "success" : "muted"}>
-                  {a.enabled ? "Active" : "Disabled"}
+                  {a.enabled ? "Active" : "Off"}
                 </Badge>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
+                  className="h-7 w-7 text-blood-300 hover:text-blood-600"
                   onClick={() => deleteAuto.mutate(a.id)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
-            <div className="flex gap-3 mt-2 ml-4.5">
-              <span className="text-[11px] text-muted-foreground">
-                Triggers: {a.triggers.map((t: { type: string }) => t.type).join(", ")}
+            <div className="flex gap-4 mt-2 ml-5">
+              <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
+                triggers: {a.triggers.map((t: { type: string }) => t.type).join(", ")}
               </span>
-              <span className="text-[11px] text-muted-foreground">
-                Actions: {a.actions.map((act: { type: string }) => act.type).join(", ")}
+              <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
+                actions: {a.actions.map((act: { type: string }) => act.type).join(", ")}
               </span>
             </div>
           </CardContent>
