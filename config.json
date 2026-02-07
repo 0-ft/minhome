@@ -1,7 +1,23 @@
 {
   "devices": {
     "0xa4c138d2b1cf1389": {
-      "name": "0xa4c138d2b1cf1389"
+      "name": "3x USB Plug",
+      "entities": {
+        "l3": "Sunrise Lamp"
+      }
+    },
+    "0x44e2f8fffe194350": {
+      "name": "Little Lamp"
+    },
+    "0xc890a81f1ffe0000": {
+      "name": "Ceiling Light"
+    },
+    "0xa4c13853da62641a": {
+      "name": "Welded Lamp"
+    },
+    "0x0cae5ffffe69064a": {
+      "name": "Desk Lamp",
+      "entities": {}
     }
   }
 }

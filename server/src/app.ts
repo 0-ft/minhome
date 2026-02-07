@@ -58,6 +58,11 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
       });
     })
 
+    .post("/api/devices/refresh", (c) => {
+      bridge.refreshStates();
+      return c.json({ ok: true });
+    })
+
     .post("/api/devices/:id/set",
       zValidator("json", z.record(z.string(), z.unknown())),
       (c) => {
@@ -90,6 +95,13 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
     // --- Automations ---
     .get("/api/automations", (c) => {
       return c.json(automations.getAll());
+    })
+
+    .get("/api/automations/:id", (c) => {
+      const id = c.req.param("id");
+      const a = automations.get(id);
+      if (!a) return c.json({ error: "Automation not found" }, 404);
+      return c.json(a);
     })
 
     .post("/api/automations",

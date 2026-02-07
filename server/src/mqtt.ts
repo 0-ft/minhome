@@ -26,6 +26,7 @@ export interface MqttBridge extends EventEmitter {
   states: Map<string, DeviceState>;
   publish(topic: string, payload: string): void;
   setDeviceState(deviceId: string, payload: Record<string, unknown>): void;
+  refreshStates(): void;
   destroy(): Promise<void>;
 }
 
@@ -56,6 +57,13 @@ export function createMqttBridge(mqttUrl: string, baseTopic = "zigbee2mqtt"): Mq
           devices.set(d.ieee_address, d);
         }
         emitter.emit("devices", list);
+
+        // Request current state for all non-coordinator devices
+        for (const d of list) {
+          if (d.type !== "Coordinator") {
+            client.publish(`${baseTopic}/${d.friendly_name}/get`, JSON.stringify({ state: "" }));
+          }
+        }
       } catch { /* ignore bad json */ }
       return;
     }
@@ -97,6 +105,14 @@ export function createMqttBridge(mqttUrl: string, baseTopic = "zigbee2mqtt"): Mq
 
   emitter.publish = (topic: string, payload: string) => {
     client.publish(topic, payload);
+  };
+
+  emitter.refreshStates = () => {
+    for (const d of devices.values()) {
+      if (d.type !== "Coordinator") {
+        client.publish(`${baseTopic}/${d.friendly_name}/get`, JSON.stringify({ state: "" }));
+      }
+    }
   };
 
   emitter.setDeviceState = (deviceId: string, payload: Record<string, unknown>) => {

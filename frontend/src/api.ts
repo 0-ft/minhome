@@ -18,6 +18,21 @@ export function useDevices() {
   });
 }
 
+/** Ask the server to query all devices for fresh state, then refetch */
+export function useRefreshStates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.api.devices.refresh.$post();
+      return res.json();
+    },
+    onSuccess: () => {
+      // Wait a moment for Z2M responses, then refetch
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["devices"] }), 1000);
+    },
+  });
+}
+
 export function useDevice(id: string) {
   return useQuery({
     queryKey: ["device", id],
@@ -46,6 +61,22 @@ export function useRenameDevice() {
   return useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
       const res = await api.api.devices[":id"].config.$put({ param: { id }, json: { name } });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["devices"] });
+    },
+  });
+}
+
+export function useRenameEntity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deviceId, entityId, name }: { deviceId: string; entityId: string; name: string }) => {
+      const res = await api.api.devices[":id"].config.$put({
+        param: { id: deviceId },
+        json: { entities: { [entityId]: name } },
+      });
       return res.json();
     },
     onSuccess: () => {

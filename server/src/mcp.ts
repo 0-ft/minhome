@@ -61,6 +61,24 @@ server.tool(
   },
 );
 
+server.tool(
+  "rename_entity",
+  "Set a friendly display name for a specific entity/endpoint within a device (e.g. one socket of a multi-socket smart plug)",
+  {
+    id: z.string().describe("Device IEEE address"),
+    entity_id: z.string().describe("Entity/endpoint identifier, e.g. 'l1', 'l2', 'l3'"),
+    name: z.string().describe("New display name for the entity"),
+  },
+  async ({ id, entity_id, name }) => {
+    const res = await api.api.devices[":id"].config.$put({
+      param: { id },
+      json: { entities: { [entity_id]: name } },
+    });
+    const body = await res.json();
+    return { content: [{ type: "text", text: JSON.stringify(body) }] };
+  },
+);
+
 server.tool("list_automations", "List all automation rules", {}, async () => {
   const res = await api.api.automations.$get();
   const automations = await res.json();

@@ -36,7 +36,12 @@ export class ConfigStore {
 
   setDevice(id: string, update: Partial<DeviceConfig>): void {
     const existing = this.data.devices[id] ?? {};
-    this.data.devices[id] = { ...existing, ...update };
+    this.data.devices[id] = {
+      ...existing,
+      ...update,
+      // Deep-merge entities so setting one doesn't wipe others
+      entities: { ...existing.entities, ...update.entities },
+    };
     this.save();
   }
 
