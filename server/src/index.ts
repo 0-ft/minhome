@@ -25,8 +25,7 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
   onFire: (id, trigger) => console.log(`[auto] ${id} fired by ${trigger}`),
 });
 
-const voiceOutputDir = resolve(DATA_DIR, "voice-recordings");
-const { app, injectWebSocket } = createApp(bridge, config, automationEngine, { voiceOutputDir });
+const { app, injectWebSocket } = createApp(bridge, config, automationEngine);
 
 // Mount in-process MCP server at /mcp (for Cursor IDE remote MCP)
 app.route("/", createMcpRoute({ bridge, config, automations: automationEngine }));
@@ -45,7 +44,7 @@ if (existsSync(frontendDist)) {
   app.use("/*", serveStatic({ root: frontendDist }));
   // SPA fallback: serve index.html for non-API, non-WS, non-MCP routes
   app.get("*", async (c, next) => {
-    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path === "/mcp") return next();
+    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path.startsWith("/audio/") || c.req.path === "/mcp") return next();
     return serveStatic({ root: frontendDist, path: "index.html" })(c, next);
   });
 }
@@ -60,6 +59,12 @@ if (process.env.AI_API_KEY) {
   console.log(`[server] AI chat enabled (model: ${process.env.AI_MODEL ?? "gpt-4o"})`);
 } else {
   console.log("[server] AI_API_KEY not set — AI chat disabled");
+}
+
+if (process.env.OPENAI_API_KEY) {
+  console.log("[server] OpenAI Realtime voice enabled");
+} else {
+  console.log("[server] OPENAI_API_KEY not set — Realtime voice disabled");
 }
 
 console.log("[server] MCP endpoint available at /mcp");

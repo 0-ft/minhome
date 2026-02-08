@@ -1,100 +1,39 @@
 /**
- * Voice module — handles incoming audio from the Voice PE bridge.
+ * Voice module — handles the bridge WebSocket connection and coordinates
+ * with the OpenAI Realtime session for speech-to-speech interaction.
  *
- * Provides a WebSocket endpoint at /ws/voice that receives:
- *   - JSON text messages: control events (voice_start, voice_end)
- *   - Binary messages: raw 16-bit PCM audio chunks (16 kHz, mono)
+ * Protocol (bridge → server):
+ *   - JSON: { type: "voice_start", conversation_id, wake_word }
+ *   - Binary: raw 24kHz 16-bit PCM audio chunks (resampled by bridge from 16kHz)
  *
- * Audio is accumulated per session and saved as a WAV file on completion.
+ * Protocol (server → bridge):
+ *   - JSON: { type: "speech_stopped" }
+ *   - JSON: { type: "tts_start", audio_path: "/audio/{sessionId}" }
+ *   - JSON: { type: "voice_done" }
  */
 
-import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { resolve } from "path";
+import { RealtimeSession, type RealtimeCallbacks } from "./voice-realtime.js";
+import type { ToolContext } from "./tools.js";
 
-// PCM format constants
-const SAMPLE_RATE = 16000;
-const BITS_PER_SAMPLE = 16;
-const NUM_CHANNELS = 1;
-const BYTES_PER_SAMPLE = BITS_PER_SAMPLE / 8;
+/** Registry of active audio streams for HTTP serving */
+export type AudioStreamRegistry = Map<string, ReadableStream<Uint8Array>>;
 
-export interface VoiceSession {
-  conversationId: string;
-  wakeWord: string;
-  startedAt: number;
-  chunks: Buffer[];
-  totalBytes: number;
-}
-
-export interface VoiceHandlers {
-  /** Called when a voice session starts (wake word detected on device). */
-  onSessionStart?: (session: VoiceSession) => void;
-  /** Called when a voice session ends (async — pipeline runs to completion). */
-  onSessionEnd?: (session: VoiceSession, wavPath: string) => void | Promise<void>;
-  /** Called on each audio chunk received. */
-  onAudioChunk?: (session: VoiceSession, chunk: Buffer) => void;
-}
-
-/**
- * Creates a WAV file header for raw PCM data.
- */
-export function createWavHeader(dataLength: number): Buffer {
-  const header = Buffer.alloc(44);
-
-  // RIFF header
-  header.write("RIFF", 0);
-  header.writeUInt32LE(36 + dataLength, 4); // file size - 8
-  header.write("WAVE", 8);
-
-  // fmt sub-chunk
-  header.write("fmt ", 12);
-  header.writeUInt32LE(16, 16); // sub-chunk size
-  header.writeUInt16LE(1, 20); // PCM format
-  header.writeUInt16LE(NUM_CHANNELS, 22);
-  header.writeUInt32LE(SAMPLE_RATE, 24);
-  header.writeUInt32LE(SAMPLE_RATE * NUM_CHANNELS * BYTES_PER_SAMPLE, 28); // byte rate
-  header.writeUInt16LE(NUM_CHANNELS * BYTES_PER_SAMPLE, 32); // block align
-  header.writeUInt16LE(BITS_PER_SAMPLE, 34);
-
-  // data sub-chunk
-  header.write("data", 36);
-  header.writeUInt32LE(dataLength, 40);
-
-  return header;
-}
-
-/**
- * Save accumulated PCM chunks as a WAV file.
- * Returns the path to the saved file.
- */
-function saveSessionAsWav(session: VoiceSession, outputDir: string): string {
-  if (!existsSync(outputDir)) {
-    mkdirSync(outputDir, { recursive: true });
-  }
-
-  const timestamp = new Date(session.startedAt).toISOString().replace(/[:.]/g, "-");
-  const filename = `voice-${timestamp}.wav`;
-  const filepath = resolve(outputDir, filename);
-
-  const pcmData = Buffer.concat(session.chunks);
-  const header = createWavHeader(pcmData.length);
-  const wavData = Buffer.concat([header, pcmData]);
-
-  writeFileSync(filepath, wavData);
-  return filepath;
+export interface VoiceWSOptions {
+  audioStreams: AudioStreamRegistry;
+  toolCtx: ToolContext;
 }
 
 /**
  * Create the voice WebSocket handler.
  * Returns an object compatible with Hono's upgradeWebSocket callback.
  */
-export function createVoiceWSHandler(outputDir: string, handlers?: VoiceHandlers) {
+export function createVoiceWSHandler(opts: VoiceWSOptions) {
   return () => {
-    let currentSession: VoiceSession | null = null;
-    // Store WS ref so we can send voice_done back to the bridge
-    let bridgeWs: { send: (data: string) => void } | null = null;
+    let bridgeWs: { send: (data: string | ArrayBuffer) => void } | null = null;
+    let activeSession: RealtimeSession | null = null;
 
     return {
-      onOpen(_evt: unknown, ws: { send: (data: string) => void }) {
+      onOpen(_evt: unknown, ws: { send: (data: string | ArrayBuffer) => void }) {
         console.log("[voice] Bridge connected");
         bridgeWs = ws;
       },
@@ -102,16 +41,14 @@ export function createVoiceWSHandler(outputDir: string, handlers?: VoiceHandlers
       onMessage(evt: { data: unknown }, _ws: unknown) {
         const { data } = evt;
 
-        // Binary message = audio chunk
+        // Binary message = audio chunk from bridge (24kHz PCM)
         if (data instanceof ArrayBuffer || Buffer.isBuffer(data)) {
-          if (!currentSession) {
-            console.warn("[voice] Received audio but no active session");
+          if (!activeSession) {
+            // No session yet — might be early audio before voice_start, ignore
             return;
           }
           const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data);
-          currentSession.chunks.push(chunk);
-          currentSession.totalBytes += chunk.length;
-          handlers?.onAudioChunk?.(currentSession, chunk);
+          activeSession.feedAudio(chunk);
           return;
         }
 
@@ -129,65 +66,58 @@ export function createVoiceWSHandler(outputDir: string, handlers?: VoiceHandlers
             case "voice_start": {
               const conversationId = String(msg.conversation_id ?? "");
               const wakeWord = String(msg.wake_word ?? "");
-              currentSession = {
-                conversationId,
-                wakeWord,
-                startedAt: Date.now(),
-                chunks: [],
-                totalBytes: 0,
+              console.log(
+                `[voice] Session starting — conversation=${conversationId} wake_word="${wakeWord}"`,
+              );
+
+              // Create a new Realtime session
+              const sessionId = conversationId || `voice-${Date.now()}`;
+              const callbacks: RealtimeCallbacks = {
+                onSpeechStopped: () => {
+                  console.log("[voice] → bridge: speech_stopped");
+                  bridgeWs?.send(JSON.stringify({ type: "speech_stopped" }));
+                },
+                onTtsStart: (audioPath: string) => {
+                  console.log(`[voice] → bridge: tts_start (${audioPath})`);
+                  bridgeWs?.send(JSON.stringify({ type: "tts_start", audio_path: audioPath }));
+                },
+                onVoiceDone: () => {
+                  console.log("[voice] → bridge: voice_done");
+                  bridgeWs?.send(
+                    JSON.stringify({ type: "voice_done", conversation_id: sessionId }),
+                  );
+                  // Clean up audio stream after a delay (give device time to finish fetching)
+                  setTimeout(() => {
+                    opts.audioStreams.delete(sessionId);
+                    console.log(`[voice] Cleaned up audio stream for ${sessionId}`);
+                  }, 30_000);
+                },
+                onError: (err: Error) => {
+                  console.error("[voice] Realtime session error:", err.message);
+                  // Send voice_done so the bridge doesn't hang
+                  bridgeWs?.send(
+                    JSON.stringify({ type: "voice_done", conversation_id: sessionId }),
+                  );
+                  opts.audioStreams.delete(sessionId);
+                },
               };
-              console.log(
-                `[voice] Session started — conversation=${conversationId} wake_word="${wakeWord}"`,
-              );
-              handlers?.onSessionStart?.(currentSession);
-              break;
-            }
 
-            case "voice_end": {
-              if (!currentSession) {
-                console.warn("[voice] voice_end but no active session");
-                break;
-              }
+              const session = new RealtimeSession(sessionId, callbacks, opts.toolCtx);
+              activeSession = session;
 
-              const durationSecs =
-                currentSession.totalBytes / (SAMPLE_RATE * BYTES_PER_SAMPLE);
-              console.log(
-                `[voice] Session ended — ${currentSession.totalBytes} bytes (~${durationSecs.toFixed(1)}s audio)`,
-              );
+              // Register the audio stream for HTTP serving
+              opts.audioStreams.set(sessionId, session.audioStream);
 
-              // Save WAV and run AI pipeline
-              if (currentSession.totalBytes > 0) {
-                const wavPath = saveSessionAsWav(currentSession, outputDir);
-                console.log(`[voice] Saved WAV: ${wavPath}`);
-                const session = currentSession;
-                // Run the async handler; when it completes, send voice_done
-                // back to the bridge so it can release the device from
-                // "thinking" state.
-                Promise.resolve(handlers?.onSessionEnd?.(session, wavPath))
-                  .then(() => {
-                    console.log(`[voice] Pipeline complete — sending voice_done`);
-                    bridgeWs?.send(
-                      JSON.stringify({
-                        type: "voice_done",
-                        conversation_id: session.conversationId,
-                      }),
-                    );
-                  })
-                  .catch((err) => {
-                    console.error("[voice] Pipeline error:", err);
-                    // Still send voice_done so the bridge doesn't hang
-                    bridgeWs?.send(
-                      JSON.stringify({
-                        type: "voice_done",
-                        conversation_id: session.conversationId,
-                      }),
-                    );
-                  });
-              } else {
-                console.log("[voice] No audio data received, skipping WAV save");
-              }
+              // Open the OpenAI Realtime connection
+              session.open().catch((err) => {
+                console.error("[voice] Failed to open Realtime session:", err);
+                bridgeWs?.send(
+                  JSON.stringify({ type: "voice_done", conversation_id: sessionId }),
+                );
+                opts.audioStreams.delete(sessionId);
+                activeSession = null;
+              });
 
-              currentSession = null;
               break;
             }
 
@@ -199,13 +129,10 @@ export function createVoiceWSHandler(outputDir: string, handlers?: VoiceHandlers
 
       onClose() {
         console.log("[voice] Bridge disconnected");
-        // If a session was in progress, save what we have
-        if (currentSession && currentSession.totalBytes > 0) {
-          const wavPath = saveSessionAsWav(currentSession, outputDir);
-          console.log(`[voice] Bridge disconnected mid-session — saved partial WAV: ${wavPath}`);
-          handlers?.onSessionEnd?.(currentSession, wavPath);
+        if (activeSession) {
+          activeSession.close();
+          activeSession = null;
         }
-        currentSession = null;
         bridgeWs = null;
       },
 

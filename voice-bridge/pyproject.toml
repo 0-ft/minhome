@@ -5,7 +5,7 @@ description = "Bridge between HA Voice PE (ESPHome) and minhome server"
 requires-python = ">=3.12"
 dependencies = [
     "aioesphomeapi>=43.14.0",
-    "pymicro-vad>=1.0.0",
+    "numpy>=2.0.0",
     "websockets>=16.0",
 ]
 

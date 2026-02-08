@@ -94,7 +94,13 @@ export function createTools(): Record<string, ToolDef> {
         entity: z.string().describe("Entity key, e.g. 'main' for single-entity devices, 'l1'/'l2'/'l3' for multi-entity"),
         payload: z.record(z.string(), z.unknown()).describe('Command payload with canonical property names, e.g. {"state":"ON","brightness":200}'),
       }),
-      execute: async ({ id, entity, payload }, { bridge }) => {
+      execute: async (args, { bridge }) => {
+        const { id, entity, payload: explicitPayload, ...rest } = args;
+        // AI sometimes flattens payload fields into top-level args — reconstruct payload
+        const payload = explicitPayload && typeof explicitPayload === "object"
+          ? explicitPayload as Record<string, unknown>
+          : Object.keys(rest).length > 0 ? rest : {};
+
         const device = bridge.devices.get(id);
         if (!device) throw new Error("Device not found");
 

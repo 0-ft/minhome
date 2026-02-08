@@ -280,7 +280,7 @@ export class AutomationEngine {
 
   private async fire(automation: Automation, triggeredBy: string): Promise<void> {
     // Evaluate conditions (AND)
-    for (const cond of automation.conditions) {
+    for (const cond of automation.conditions ?? []) {
       if (!this.evaluateCondition(cond)) return;
     }
 

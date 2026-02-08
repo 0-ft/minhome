@@ -43,6 +43,49 @@
           ]
         }
       ]
+    },
+    {
+      "id": "little-lamp-toggle",
+      "name": "Little Lamp Toggle 5s",
+      "enabled": true,
+      "triggers": [
+        {
+          "type": "interval",
+          "every": 5
+        }
+      ],
+      "actions": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "device_state",
+            "device": "0x44e2f8fffe194350",
+            "entity": "main",
+            "property": "state",
+            "equals": "OFF"
+          },
+          "then": [
+            {
+              "type": "device_set",
+              "device": "0x44e2f8fffe194350",
+              "entity": "main",
+              "payload": {
+                "state": "ON"
+              }
+            }
+          ],
+          "else": [
+            {
+              "type": "device_set",
+              "device": "0x44e2f8fffe194350",
+              "entity": "main",
+              "payload": {
+                "state": "OFF"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

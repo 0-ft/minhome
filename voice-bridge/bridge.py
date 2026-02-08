@@ -7,9 +7,9 @@ Protocol:
   1. Connect to Voice PE via ESPHome API (TCP:6053)
   2. Subscribe to voice assistant events
   3. On wake word → device streams audio over the API connection
-  4. Forward raw 16-bit PCM (16 kHz, mono) audio to minhome at ws://HOST:PORT/ws/voice
-  5. Use VAD (pymicro-vad) to detect end of speech and stop the pipeline
-  6. Send pipeline events back to device so its LEDs progress correctly
+  4. Forward resampled 24 kHz PCM audio to minhome at ws://HOST:PORT/ws/voice
+  5. Server manages OpenAI Realtime session, sends control events back
+  6. Bridge relays device LED events based on server messages
 """
 
 from __future__ import annotations
@@ -18,8 +18,9 @@ import asyncio
 import json
 import logging
 import os
-from dataclasses import dataclass, field
 from typing import Any
+
+import numpy as np
 
 from aioesphomeapi import (
     APIClient,
@@ -27,7 +28,6 @@ from aioesphomeapi import (
     VoiceAssistantAudioSettings,
     VoiceAssistantEventType,
 )
-from pymicro_vad import MicroVad
 
 from websockets.asyncio.client import connect as ws_connect
 
@@ -40,15 +40,10 @@ VOICE_PE_PASSWORD = os.environ.get("VOICE_PE_PASSWORD", "")
 VOICE_PE_NOISE_PSK = os.environ.get("VOICE_PE_NOISE_PSK", "")
 
 MINHOME_WS_URL = os.environ.get("MINHOME_WS_URL", "ws://localhost:3111/ws/voice")
+MINHOME_AUDIO_BASE_URL = os.environ.get("MINHOME_AUDIO_BASE_URL", "http://localhost:3111")
 
 # Max seconds of audio to capture per pipeline run (hard timeout)
-MAX_PIPELINE_DURATION = float(os.environ.get("MAX_PIPELINE_DURATION", "15"))
-
-# VAD configuration
-VAD_SPEECH_SECONDS = float(os.environ.get("VAD_SPEECH_SECONDS", "0.3"))
-VAD_SILENCE_SECONDS = float(os.environ.get("VAD_SILENCE_SECONDS", "0.7"))
-VAD_COMMAND_SECONDS = float(os.environ.get("VAD_COMMAND_SECONDS", "1.0"))
-VAD_TIMEOUT_SECONDS = float(os.environ.get("VAD_TIMEOUT_SECONDS", "15.0"))
+MAX_PIPELINE_DURATION = float(os.environ.get("MAX_PIPELINE_DURATION", "30"))
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
@@ -63,144 +58,20 @@ log = logging.getLogger("voice-bridge")
 
 
 # ---------------------------------------------------------------------------
-# Voice Activity Detection / Command Segmenter
+# Audio resampling helpers (16 kHz ↔ 24 kHz)
 # ---------------------------------------------------------------------------
-# Inspired by Home Assistant's VoiceCommandSegmenter.  Uses pymicro-vad for
-# speech probability and a simple state machine to detect when a voice command
-# starts and ends.
-#
-# States:
-#   WAITING  → accumulating speech_seconds of speech → IN_COMMAND
-#   IN_COMMAND → after command_seconds minimum, silence_seconds of silence → DONE
-#
-# pymicro-vad expects 10ms chunks (320 bytes = 160 int16 samples @ 16 kHz).
 
-VAD_CHUNK_BYTES = 320  # 10ms @ 16kHz 16-bit mono
-
-
-@dataclass
-class VoiceSegmenter:
-    """Detects the start and end of a voice command in a PCM audio stream."""
-
-    speech_seconds: float = 0.3
-    """Seconds of speech before voice command has started."""
-
-    silence_seconds: float = 0.7
-    """Seconds of silence after voice command has ended."""
-
-    command_seconds: float = 1.0
-    """Minimum number of seconds for a voice command (speech_seconds included)."""
-
-    timeout_seconds: float = 15.0
-    """Maximum number of seconds before timeout."""
-
-    before_command_threshold: float = 0.2
-    """Speech probability threshold before command starts."""
-
-    in_command_threshold: float = 0.5
-    """Speech probability threshold during command."""
-
-    reset_seconds: float = 1.0
-    """Seconds of opposite signal before resetting counters."""
-
-    # --- internal state ---
-    _vad: MicroVad = field(default_factory=MicroVad, repr=False)
-    _buf: bytearray = field(default_factory=bytearray, repr=False)
-    _in_command: bool = False
-    _timed_out: bool = False
-    _speech_left: float = 0.0
-    _silence_left: float = 0.0
-    _command_left: float = 0.0
-    _timeout_left: float = 0.0
-    _reset_left: float = 0.0
-
-    def __post_init__(self) -> None:
-        self.reset()
-
-    def reset(self) -> None:
-        """Reset all state for a new pipeline run."""
-        self._vad = MicroVad()
-        self._buf = bytearray()
-        self._in_command = False
-        self._timed_out = False
-        self._speech_left = self.speech_seconds
-        self._silence_left = self.silence_seconds
-        self._command_left = self.command_seconds - self.speech_seconds
-        self._timeout_left = self.timeout_seconds
-        self._reset_left = self.reset_seconds
-
-    @property
-    def in_command(self) -> bool:
-        return self._in_command
-
-    @property
-    def timed_out(self) -> bool:
-        return self._timed_out
-
-    def process(self, audio: bytes) -> bool:
-        """Feed raw PCM audio bytes.  Returns False when voice command is done."""
-        self._buf.extend(audio)
-
-        while len(self._buf) >= VAD_CHUNK_BYTES:
-            chunk = bytes(self._buf[:VAD_CHUNK_BYTES])
-            del self._buf[:VAD_CHUNK_BYTES]
-
-            speech_prob = self._vad.process_10ms(chunk)
-            if speech_prob < 0:
-                # VAD needs more audio to warm up
-                continue
-
-            if not self._process_chunk(0.01, speech_prob):
-                return False
-
-        return True
-
-    def _process_chunk(self, chunk_seconds: float, speech_prob: float) -> bool:
-        """Process a single 10ms chunk.  Returns False when command is done."""
-        # Hard timeout
-        self._timeout_left -= chunk_seconds
-        if self._timeout_left <= 0:
-            log.debug("VAD timeout after %.1fs", self.timeout_seconds)
-            self._timed_out = True
-            return False
-
-        if not self._in_command:
-            # --- Waiting for speech to start ---
-            is_speech = speech_prob > self.before_command_threshold
-            if is_speech:
-                self._reset_left = self.reset_seconds
-                self._speech_left -= chunk_seconds
-                if self._speech_left <= 0:
-                    self._in_command = True
-                    self._command_left = self.command_seconds - self.speech_seconds
-                    self._silence_left = self.silence_seconds
-                    log.info("VAD: voice command started")
-            else:
-                # Reset speech counter after enough silence
-                self._reset_left -= chunk_seconds
-                if self._reset_left <= 0:
-                    self._speech_left = self.speech_seconds
-                    self._reset_left = self.reset_seconds
-        else:
-            # --- Inside command, waiting for silence ---
-            is_speech = speech_prob > self.in_command_threshold
-            if not is_speech:
-                # Silence
-                self._reset_left = self.reset_seconds
-                self._silence_left -= chunk_seconds
-                self._command_left -= chunk_seconds
-                if self._silence_left <= 0 and self._command_left <= 0:
-                    log.info("VAD: voice command finished")
-                    return False
-            else:
-                # Speech — reset silence counter after enough continuous speech
-                self._command_left -= chunk_seconds
-                self._reset_left -= chunk_seconds
-                if self._reset_left <= 0:
-                    self._silence_left = self.silence_seconds
-                    self._reset_left = self.reset_seconds
-
-        return True
+def resample_16_to_24(pcm16: bytes) -> bytes:
+    """Resample 16-bit PCM from 16 kHz to 24 kHz (ratio 1.5) using linear interpolation."""
+    samples = np.frombuffer(pcm16, dtype=np.int16).astype(np.float32)
+    n_in = len(samples)
+    if n_in == 0:
+        return b""
+    n_out = int(n_in * 24000 / 16000)
+    x_in = np.arange(n_in)
+    x_out = np.linspace(0, n_in - 1, n_out)
+    resampled = np.interp(x_out, x_in, samples)
+    return resampled.clip(-32768, 32767).astype(np.int16).tobytes()
 
 
 # ---------------------------------------------------------------------------
@@ -223,8 +94,6 @@ class VoiceBridge:
         self._ws_lock = asyncio.Lock()
         self._ws_reader_task: asyncio.Task | None = None
         self._reconnect: ReconnectLogic | None = None
-        # Per-conversation events signalled when server sends voice_done
-        self._pipeline_done: dict[str, asyncio.Event] = {}
 
     # -- WebSocket to minhome --------------------------------------------------
 
@@ -260,14 +129,42 @@ class VoiceBridge:
                 if isinstance(raw, str):
                     msg = json.loads(raw)
                     msg_type = msg.get("type")
-                    if msg_type == "voice_done":
+
+                    if msg_type == "speech_stopped":
+                        # OpenAI detected end of speech → show "thinking" LEDs
+                        log.info("Server: speech_stopped → sending STT_VAD_END")
+                        self.cli.send_voice_assistant_event(
+                            VoiceAssistantEventType.VOICE_ASSISTANT_STT_VAD_END, {}
+                        )
+
+                    elif msg_type == "tts_start":
+                        # Server has audio ready → send TTS URL to device
+                        audio_path = msg.get("audio_path", "")
+                        audio_url = f"{MINHOME_AUDIO_BASE_URL}{audio_path}"
+                        log.info("Server: tts_start → sending TTS events (url=%s)", audio_url)
+
+                        # TTS_START triggers "replying" LEDs on the device
+                        self.cli.send_voice_assistant_event(
+                            VoiceAssistantEventType.VOICE_ASSISTANT_TTS_START,
+                            {"url": audio_url},
+                        )
+                        # TTS_END with URL triggers media_player to fetch and play
+                        self.cli.send_voice_assistant_event(
+                            VoiceAssistantEventType.VOICE_ASSISTANT_TTS_END,
+                            {"url": audio_url},
+                        )
+
+                    elif msg_type == "voice_done":
+                        # Server pipeline complete → return device to idle
                         conv_id = msg.get("conversation_id", "")
-                        log.info("Received voice_done for conversation=%s", conv_id)
-                        event = self._pipeline_done.get(conv_id)
-                        if event:
-                            event.set()
+                        log.info("Server: voice_done (conversation=%s) → sending RUN_END", conv_id)
+                        self.cli.send_voice_assistant_event(
+                            VoiceAssistantEventType.VOICE_ASSISTANT_RUN_END, {}
+                        )
+
                     else:
                         log.debug("WS message from server: %s", msg_type)
+
             except Exception as exc:
                 log.warning("WS reader error: %s", exc)
                 self._ws = None
@@ -288,8 +185,7 @@ class VoiceBridge:
         """Send binary data, skipping if no connection (non-blocking fast path)."""
         ws = self._ws
         if ws is None:
-            ws = await self._ensure_ws()
-        if ws is None:
+            # Don't try to reconnect on every audio chunk — just drop
             return
         try:
             await ws.send(data)
@@ -355,20 +251,14 @@ class VoiceBridge:
         self._audio_queue.put_nowait(None)
 
     async def _forward_audio(self, conversation_id: str) -> None:
-        """Read audio from the queue and forward to minhome over WebSocket.
+        """Read audio from the queue, resample 16kHz → 24kHz, and forward to minhome.
 
-        Uses VoiceSegmenter (pymicro-vad) to detect end of speech.
+        The server handles VAD via OpenAI's semantic_vad — we just stream audio
+        until the device stops or we hit the hard timeout.
         """
         total_bytes = 0
         deadline = asyncio.get_event_loop().time() + MAX_PIPELINE_DURATION
         stop_reason = "unknown"
-
-        segmenter = VoiceSegmenter(
-            speech_seconds=VAD_SPEECH_SECONDS,
-            silence_seconds=VAD_SILENCE_SECONDS,
-            command_seconds=VAD_COMMAND_SECONDS,
-            timeout_seconds=VAD_TIMEOUT_SECONDS,
-        )
 
         try:
             while True:
@@ -393,63 +283,18 @@ class VoiceBridge:
                     break
 
                 total_bytes += len(chunk)
-                await self._ws_send_binary(chunk)
 
-                # Run VAD on the chunk — returns False when command ends
-                if not segmenter.process(chunk):
-                    if segmenter.timed_out:
-                        stop_reason = f"VAD timeout ({VAD_TIMEOUT_SECONDS:.0f}s)"
-                    else:
-                        stop_reason = "VAD end-of-speech"
-                    break
+                # Resample 16kHz → 24kHz and send as binary
+                resampled = resample_16_to_24(chunk)
+                await self._ws_send_binary(resampled)
 
         except asyncio.CancelledError:
             stop_reason = "cancelled"
         finally:
             duration = total_bytes / (16000 * 2) if total_bytes else 0
             log.info(
-                "Audio done — %s — %d bytes (~%.1fs)",
+                "Audio forwarding done — %s — %d bytes (~%.1fs of 16kHz audio)",
                 stop_reason, total_bytes, duration,
-            )
-
-            # Signal device to show "thinking" LEDs.
-            # STT_VAD_END triggers the firmware's on_stt_vad_end handler which
-            # sets voice_assistant_phase = thinking_phase_id (2 LEDs blinking).
-            # This also transitions the C++ state from STREAMING_MICROPHONE →
-            # STOP_MICROPHONE → AWAITING_RESPONSE (after mic stops).
-            self.cli.send_voice_assistant_event(
-                VoiceAssistantEventType.VOICE_ASSISTANT_STT_VAD_END, {}
-            )
-
-            # Tell minhome the voice session has ended (triggers AI pipeline)
-            await self._ws_send_json({
-                "type": "voice_end",
-                "conversation_id": conversation_id,
-                "audio_bytes": total_bytes,
-            })
-
-            # Wait for the server to finish the AI pipeline (transcription +
-            # tool calls).  The server sends {"type":"voice_done"} when done.
-            # While we wait, the device stays in "thinking" LED state.
-            done_event = self._pipeline_done.setdefault(
-                conversation_id, asyncio.Event()
-            )
-            try:
-                log.info("Waiting for server pipeline to complete…")
-                await asyncio.wait_for(done_event.wait(), timeout=30)
-                log.info("Server pipeline complete")
-            except asyncio.TimeoutError:
-                log.warning(
-                    "Timed out waiting for pipeline completion (30s)"
-                )
-            finally:
-                self._pipeline_done.pop(conversation_id, None)
-
-            # By now the device has transitioned from STOP_MICROPHONE →
-            # AWAITING_RESPONSE (mic stop is fast, AI pipeline takes seconds).
-            # RUN_END handles AWAITING_RESPONSE → IDLE correctly.
-            self.cli.send_voice_assistant_event(
-                VoiceAssistantEventType.VOICE_ASSISTANT_RUN_END, {}
             )
 
     # -- Connection lifecycle --------------------------------------------------
@@ -484,6 +329,7 @@ class VoiceBridge:
     async def run(self) -> None:
         """Main entry point — connect and run forever."""
         log.info("Starting Voice Bridge → %s:%d", VOICE_PE_HOST, VOICE_PE_PORT)
+        log.info("Audio base URL: %s", MINHOME_AUDIO_BASE_URL)
 
         self._reconnect = ReconnectLogic(
             client=self.cli,

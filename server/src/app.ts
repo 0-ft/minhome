@@ -10,16 +10,15 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { createChatRoute } from "./chat/index.js";
 import { authMiddleware, authRoutes } from "./auth.js";
 import { buildDeviceResponse, type ToolContext } from "./tools.js";
-import { createVoiceWSHandler } from "./voice.js";
-import { processVoiceCommand } from "./voice-pipeline.js";
+import { createVoiceWSHandler, type AudioStreamRegistry } from "./voice.js";
 
-export interface CreateAppOptions {
-  voiceOutputDir?: string;
-}
-
-export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine, opts?: CreateAppOptions) {
+export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
   const app = new Hono();
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+
+  // Shared registry of active audio streams for voice response playback
+  const audioStreams: AudioStreamRegistry = new Map();
+  const toolCtx: ToolContext = { bridge, config, automations };
 
   // --- Auth (no-ops when AUTH_PASSWORD is unset) ---
   app.route("/", authRoutes());
@@ -241,13 +240,25 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
 
     // --- Voice Bridge WebSocket ---
     .get("/ws/voice", upgradeWebSocket(
-      createVoiceWSHandler(opts?.voiceOutputDir ?? "./voice-recordings", {
-        async onSessionEnd(session) {
-          const ctx: ToolContext = { bridge, config, automations };
-          await processVoiceCommand(session, ctx);
+      createVoiceWSHandler({ audioStreams, toolCtx })
+    ))
+
+    // --- Audio streaming for voice responses ---
+    .get("/audio/:sessionId", (c) => {
+      const sessionId = c.req.param("sessionId");
+      const stream = audioStreams.get(sessionId);
+      if (!stream) {
+        return c.json({ error: "Audio stream not found" }, 404);
+      }
+      console.log(`[audio] Device fetching audio for session ${sessionId}`);
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "audio/wav",
+          "Transfer-Encoding": "chunked",
+          "Cache-Control": "no-cache, no-store",
         },
-      })
-    ));
+      });
+    });
 
   return { app, injectWebSocket };
 }
