@@ -28,8 +28,8 @@ export interface VoiceSession {
 export interface VoiceHandlers {
   /** Called when a voice session starts (wake word detected on device). */
   onSessionStart?: (session: VoiceSession) => void;
-  /** Called when a voice session ends. Returns the path to the saved WAV. */
-  onSessionEnd?: (session: VoiceSession, wavPath: string) => void;
+  /** Called when a voice session ends (async — pipeline runs to completion). */
+  onSessionEnd?: (session: VoiceSession, wavPath: string) => void | Promise<void>;
   /** Called on each audio chunk received. */
   onAudioChunk?: (session: VoiceSession, chunk: Buffer) => void;
 }
@@ -90,13 +90,16 @@ function saveSessionAsWav(session: VoiceSession, outputDir: string): string {
 export function createVoiceWSHandler(outputDir: string, handlers?: VoiceHandlers) {
   return () => {
     let currentSession: VoiceSession | null = null;
+    // Store WS ref so we can send voice_done back to the bridge
+    let bridgeWs: { send: (data: string) => void } | null = null;
 
     return {
-      onOpen(_evt: unknown) {
+      onOpen(_evt: unknown, ws: { send: (data: string) => void }) {
         console.log("[voice] Bridge connected");
+        bridgeWs = ws;
       },
 
-      onMessage(evt: { data: unknown }) {
+      onMessage(evt: { data: unknown }, _ws: unknown) {
         const { data } = evt;
 
         // Binary message = audio chunk
@@ -152,11 +155,34 @@ export function createVoiceWSHandler(outputDir: string, handlers?: VoiceHandlers
                 `[voice] Session ended — ${currentSession.totalBytes} bytes (~${durationSecs.toFixed(1)}s audio)`,
               );
 
-              // Save WAV
+              // Save WAV and run AI pipeline
               if (currentSession.totalBytes > 0) {
                 const wavPath = saveSessionAsWav(currentSession, outputDir);
                 console.log(`[voice] Saved WAV: ${wavPath}`);
-                handlers?.onSessionEnd?.(currentSession, wavPath);
+                const session = currentSession;
+                // Run the async handler; when it completes, send voice_done
+                // back to the bridge so it can release the device from
+                // "thinking" state.
+                Promise.resolve(handlers?.onSessionEnd?.(session, wavPath))
+                  .then(() => {
+                    console.log(`[voice] Pipeline complete — sending voice_done`);
+                    bridgeWs?.send(
+                      JSON.stringify({
+                        type: "voice_done",
+                        conversation_id: session.conversationId,
+                      }),
+                    );
+                  })
+                  .catch((err) => {
+                    console.error("[voice] Pipeline error:", err);
+                    // Still send voice_done so the bridge doesn't hang
+                    bridgeWs?.send(
+                      JSON.stringify({
+                        type: "voice_done",
+                        conversation_id: session.conversationId,
+                      }),
+                    );
+                  });
               } else {
                 console.log("[voice] No audio data received, skipping WAV save");
               }
@@ -180,6 +206,7 @@ export function createVoiceWSHandler(outputDir: string, handlers?: VoiceHandlers
           handlers?.onSessionEnd?.(currentSession, wavPath);
         }
         currentSession = null;
+        bridgeWs = null;
       },
 
       onError(evt: unknown) {

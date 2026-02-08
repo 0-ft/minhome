@@ -242,11 +242,9 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
     // --- Voice Bridge WebSocket ---
     .get("/ws/voice", upgradeWebSocket(
       createVoiceWSHandler(opts?.voiceOutputDir ?? "./voice-recordings", {
-        onSessionEnd(session) {
+        async onSessionEnd(session) {
           const ctx: ToolContext = { bridge, config, automations };
-          processVoiceCommand(session, ctx).catch((err) =>
-            console.error("[voice] Pipeline error:", err),
-          );
+          await processVoiceCommand(session, ctx);
         },
       })
     ));

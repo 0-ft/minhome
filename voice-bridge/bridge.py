@@ -221,7 +221,10 @@ class VoiceBridge:
         self._audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
         self._ws: Any = None  # websockets connection
         self._ws_lock = asyncio.Lock()
+        self._ws_reader_task: asyncio.Task | None = None
         self._reconnect: ReconnectLogic | None = None
+        # Per-conversation events signalled when server sends voice_done
+        self._pipeline_done: dict[str, asyncio.Event] = {}
 
     # -- WebSocket to minhome --------------------------------------------------
 
@@ -235,10 +238,40 @@ class VoiceBridge:
             try:
                 self._ws = await ws_connect(MINHOME_WS_URL)
                 log.info("Connected to minhome WebSocket")
+                # Start background reader for server → bridge messages
+                if self._ws_reader_task is None or self._ws_reader_task.done():
+                    self._ws_reader_task = asyncio.get_running_loop().create_task(
+                        self._ws_reader()
+                    )
             except Exception as exc:
                 log.error("Failed to connect to minhome: %s", exc)
                 self._ws = None
             return self._ws
+
+    async def _ws_reader(self) -> None:
+        """Read incoming messages from the minhome WebSocket (server → bridge)."""
+        while True:
+            ws = self._ws
+            if ws is None:
+                await asyncio.sleep(1)
+                continue
+            try:
+                raw = await ws.recv()
+                if isinstance(raw, str):
+                    msg = json.loads(raw)
+                    msg_type = msg.get("type")
+                    if msg_type == "voice_done":
+                        conv_id = msg.get("conversation_id", "")
+                        log.info("Received voice_done for conversation=%s", conv_id)
+                        event = self._pipeline_done.get(conv_id)
+                        if event:
+                            event.set()
+                    else:
+                        log.debug("WS message from server: %s", msg_type)
+            except Exception as exc:
+                log.warning("WS reader error: %s", exc)
+                self._ws = None
+                await asyncio.sleep(1)
 
     async def _ws_send_json(self, msg: dict) -> None:
         ws = await self._ensure_ws()
@@ -379,20 +412,45 @@ class VoiceBridge:
                 stop_reason, total_bytes, duration,
             )
 
-            # Send RUN_END while device is still in STREAMING_MICROPHONE state.
-            # The C++ RUN_END handler transitions STREAMING_MICROPHONE → IDLE.
-            # (Sending STT_VAD_END first would put it in STOP_MICROPHONE, which
-            # RUN_END doesn't handle, leaving the device stuck.)
+            # Signal device to show "thinking" LEDs.
+            # STT_VAD_END triggers the firmware's on_stt_vad_end handler which
+            # sets voice_assistant_phase = thinking_phase_id (2 LEDs blinking).
+            # This also transitions the C++ state from STREAMING_MICROPHONE →
+            # STOP_MICROPHONE → AWAITING_RESPONSE (after mic stops).
             self.cli.send_voice_assistant_event(
-                VoiceAssistantEventType.VOICE_ASSISTANT_RUN_END, {}
+                VoiceAssistantEventType.VOICE_ASSISTANT_STT_VAD_END, {}
             )
 
-            # Tell minhome the voice session has ended
+            # Tell minhome the voice session has ended (triggers AI pipeline)
             await self._ws_send_json({
                 "type": "voice_end",
                 "conversation_id": conversation_id,
                 "audio_bytes": total_bytes,
             })
+
+            # Wait for the server to finish the AI pipeline (transcription +
+            # tool calls).  The server sends {"type":"voice_done"} when done.
+            # While we wait, the device stays in "thinking" LED state.
+            done_event = self._pipeline_done.setdefault(
+                conversation_id, asyncio.Event()
+            )
+            try:
+                log.info("Waiting for server pipeline to complete…")
+                await asyncio.wait_for(done_event.wait(), timeout=30)
+                log.info("Server pipeline complete")
+            except asyncio.TimeoutError:
+                log.warning(
+                    "Timed out waiting for pipeline completion (30s)"
+                )
+            finally:
+                self._pipeline_done.pop(conversation_id, None)
+
+            # By now the device has transitioned from STOP_MICROPHONE →
+            # AWAITING_RESPONSE (mic stop is fast, AI pipeline takes seconds).
+            # RUN_END handles AWAITING_RESPONSE → IDLE correctly.
+            self.cli.send_voice_assistant_event(
+                VoiceAssistantEventType.VOICE_ASSISTANT_RUN_END, {}
+            )
 
     # -- Connection lifecycle --------------------------------------------------
 
