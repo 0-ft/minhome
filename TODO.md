@@ -4,4 +4,6 @@
 - [ ] Better prompting for mood lighting + brightness calibration (per entity prompts)
 - [x] Room as config
 - [ ] Split config into files (room, devices, llm)
-- [ ] 
+- [ ] Extract logo to component
+- [ ] Server side chats
+- [ ] MCP for updating room

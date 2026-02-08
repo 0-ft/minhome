@@ -14,29 +14,10 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
-// ── Helpers ──────────────────────────────────────────────
-
-/** Check response status and throw with a descriptive message on failure. */
-async function assertOk(res: Response, action: string): Promise<void> {
-  if (!res.ok) {
-    let detail: string;
-    try {
-      const body = await res.json();
-      detail = typeof body === "object" && body !== null && "error" in body
-        ? String((body as Record<string, unknown>).error)
-        : JSON.stringify(body);
-    } catch {
-      detail = await res.text().catch(() => res.statusText);
-    }
-    throw new Error(`${action} failed (${res.status}): ${detail}`);
-  }
-}
-
 // --- Tools ---
 
 server.tool("list_devices", "List all Zigbee devices with their current state", {}, async () => {
   const res = await api.api.devices.$get();
-  await assertOk(res, "list_devices");
   const devices = await res.json();
   return { content: [{ type: "text", text: JSON.stringify(devices, null, 2) }] };
 });
@@ -47,7 +28,6 @@ server.tool(
   { id: z.string().describe("Device IEEE address, e.g. 0xa4c138d2b1cf1389") },
   async ({ id }) => {
     const res = await api.api.devices[":id"].$get({ param: { id } });
-    await assertOk(res, `get_device(${id})`);
     const device = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(device, null, 2) }] };
   },
@@ -62,7 +42,6 @@ server.tool(
   },
   async ({ id, payload }) => {
     const res = await api.api.devices[":id"].set.$post({ param: { id }, json: payload });
-    await assertOk(res, `control_device(${id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },
@@ -77,7 +56,6 @@ server.tool(
   },
   async ({ id, name }) => {
     const res = await api.api.devices[":id"].config.$put({ param: { id }, json: { name } });
-    await assertOk(res, `rename_device(${id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },
@@ -96,15 +74,49 @@ server.tool(
       param: { id },
       json: { entities: { [entity_id]: name } },
     });
-    await assertOk(res, `rename_entity(${id}/${entity_id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },
 );
 
+// --- Room config ---
+
+server.tool("get_room_config", "Read the current 3D room configuration (dimensions, furniture, lights). Always call this before update_room_config.", {}, async () => {
+  const res = await api.api.config.room.$get();
+  const body = await res.json();
+  return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
+});
+
+server.tool(
+  "update_room_config",
+  `Replace the entire 3D room configuration. IMPORTANT: always call get_room_config first so you have the current state, then send back the full config with your changes applied.
+
+The room config has this structure:
+- dimensions: { width, height, depth } in metres. x = west→east, y = up, z = north→south. Origin is NW corner at floor level.
+- floor: CSS colour string for the floor.
+- furniture: array of items, each with a "type" discriminator:
+    - "box": { position (centre), size [w,h,d], color, rotation? }
+    - "cylinder": { position (centre), radius, height, color, rotation? }
+    - "extrude": { position (base), points (2D polygon, min 3), depth, color, rotation? }
+- lights: array of { deviceId (IEEE address), entityId? (endpoint), position [x,y,z], type ("ceiling"|"desk"|"table"|"floor") }
+- camera: optional, will be preserved automatically — do not include it.
+
+All positions/sizes are in metres. Colours are CSS strings.`,
+  {
+    config: z.string().describe("Full room config as a JSON string. Must be valid against the room schema."),
+  },
+  async ({ config }) => {
+    const parsed = JSON.parse(config);
+    const res = await api.api.config.room.$put({ json: parsed });
+    const body = await res.json();
+    return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
+  },
+);
+
+// --- Automations ---
+
 server.tool("list_automations", "List all automation rules", {}, async () => {
   const res = await api.api.automations.$get();
-  await assertOk(res, "list_automations");
   const automations = await res.json();
   return { content: [{ type: "text", text: JSON.stringify(automations, null, 2) }] };
 });
@@ -115,7 +127,6 @@ server.tool(
   AutomationSchema.shape,
   async (automation) => {
     const res = await api.api.automations.$post({ json: automation });
-    await assertOk(res, "create_automation");
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
   },
@@ -130,7 +141,6 @@ server.tool(
   },
   async ({ id, ...patch }) => {
     const res = await api.api.automations[":id"].$put({ param: { id }, json: patch });
-    await assertOk(res, `update_automation(${id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
   },
@@ -142,7 +152,6 @@ server.tool(
   { id: z.string().describe("Automation ID") },
   async ({ id }) => {
     const res = await api.api.automations[":id"].$delete({ param: { id } });
-    await assertOk(res, `delete_automation(${id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },

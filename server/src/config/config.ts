@@ -62,6 +62,21 @@ export class ConfigStore {
     this.save();
   }
 
+  getRoom(): Config["room"] | undefined {
+    this.reload();
+    return this.data.room;
+  }
+
+  setRoom(room: z.infer<typeof RoomSchema>): void {
+    this.reload();
+    // Preserve camera if existing and not provided in the update
+    if (this.data.room?.camera && !room.camera) {
+      room.camera = this.data.room.camera;
+    }
+    this.data.room = room;
+    this.save();
+  }
+
   setRoomCamera(camera: { position: [number, number, number]; target: [number, number, number]; zoom: number }): void {
     this.reload();
     if (this.data.room) {

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { MqttBridge } from "./mqtt.js";
-import { CameraSchema } from "./config/config.js";
+import { CameraSchema, RoomSchema } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
@@ -96,6 +96,21 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
     .get("/api/config", (c) => {
       return c.json(config.get());
     })
+
+    .get("/api/config/room", (c) => {
+      const room = config.getRoom();
+      if (!room) return c.json({ error: "Room not configured" }, 404);
+      return c.json(room);
+    })
+
+    .put("/api/config/room",
+      zValidator("json", RoomSchema),
+      (c) => {
+        const room = c.req.valid("json");
+        config.setRoom(room);
+        return c.json({ ok: true });
+      },
+    )
 
     .put("/api/config/room/camera",
       zValidator("json", CameraSchema),
