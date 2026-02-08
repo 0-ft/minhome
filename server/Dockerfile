@@ -18,7 +18,7 @@ COPY server/src server/src
 COPY server/tsconfig.json server/
 COPY frontend/ frontend/
 
-# Build frontend
+# Build frontend only (server runs via tsx, no tsc build needed)
 RUN pnpm --filter @minhome/frontend build
 
 # Production stage
@@ -34,11 +34,12 @@ COPY --from=base /app/node_modules node_modules/
 COPY --from=base /app/server/node_modules server/node_modules/
 
 COPY --from=base /app/server/src server/src
+COPY --from=base /app/server/tsconfig.json server/
+COPY --from=base /app/tsconfig.base.json ./
 COPY --from=base /app/frontend/dist frontend/dist
 
 ENV NODE_ENV=production
 ENV PORT=3111
 EXPOSE 3111
 
-CMD ["pnpm", "--filter", "@minhome/server", "start"]
-
+CMD ["pnpm", "--filter", "@minhome/server", "dev"]
