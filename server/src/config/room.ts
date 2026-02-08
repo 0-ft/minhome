@@ -10,6 +10,7 @@ const Vec2 = z.tuple([z.number(), z.number()])
 
 const FurnitureBoxSchema = z.object({
   type: z.literal("box"),
+  name: z.string().optional().describe("Optional human-readable label for this piece, e.g. 'desk-top', 'shelf-3'. Useful for LLM comprehension."),
   position: Vec3.describe("Centre of the box [x, y, z] in metres."),
   rotation: Vec3.optional().describe("Euler rotation [rx, ry, rz] in radians. Optional, defaults to no rotation."),
   size: Vec3.describe("[width, height, depth] of the box in metres."),
@@ -18,6 +19,7 @@ const FurnitureBoxSchema = z.object({
 
 const FurnitureCylinderSchema = z.object({
   type: z.literal("cylinder"),
+  name: z.string().optional().describe("Optional human-readable label for this piece. Useful for LLM comprehension."),
   position: Vec3.describe("Centre of the cylinder [x, y, z] in metres."),
   rotation: Vec3.optional().describe("Euler rotation [rx, ry, rz] in radians. Optional, defaults to no rotation."),
   radius: z.number().describe("Radius of the cylinder in metres."),
@@ -27,6 +29,7 @@ const FurnitureCylinderSchema = z.object({
 
 const FurnitureExtrudeSchema = z.object({
   type: z.literal("extrude"),
+  name: z.string().optional().describe("Optional human-readable label for this piece. Useful for LLM comprehension."),
   position: Vec3.describe("Base position [x, y, z] of the extrusion in metres."),
   rotation: Vec3.optional().describe("Euler rotation [rx, ry, rz] in radians. Optional, defaults to no rotation."),
   points: z.array(Vec2).min(3).describe("Array of [x, y] 2D points defining the polygon cross-section to extrude. Minimum 3 points."),
@@ -34,11 +37,31 @@ const FurnitureExtrudeSchema = z.object({
   color: z.string().describe("CSS colour string, e.g. '#8b7355' or 'tan'."),
 }).describe("A polygon extruded along the Y axis — useful for irregular shapes like keyboard wedges or angled surfaces.");
 
+/** A single renderable furniture primitive (box, cylinder, or extrude). */
+export const FurniturePrimitiveSchema = z.discriminatedUnion("type", [
+  FurnitureBoxSchema,
+  FurnitureCylinderSchema,
+  FurnitureExtrudeSchema,
+]).describe("A single furniture primitive. Discriminated on 'type': 'box' (cuboid), 'cylinder', or 'extrude' (polygon extrusion).");
+
+export type FurniturePrimitive = z.infer<typeof FurniturePrimitiveSchema>;
+
+/** A named group of primitives that form one logical piece of furniture. */
+export const FurnitureGroupSchema = z.object({
+  type: z.literal("group"),
+  name: z.string().describe("Name of the furniture group, e.g. 'desk', 'shelving-unit-NE', 'bed'. Helps LLMs understand which primitives belong together."),
+  items: z.array(FurniturePrimitiveSchema).min(1).describe("The individual primitives that make up this piece of furniture."),
+}).describe("A named group of furniture primitives that form a single logical piece (e.g. a desk with legs, a shelving unit with posts and shelves). Flattened for rendering — the grouping is purely semantic.");
+
+export type FurnitureGroup = z.infer<typeof FurnitureGroupSchema>;
+
+/** A furniture entry is either a standalone primitive or a named group. */
 export const FurnitureItemSchema = z.discriminatedUnion("type", [
   FurnitureBoxSchema,
   FurnitureCylinderSchema,
   FurnitureExtrudeSchema,
-]).describe("A single furniture piece. Discriminated on 'type': 'box' (cuboid), 'cylinder', or 'extrude' (polygon extrusion).");
+  FurnitureGroupSchema,
+]).describe("A furniture entry: either a standalone primitive ('box', 'cylinder', 'extrude') or a 'group' of primitives forming one logical piece of furniture.");
 
 export type FurnitureItem = z.infer<typeof FurnitureItemSchema>;
 

@@ -6,4 +6,6 @@
 - [ ] Split config into files (room, devices, llm)
 - [ ] Extract logo to component
 - [ ] Server side chats
-- [ ] MCP for updating room
+- [x] MCP for updating room
+  - [x] Furniture groups
+- [ ] Device loading

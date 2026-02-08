@@ -6,8 +6,8 @@ import { RoomSchema } from "./room.js";
 // Re-export sub-module types for consumers
 export { DeviceConfigSchema } from "./devices.js";
 export type { DeviceConfig } from "./devices.js";
-export { RoomSchema, RoomDimensionsSchema, FurnitureItemSchema, RoomLightSchema, CameraSchema } from "./room.js";
-export type { RoomConfig, RoomDimensions, FurnitureItem, RoomLight, CameraConfig } from "./room.js";
+export { RoomSchema, RoomDimensionsSchema, FurniturePrimitiveSchema, FurnitureGroupSchema, FurnitureItemSchema, RoomLightSchema, CameraSchema } from "./room.js";
+export type { RoomConfig, RoomDimensions, FurniturePrimitive, FurnitureGroup, FurnitureItem, RoomLight, CameraConfig } from "./room.js";
 
 // ── Combined config ──────────────────────────────────────
 

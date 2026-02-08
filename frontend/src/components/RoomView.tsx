@@ -13,10 +13,14 @@ export interface RoomDimensions {
   depth: number;
 }
 
-export type FurnitureItem =
-  | { type: "box"; position: [number, number, number]; rotation?: [number, number, number]; size: [number, number, number]; color: string }
-  | { type: "cylinder"; position: [number, number, number]; rotation?: [number, number, number]; radius: number; height: number; color: string }
-  | { type: "extrude"; position: [number, number, number]; rotation?: [number, number, number]; points: [number, number][]; depth: number; color: string };
+export type FurniturePrimitive =
+  | { type: "box"; name?: string; position: [number, number, number]; rotation?: [number, number, number]; size: [number, number, number]; color: string }
+  | { type: "cylinder"; name?: string; position: [number, number, number]; rotation?: [number, number, number]; radius: number; height: number; color: string }
+  | { type: "extrude"; name?: string; position: [number, number, number]; rotation?: [number, number, number]; points: [number, number][]; depth: number; color: string };
+
+export type FurnitureGroup = { type: "group"; name: string; items: FurniturePrimitive[] };
+
+export type FurnitureItem = FurniturePrimitive | FurnitureGroup;
 
 export interface RoomLightDef {
   deviceId: string;
@@ -69,8 +73,8 @@ function Room({ dimensions, floorColor }: { dimensions: RoomDimensions; floorCol
   );
 }
 
-// ── Single furniture mesh from config ───────────────────
-function FurniturePiece({ item }: { item: FurnitureItem }) {
+// ── Single furniture primitive mesh ─────────────────────
+function FurniturePrimitiveMesh({ item }: { item: FurniturePrimitive }) {
   const rotation: [number, number, number] | undefined = item.rotation;
 
   switch (item.type) {
@@ -125,6 +129,20 @@ function FurniturePiece({ item }: { item: FurnitureItem }) {
       );
     }
   }
+}
+
+// ── Single furniture entry (primitive or group) ─────────
+function FurniturePiece({ item }: { item: FurnitureItem }) {
+  if (item.type === "group") {
+    return (
+      <group>
+        {item.items.map((child, i) => (
+          <FurniturePrimitiveMesh key={i} item={child} />
+        ))}
+      </group>
+    );
+  }
+  return <FurniturePrimitiveMesh item={item} />;
 }
 
 // ── All furniture from config ───────────────────────────

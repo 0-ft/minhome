@@ -29,310 +29,172 @@
     "floor": "#cdc0ae",
     "furniture": [
       {
-        "type": "box",
-        "position": [
-          0.75,
-          0.18,
-          1
-        ],
-        "size": [
-          1.5,
-          0.36,
-          2
-        ],
-        "color": "#8b7355"
+        "type": "group",
+        "name": "bed",
+        "items": [
+          {
+            "type": "box",
+            "name": "frame",
+            "position": [0.75, 0.18, 1],
+            "size": [1.5, 0.36, 2],
+            "color": "#8b7355"
+          },
+          {
+            "type": "box",
+            "name": "mattress",
+            "position": [0.75, 0.4, 1.05],
+            "size": [1.4, 0.1, 1.85],
+            "color": "#b8a690"
+          },
+          {
+            "type": "box",
+            "name": "headboard",
+            "position": [0.75, 0.5, 0.04],
+            "size": [1.5, 0.65, 0.06],
+            "color": "#8b7355"
+          }
+        ]
       },
       {
-        "type": "box",
-        "position": [
-          0.75,
-          0.4,
-          1.05
-        ],
-        "size": [
-          1.4,
-          0.1,
-          1.85
-        ],
-        "color": "#b8a690"
-      },
-      {
-        "type": "box",
-        "position": [
-          0.75,
-          0.5,
-          0.04
-        ],
-        "size": [
-          1.5,
-          0.65,
-          0.06
-        ],
-        "color": "#8b7355"
-      },
-      {
-        "type": "box",
-        "position": [
-          2.8,
-          0.73,
-          0.3
-        ],
-        "size": [
-          2,
-          0.04,
-          0.6
-        ],
-        "color": "#a69880"
-      },
-      {
-        "type": "cylinder",
-        "position": [
-          1.84,
-          0.355,
-          0.08
-        ],
-        "radius": 0.03,
-        "height": 0.71,
-        "color": "#a69880"
-      },
-      {
-        "type": "cylinder",
-        "position": [
-          1.84,
-          0.355,
-          0.52
-        ],
-        "radius": 0.03,
-        "height": 0.71,
-        "color": "#a69880"
-      },
-      {
-        "type": "box",
-        "position": [
-          3.6,
-          0.355,
-          0.285
-        ],
-        "size": [
-          0.4,
-          0.71,
-          0.57
-        ],
-        "color": "#9b8c76"
+        "type": "group",
+        "name": "desk",
+        "items": [
+          {
+            "type": "box",
+            "name": "top",
+            "position": [2.8, 0.73, 0.3],
+            "size": [2, 0.04, 0.6],
+            "color": "#a69880"
+          },
+          {
+            "type": "cylinder",
+            "name": "left-front-leg",
+            "position": [1.84, 0.355, 0.08],
+            "radius": 0.03,
+            "height": 0.71,
+            "color": "#a69880"
+          },
+          {
+            "type": "cylinder",
+            "name": "left-back-leg",
+            "position": [1.84, 0.355, 0.52],
+            "radius": 0.03,
+            "height": 0.71,
+            "color": "#a69880"
+          },
+          {
+            "type": "box",
+            "name": "right-drawer-unit",
+            "position": [3.6, 0.355, 0.285],
+            "size": [0.4, 0.71, 0.57],
+            "color": "#9b8c76"
+          }
+        ]
       },
       {
         "type": "extrude",
-        "position": [
-          2.745,
-          0.75,
-          0.22
-        ],
-        "rotation": [
-          0,
-          -1.5708,
-          0
-        ],
-        "points": [
-          [
-            0,
-            0
-          ],
-          [
-            0,
-            0.02
-          ],
-          [
-            0.12,
-            0.008
-          ],
-          [
-            0.12,
-            0
-          ]
-        ],
+        "name": "keyboard",
+        "position": [2.745, 0.75, 0.22],
+        "rotation": [0, -1.5708, 0],
+        "points": [[0, 0], [0, 0.02], [0.12, 0.008], [0.12, 0]],
         "depth": 0.36,
         "color": "#2a2a2a"
       },
       {
         "type": "box",
-        "position": [
-          2.565,
-          1.15,
-          0.015
-        ],
-        "size": [
-          0.53,
-          0.3,
-          0.03
-        ],
+        "name": "monitor",
+        "position": [2.565, 1.15, 0.015],
+        "size": [0.53, 0.3, 0.03],
         "color": "#1a1a1a"
       },
       {
-        "type": "box",
-        "position": [
-          4.565,
-          0.95,
-          0.02
-        ],
-        "size": [
-          0.03,
-          1.9,
-          0.03
-        ],
-        "color": "#7d6f5c"
+        "type": "group",
+        "name": "shelving-unit-NE",
+        "items": [
+          {
+            "type": "box",
+            "name": "post-front-left",
+            "position": [4.565, 0.95, 0.02],
+            "size": [0.03, 1.9, 0.03],
+            "color": "#7d6f5c"
+          },
+          {
+            "type": "box",
+            "name": "post-front-right",
+            "position": [5.385, 0.95, 0.02],
+            "size": [0.03, 1.9, 0.03],
+            "color": "#7d6f5c"
+          },
+          {
+            "type": "box",
+            "name": "post-back-left",
+            "position": [4.565, 0.95, 0.53],
+            "size": [0.03, 1.9, 0.03],
+            "color": "#7d6f5c"
+          },
+          {
+            "type": "box",
+            "name": "post-back-right",
+            "position": [5.385, 0.95, 0.53],
+            "size": [0.03, 1.9, 0.03],
+            "color": "#7d6f5c"
+          },
+          {
+            "type": "box",
+            "name": "shelf-1-bottom",
+            "position": [4.975, 0.03, 0.275],
+            "size": [0.85, 0.06, 0.55],
+            "color": "#7d6f5c"
+          },
+          {
+            "type": "box",
+            "name": "shelf-2",
+            "position": [4.975, 0.49, 0.275],
+            "size": [0.85, 0.06, 0.55],
+            "color": "#7d6f5c"
+          },
+          {
+            "type": "box",
+            "name": "shelf-3",
+            "position": [4.975, 0.95, 0.275],
+            "size": [0.85, 0.06, 0.55],
+            "color": "#7d6f5c"
+          },
+          {
+            "type": "box",
+            "name": "shelf-4",
+            "position": [4.975, 1.41, 0.275],
+            "size": [0.85, 0.06, 0.55],
+            "color": "#7d6f5c"
+          },
+          {
+            "type": "box",
+            "name": "shelf-5-top",
+            "position": [4.975, 1.87, 0.275],
+            "size": [0.85, 0.06, 0.55],
+            "color": "#7d6f5c"
+          }
+        ]
       },
       {
         "type": "box",
-        "position": [
-          5.385,
-          0.95,
-          0.02
-        ],
-        "size": [
-          0.03,
-          1.9,
-          0.03
-        ],
-        "color": "#7d6f5c"
-      },
-      {
-        "type": "box",
-        "position": [
-          4.565,
-          0.95,
-          0.53
-        ],
-        "size": [
-          0.03,
-          1.9,
-          0.03
-        ],
-        "color": "#7d6f5c"
-      },
-      {
-        "type": "box",
-        "position": [
-          5.385,
-          0.95,
-          0.53
-        ],
-        "size": [
-          0.03,
-          1.9,
-          0.03
-        ],
-        "color": "#7d6f5c"
-      },
-      {
-        "type": "box",
-        "position": [
-          4.975,
-          0.03,
-          0.275
-        ],
-        "size": [
-          0.85,
-          0.06,
-          0.55
-        ],
-        "color": "#7d6f5c"
-      },
-      {
-        "type": "box",
-        "position": [
-          4.975,
-          0.49,
-          0.275
-        ],
-        "size": [
-          0.85,
-          0.06,
-          0.55
-        ],
-        "color": "#7d6f5c"
-      },
-      {
-        "type": "box",
-        "position": [
-          4.975,
-          0.95,
-          0.275
-        ],
-        "size": [
-          0.85,
-          0.06,
-          0.55
-        ],
-        "color": "#7d6f5c"
-      },
-      {
-        "type": "box",
-        "position": [
-          4.975,
-          1.41,
-          0.275
-        ],
-        "size": [
-          0.85,
-          0.06,
-          0.55
-        ],
-        "color": "#7d6f5c"
-      },
-      {
-        "type": "box",
-        "position": [
-          4.975,
-          1.87,
-          0.275
-        ],
-        "size": [
-          0.85,
-          0.06,
-          0.55
-        ],
-        "color": "#7d6f5c"
-      },
-      {
-        "type": "box",
-        "position": [
-          2.7,
-          0.205,
-          2.805
-        ],
-        "size": [
-          0.77,
-          0.41,
-          0.39
-        ],
+        "name": "drawers-S",
+        "position": [2.7, 0.205, 2.805],
+        "size": [0.77, 0.41, 0.39],
         "color": "#9b8c76"
       },
       {
         "type": "box",
-        "position": [
-          2.115,
-          0.285,
-          2.825
-        ],
-        "size": [
-          0.4,
-          0.57,
-          0.35
-        ],
+        "name": "small-shelf-S",
+        "position": [2.115, 0.285, 2.825],
+        "size": [0.4, 0.57, 0.35],
         "color": "#7d6f5c"
       },
       {
         "type": "box",
-        "position": [
-          3.275,
-          0.005,
-          1.6
-        ],
-        "size": [
-          1.8,
-          0.01,
-          1.5
-        ],
+        "name": "rug",
+        "position": [3.275, 0.005, 1.6],
+        "size": [1.8, 0.01, 1.5],
         "color": "#b5a894"
       }
     ],

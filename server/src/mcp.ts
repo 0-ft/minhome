@@ -94,14 +94,17 @@ server.tool(
 The room config has this structure:
 - dimensions: { width, height, depth } in metres. x = west→east, y = up, z = north→south. Origin is NW corner at floor level.
 - floor: CSS colour string for the floor.
-- furniture: array of items, each with a "type" discriminator:
-    - "box": { position (centre), size [w,h,d], color, rotation? }
-    - "cylinder": { position (centre), radius, height, color, rotation? }
-    - "extrude": { position (base), points (2D polygon, min 3), depth, color, rotation? }
+- furniture: array of entries, each with a "type" discriminator:
+    Primitives (each has optional "name" for labelling):
+    - "box": { name?, position (centre), size [w,h,d], color, rotation? }
+    - "cylinder": { name?, position (centre), radius, height, color, rotation? }
+    - "extrude": { name?, position (base), points (2D polygon, min 3), depth, color, rotation? }
+    Group (collects related primitives into a named piece of furniture):
+    - "group": { name (required), items: [ ...primitives ] }
 - lights: array of { deviceId (IEEE address), entityId? (endpoint), position [x,y,z], type ("ceiling"|"desk"|"table"|"floor") }
 - camera: optional, will be preserved automatically — do not include it.
 
-All positions/sizes are in metres. Colours are CSS strings.`,
+All positions/sizes are in metres. Colours are CSS strings. Use groups to keep multi-part furniture (e.g. a desk with legs, a shelving unit) logically organised.`,
   {
     config: z.string().describe("Full room config as a JSON string. Must be valid against the room schema."),
   },
