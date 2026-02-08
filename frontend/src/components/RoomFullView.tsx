@@ -6,7 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import { Send, X, Home, Loader2, Check, Camera } from "lucide-react";
 import type { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
-import { ToolCallPart } from "./ToolCallDisplay.js";
+import { ToolCallPart, isToolPart, toolPartName } from "./ToolCallDisplay.js";
 import type { ToolPart } from "./ToolCallDisplay.js";
 import { Scene, useRoomData } from "./RoomView.js";
 import type { GetCameraState } from "./RoomView.js";
@@ -46,7 +46,7 @@ function FloatingMessage({ message }: { message: UIMessage }) {
               );
             }
 
-            if (part.type === "dynamic-tool") {
+            if (isToolPart(part)) {
               const tp = part as ToolPart;
               const done = tp.state === "output-available";
               const errored = tp.state === "output-error";
@@ -64,7 +64,7 @@ function FloatingMessage({ message }: { message: UIMessage }) {
                     ) : (
                       <Loader2 className="h-3 w-3 animate-spin text-teal-400/40" />
                     )}
-                    <span>{tp.toolName}</span>
+                    <span>{toolPartName(tp)}</span>
                   </div>
                   {errored && tp.errorText && (
                     <p className="text-[10px] text-blood-400/50 ml-[18px] truncate max-w-xs">{tp.errorText}</p>

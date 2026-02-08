@@ -9,9 +9,10 @@ import type { DeviceData } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────
 
+/** Covers both static (`tool-${name}`) and dynamic (`dynamic-tool`) UI parts. */
 export interface ToolPart {
-  type: "dynamic-tool";
-  toolName: string;
+  type: string;
+  toolName?: string; // present on dynamic-tool parts only
   toolCallId: string;
   state: string;
   input?: unknown;
@@ -22,6 +23,18 @@ export interface ToolPart {
 type ToolInput = Record<string, unknown>;
 
 // ── Helpers ──────────────────────────────────────────────
+
+/** Check whether a message part represents a tool call (static or dynamic). */
+export function isToolPart(part: { type: string }): boolean {
+  return part.type === "dynamic-tool" || part.type.startsWith("tool-");
+}
+
+/** Extract the tool name from either a static or dynamic tool part. */
+export function toolPartName(part: ToolPart): string {
+  if (part.type === "dynamic-tool") return part.toolName ?? "unknown";
+  if (part.type.startsWith("tool-")) return part.type.slice(5);
+  return "unknown";
+}
 
 function getInput(part: ToolPart): ToolInput {
   return (part.input && typeof part.input === "object" ? part.input : {}) as ToolInput;
@@ -171,8 +184,9 @@ function SimpleSummary({ icon: Icon, label }: { icon: React.ComponentType<{ clas
 
 function ToolSummary({ part, devices }: { part: ToolPart; devices?: DeviceData[] }) {
   const input = getInput(part);
+  const name = toolPartName(part);
 
-  switch (part.toolName) {
+  switch (name) {
     case "control_device":
       return <ControlDeviceSummary input={input} devices={devices} />;
     case "get_device":
@@ -195,7 +209,7 @@ function ToolSummary({ part, devices }: { part: ToolPart; devices?: DeviceData[]
       return (
         <span className="flex items-center gap-1.5">
           <Wrench className="h-3 w-3 text-sand-500" />
-          <span className="font-mono">{part.toolName}</span>
+          <span className="font-mono">{name}</span>
         </span>
       );
   }

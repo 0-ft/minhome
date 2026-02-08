@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Send, X, Loader2 } from "lucide-react";
 import type { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
-import { ToolCallPart } from "./ToolCallDisplay.js";
+import { ToolCallPart, isToolPart } from "./ToolCallDisplay.js";
+import type { ToolPart } from "./ToolCallDisplay.js";
 
 function useChatInfo() {
   return useQuery({
@@ -171,8 +172,8 @@ function MessageBubble({ message }: { message: UIMessage }) {
             );
           }
 
-          if (part.type === "dynamic-tool") {
-            return <ToolCallPart key={i} part={part} />;
+          if (isToolPart(part)) {
+            return <ToolCallPart key={i} part={part as ToolPart} />;
           }
 
           return null;
