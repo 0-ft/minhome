@@ -26,3 +26,4 @@
 - [ ] Config page: mqtt messages, mqtt pairing, config state, zigbee devices/state, voice devices+state
 - [ ] Auto find voice PE devices
 - [ ] Openai Realtime API
+- [ ] voice endpoint auth check

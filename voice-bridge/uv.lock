@@ -288,6 +288,16 @@ wheels = [
 ]
 
 [[package]]
+name = "pymicro-vad"
+version = "2.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/ac/fe480b37a6b3f6af5c0953aee980162a1ed27b8052bc2447aaffafa7f70f/pymicro_vad-2.0.1.tar.gz", hash = "sha256:51d188b3d02e5612a72f1c2a190d0c183daaeaf4bb012b83e1e458b9d104db8c", size = 137330, upload-time = "2025-12-16T22:42:50.349Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/c0/128e859c5fcdf2a1ff18df5ebfc3850d482e9157ec824b50e834d3916b15/pymicro_vad-2.0.1-cp39-abi3-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b9fc2876936d797c12942cb0ad53dad1fdbf3dd9ffbd747ff5abc52ef4572ee6", size = 324526, upload-time = "2025-12-16T22:42:47.607Z" },
+    { url = "https://files.pythonhosted.org/packages/67/f6/978aa8034b4d0b70faf0e518228357af897ffb588a894f78f7d82599d08f/pymicro_vad-2.0.1-cp39-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5f143eb8ced8606dcab6ac4fad96b2b51c66517a446261e092b59c792d747d67", size = 326501, upload-time = "2025-12-16T22:42:48.816Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -323,6 +333,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aioesphomeapi" },
+    { name = "pymicro-vad" },
     { name = "websockets" },
 ]
 
@@ -334,6 +345,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aioesphomeapi", specifier = ">=43.14.0" },
+    { name = "pymicro-vad", specifier = ">=1.0.0" },
     { name = "websockets", specifier = ">=16.0" },
 ]
 
