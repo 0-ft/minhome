@@ -2,41 +2,22 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { MqttBridge } from "./mqtt.js";
-import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, buildEntityResponses, resolveEntityPayload } from "./config/config.js";
+import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, resolveEntityPayload } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { createChatRoute } from "./chat/index.js";
-
-function buildDeviceResponse(bridge: MqttBridge, config: ConfigStore, id: string) {
-  const d = bridge.devices.get(id);
-  if (!d) return null;
-  const custom = config.getDevice(id);
-  const state = bridge.states.get(id) ?? {};
-  const exposes = d.definition?.exposes ?? [];
-  const extracted = extractEntitiesFromExposes(exposes);
-  const deviceName = custom?.name ?? d.friendly_name;
-  const entities = buildEntityResponses(extracted, deviceName, custom?.entities, state);
-
-  return {
-    id: d.ieee_address,
-    friendly_name: d.friendly_name,
-    name: deviceName,
-    entities,
-    type: d.type,
-    vendor: d.definition?.vendor ?? null,
-    model: d.definition?.model ?? null,
-    description: d.definition?.description ?? null,
-    supported: d.supported ?? false,
-    state,
-    exposes,
-  };
-}
+import { authMiddleware, authRoutes } from "./auth.js";
+import { buildDeviceResponse } from "./tools.js";
 
 export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
   const app = new Hono();
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+
+  // --- Auth (no-ops when AUTH_PASSWORD is unset) ---
+  app.route("/", authRoutes());
+  app.use("*", authMiddleware());
 
   // --- AI Chat ---
   app.route("/", createChatRoute(bridge, config, automations));

@@ -18,3 +18,4 @@
 - [ ] Types deduplication
 - [ ] Entity/device configurable icons
 - [ ] 404 route
+- [ ] MCP/prompts should not mention function e.g. zigbee mqtt

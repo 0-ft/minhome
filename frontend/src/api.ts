@@ -5,6 +5,50 @@ import { useEffect, useRef, useCallback } from "react";
 
 export const api = hc<AppType>("/");
 
+// --- Auth ---
+
+export function useAuthCheck() {
+  return useQuery({
+    queryKey: ["auth"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/check");
+      return res.json() as Promise<{ required: boolean; authenticated: boolean }>;
+    },
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+export function useLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (password: string) => {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) throw new Error("Invalid password");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+export function useLogout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await fetch("/api/auth/logout", { method: "POST" });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
 // --- Hooks ---
 
 export function useDevices() {

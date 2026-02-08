@@ -1,13 +1,14 @@
 import { useState, useCallback, useRef } from "react";
 import { useLocation, useNavigate, Routes, Route, Navigate, Link } from "react-router-dom";
-import { useRealtimeUpdates } from "./api.js";
+import { useRealtimeUpdates, useAuthCheck, useLogout } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
 import { EntitiesView } from "./components/EntitiesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { RoomView } from "./components/RoomView.js";
 import { RoomFullView } from "./components/RoomFullView.js";
 import { ChatPane } from "./components/ChatPane.js";
-import { MessageSquare } from "lucide-react";
+import { LoginPage } from "./components/LoginPage.js";
+import { MessageSquare, LogOut } from "lucide-react";
 import { Logo } from "./components/Logo.js";
 
 const TABS = ["entities", "devices", "automations", "room"] as const;
@@ -18,21 +19,36 @@ const MAX_CHAT_WIDTH = 700;
 const DEFAULT_CHAT_WIDTH = 440;
 
 export function App() {
+  const { data: auth, isLoading } = useAuthCheck();
+
+  // Still checking auth status
+  if (isLoading) return null;
+
+  // Auth required but not authenticated — show login
+  if (auth?.required && !auth.authenticated) {
+    return <LoginPage onSuccess={() => window.location.reload()} />;
+  }
+
+  return <AuthenticatedApp showLogout={auth?.required ?? false} />;
+}
+
+function AuthenticatedApp({ showLogout }: { showLogout: boolean }) {
   useRealtimeUpdates();
 
   return (
     <Routes>
       <Route path="/room-full" element={<RoomFullView />} />
       <Route path="/" element={<Navigate to="/entities" replace />} />
-      <Route path="/*" element={<MainLayout />} />
+      <Route path="/*" element={<MainLayout showLogout={showLogout} />} />
     </Routes>
   );
 }
 
-function MainLayout() {
+function MainLayout({ showLogout }: { showLogout: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const tab = (TABS.find((t) => location.pathname === `/${t}`) ?? "entities") as Tab;
+  const logout = useLogout();
   const [chatOpen, setChatOpen] = useState(
     () => window.matchMedia("(min-width: 768px)").matches,
   );
@@ -100,6 +116,16 @@ function MainLayout() {
             >
               <MessageSquare className="h-4 w-4" />
             </button>
+
+            {showLogout && (
+              <button
+                onClick={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+                className="p-2 rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </header>

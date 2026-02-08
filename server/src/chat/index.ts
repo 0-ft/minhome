@@ -1,39 +1,11 @@
 import { Hono } from "hono";
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from "ai";
+import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type Tool } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
-import { Experimental_StdioMCPTransport as StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import type { MqttBridge } from "../mqtt.js";
 import type { ConfigStore } from "../config/config.js";
 import type { AutomationEngine } from "../automations.js";
 import { buildSystemPrompt } from "./context.js";
-import { resolve } from "path";
-
-// ── MCP client singleton ──────────────────────────────────
-
-let mcpClient: MCPClient | null = null;
-
-export async function initMCPClient(): Promise<void> {
-  const mcpScript = resolve(import.meta.dirname, "../mcp.ts");
-  mcpClient = await createMCPClient({
-    transport: new StdioMCPTransport({
-      command: "tsx",
-      args: [mcpScript],
-      env: {
-        ...process.env as Record<string, string>,
-        MINHOME_URL: `http://localhost:${process.env.PORT ?? "3111"}`,
-      },
-    }),
-    name: "minhome-chat",
-  });
-  console.log("[chat] MCP client connected");
-}
-
-export async function destroyMCPClient(): Promise<void> {
-  await mcpClient?.close();
-  mcpClient = null;
-  console.log("[chat] MCP client closed");
-}
+import { createTools, type ToolContext } from "../tools.js";
 
 // ── Model configuration ───────────────────────────────────
 
@@ -48,49 +20,47 @@ const modelId = process.env.AI_MODEL ?? "gpt-4o";
 
 export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
   const chat = new Hono();
+  const ctx: ToolContext = { bridge, config, automations };
+
+  // Build AI SDK tools from shared definitions (direct in-process execution)
+  function buildAiTools(): Record<string, Tool> {
+    const defs = createTools();
+    return Object.fromEntries(
+      Object.entries(defs).map(([name, def]) => [
+        name,
+        {
+          description: def.description,
+          inputSchema: def.parameters,
+          execute: async (params: any) => JSON.stringify(await def.execute(params, ctx)),
+        } satisfies Tool,
+      ]),
+    );
+  }
 
   chat.get("/api/chat/info", (c) => {
     return c.json({
       model: modelId,
-      available: !!mcpClient && !!process.env.AI_API_KEY,
+      available: !!process.env.AI_API_KEY,
     });
   });
 
-  chat.get("/api/chat/debug", async (c) => {
+  chat.get("/api/chat/debug", (c) => {
     const system = buildSystemPrompt(bridge, config, automations);
-    const rawTools = mcpClient ? await mcpClient.tools() : {};
+    const defs = createTools();
 
-    // Extract tool definitions with their JSON schemas (stored in inputSchema)
     const toolDefs = Object.fromEntries(
-      Object.entries(rawTools).map(([name, tool]) => {
-        const t = tool as Record<string, unknown>;
-        return [name, {
-          description: t.description,
-          inputSchema: t.inputSchema,
-        }];
-      }),
+      Object.entries(defs).map(([name, def]) => [name, { description: def.description }]),
     );
-
-    const toolsJson = JSON.stringify(toolDefs, null, 2);
 
     return c.json({
       systemPromptChars: system.length,
-      toolDefinitionsChars: toolsJson.length,
-      totalChars: system.length + toolsJson.length,
       toolCount: Object.keys(toolDefs).length,
-      toolSizes: Object.fromEntries(
-        Object.entries(toolDefs).map(([name, def]) => [name, JSON.stringify(def).length]),
-      ),
+      tools: toolDefs,
       systemPrompt: system,
-      toolDefinitions: toolDefs,
     });
   });
 
   chat.post("/api/chat", async (c) => {
-    if (!mcpClient) {
-      return c.json({ error: "AI chat not available (MCP client not initialized)" }, 503);
-    }
-
     if (!process.env.AI_API_KEY) {
       return c.json({ error: "AI chat not configured (AI_API_KEY not set)" }, 503);
     }
@@ -98,39 +68,9 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automat
     const body = await c.req.json<{ messages: UIMessage[] }>();
     const { messages } = body;
 
-    const rawTools = await mcpClient.tools();
     const system = buildSystemPrompt(bridge, config, automations);
     const modelMessages = await convertToModelMessages(messages);
-
-    // Wrap tool execute functions to surface MCP `isError` as thrown errors.
-    // The @ai-sdk/mcp adapter returns MCP results (including isError: true)
-    // without throwing, so the AI SDK treats them as successes. Wrapping
-    // ensures the AI SDK creates proper tool-error parts for the frontend.
-    const tools = Object.fromEntries(
-      Object.entries(rawTools).map(([name, tool]) => {
-        if (!tool.execute) return [name, tool];
-        const origExecute = tool.execute.bind(tool);
-        return [name, {
-          ...tool,
-          execute: async (...args: Parameters<typeof origExecute>) => {
-            const result = await origExecute(...args);
-            if (result && typeof result === "object" && "isError" in result && (result as Record<string, unknown>).isError) {
-              // Extract error text from MCP content array
-              const content = (result as Record<string, unknown>).content;
-              let errorMsg = "Tool execution failed";
-              if (Array.isArray(content)) {
-                const texts = content
-                  .filter((p: unknown) => p && typeof p === "object" && (p as Record<string, unknown>).type === "text")
-                  .map((p: unknown) => (p as Record<string, string>).text);
-                if (texts.length > 0) errorMsg = texts.join("\n");
-              }
-              throw new Error(errorMsg);
-            }
-            return result;
-          },
-        }];
-      }),
-    );
+    const tools = buildAiTools();
 
     const result = streamText({
       model: openai.chat(modelId),
@@ -145,4 +85,3 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automat
 
   return chat;
 }
-

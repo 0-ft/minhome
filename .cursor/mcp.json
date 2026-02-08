@@ -1,12 +1,7 @@
 {
   "mcpServers": {
     "minhome": {
-      "command": "npx",
-      "args": ["tsx", "server/src/mcp.ts"],
-      "cwd": "/home/atlas/Desktop/minhome",
-      "env": {
-        "MINHOME_URL": "http://localhost:3111"
-      }
+      "url": "http://localhost:3111/mcp"
     }
   }
 }
