@@ -56,6 +56,36 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automat
     });
   });
 
+  chat.get("/api/chat/debug", async (c) => {
+    const system = buildSystemPrompt(bridge, config, automations);
+    const rawTools = mcpClient ? await mcpClient.tools() : {};
+
+    // Extract tool definitions with their JSON schemas (stored in inputSchema)
+    const toolDefs = Object.fromEntries(
+      Object.entries(rawTools).map(([name, tool]) => {
+        const t = tool as Record<string, unknown>;
+        return [name, {
+          description: t.description,
+          inputSchema: t.inputSchema,
+        }];
+      }),
+    );
+
+    const toolsJson = JSON.stringify(toolDefs, null, 2);
+
+    return c.json({
+      systemPromptChars: system.length,
+      toolDefinitionsChars: toolsJson.length,
+      totalChars: system.length + toolsJson.length,
+      toolCount: Object.keys(toolDefs).length,
+      toolSizes: Object.fromEntries(
+        Object.entries(toolDefs).map(([name, def]) => [name, JSON.stringify(def).length]),
+      ),
+      systemPrompt: system,
+      toolDefinitions: toolDefs,
+    });
+  });
+
   chat.post("/api/chat", async (c) => {
     if (!mcpClient) {
       return c.json({ error: "AI chat not available (MCP client not initialized)" }, 503);

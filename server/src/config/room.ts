@@ -1,12 +1,14 @@
 import { z } from "zod";
 
-// ── Furniture primitives ──────────────────────────────────
+// ── Shared vectors ────────────────────────────────────────
 
-const Vec3 = z.tuple([z.number(), z.number(), z.number()])
+const Vec3 = z.array(z.number()).length(3)
   .describe("[x, y, z] in metres. x = west→east, y = up, z = north→south. Origin is at the NW corner of the room at floor level.");
 
-const Vec2 = z.tuple([z.number(), z.number()])
+const Vec2 = z.array(z.number()).length(2)
   .describe("[x, y] 2D point in metres, used for extrude polygon cross-sections.");
+
+// ── Furniture primitives ──────────────────────────────────
 
 const FurnitureBoxSchema = z.object({
   type: z.literal("box"),

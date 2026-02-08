@@ -5,6 +5,7 @@ import { z } from "zod";
 import { hc } from "hono/client";
 import type { AppType } from "./app.js";
 import { AutomationSchema } from "./automations.js";
+import { RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema } from "./config/config.js";
 
 const BASE_URL = process.env.MINHOME_URL ?? "http://localhost:3111";
 const api = hc<AppType>(BASE_URL);
@@ -98,39 +99,82 @@ server.tool(
 );
 
 // --- Room config ---
+// Coordinate system: x = west→east, y = up, z = north→south. Origin at NW corner, floor level.
+// All positions/sizes in metres. Colours are CSS strings.
+// Furniture types: 'box' (position=centre, size=[w,h,d]), 'cylinder' (position=centre, radius, height),
+//   'extrude' (position=base, points=2D polygon, depth), 'group' (name + items array of primitives).
+// All have optional name, rotation ([rx,ry,rz] radians), and color fields.
 
-server.tool("get_room_config", "Read the current 3D room configuration (dimensions, furniture, lights). Always call this before update_room_config.", {}, async () => {
+server.tool("get_room_config", "Read the current 3D room configuration (dimensions, furniture, lights). Always call this before making changes.", {}, async () => {
   const res = await api.api.config.room.$get();
   const body = await res.json();
   return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
 });
 
 server.tool(
-  "update_room_config",
-  `Replace the entire 3D room configuration. IMPORTANT: always call get_room_config first so you have the current state, then send back the full config with your changes applied.
-
-The room config has this structure:
-- dimensions: { width, height, depth } in metres. x = west→east, y = up, z = north→south. Origin is NW corner at floor level.
-- floor: CSS colour string for the floor.
-- furniture: array of entries, each with a "type" discriminator:
-    Primitives (each has optional "name" for labelling):
-    - "box": { name?, position (centre), size [w,h,d], color, rotation? }
-    - "cylinder": { name?, position (centre), radius, height, color, rotation? }
-    - "extrude": { name?, position (base), points (2D polygon, min 3), depth, color, rotation? }
-    Group (collects related primitives into a named piece of furniture):
-    - "group": { name (required), items: [ ...primitives ] }
-- lights: array of { deviceId (IEEE address), entityId (entity key, e.g. 'main'), position [x,y,z], type ("ceiling"|"desk"|"table"|"floor") }
-- camera: optional, will be preserved automatically — do not include it.
-
-All positions/sizes are in metres. Colours are CSS strings. Use groups to keep multi-part furniture (e.g. a desk with legs, a shelving unit) logically organised.`,
+  "set_room_dimensions",
+  "Update room dimensions and/or floor colour. Only provided fields are changed.",
   {
-    config: z.string().describe("Full room config as a JSON string. Must be valid against the room schema."),
+    dimensions: RoomDimensionsSchema.optional().describe("Room bounding box {width, height, depth} in metres"),
+    floor: z.string().optional().describe("CSS floor colour"),
   },
-  async ({ config }) => {
-    const parsed = JSON.parse(config);
-    const res = await api.api.config.room.$put({ json: parsed });
+  async (params) => {
+    const res = await api.api.config.room.$patch({ json: params });
     const body = await res.json();
-    return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
+    return { content: [{ type: "text", text: JSON.stringify(body) }] };
+  },
+);
+
+server.tool(
+  "set_room_lights",
+  "Replace the room's light placements. Each light links to a device entity by IEEE address + entity key.",
+  {
+    lights: z.array(RoomLightSchema).describe("Full lights array — replaces existing"),
+  },
+  async ({ lights }) => {
+    const res = await api.api.config.room.$patch({ json: { lights } });
+    const body = await res.json();
+    return { content: [{ type: "text", text: JSON.stringify(body) }] };
+  },
+);
+
+server.tool(
+  "update_room_furniture",
+  "Replace the entire furniture array. Use get_room_config first, then send back the full modified array. For editing a single piece, prefer upsert_furniture_item instead.",
+  {
+    furniture: z.array(FurnitureItemSchema).describe("Full furniture array — replaces existing"),
+  },
+  async ({ furniture }) => {
+    const res = await api.api.config.room.$patch({ json: { furniture } });
+    const body = await res.json();
+    return { content: [{ type: "text", text: JSON.stringify(body) }] };
+  },
+);
+
+server.tool(
+  "upsert_furniture_item",
+  "Add or update a single named furniture item. Looks up by name and replaces it, or appends if not found. The item can be a primitive (box/cylinder/extrude) or a group of primitives.",
+  {
+    name: z.string().describe("Name of the furniture item to find and replace (or insert if new)"),
+    item: FurnitureItemSchema.describe("The furniture item data"),
+  },
+  async ({ name, item }) => {
+    const res = await api.api.config.room.furniture[":name"].$put({ param: { name }, json: item });
+    const body = await res.json();
+    return { content: [{ type: "text", text: JSON.stringify(body) }] };
+  },
+);
+
+server.tool(
+  "remove_furniture_item",
+  "Remove a furniture item by name.",
+  {
+    name: z.string().describe("Name of the furniture item to remove"),
+  },
+  async ({ name }) => {
+    const res = await api.api.config.room.furniture[":name"].$delete({ param: { name } });
+    const body = await res.json();
+    return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },
 );
 

@@ -160,6 +160,9 @@ export function useRealtimeUpdates() {
         if (msg.type === "state_change" || msg.type === "devices") {
           qc.invalidateQueries({ queryKey: ["devices"] });
         }
+        if (msg.type === "config_change") {
+          qc.invalidateQueries({ queryKey: ["config"] });
+        }
       } catch { /* ignore */ }
     };
 

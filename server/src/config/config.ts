@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { z } from "zod";
 import { DeviceConfigSchema, EntityConfigSchema, extractEntitiesFromExposes } from "./devices.js";
-import { RoomSchema } from "./room.js";
+import { RoomSchema, type FurnitureItem } from "./room.js";
 
 // Re-export sub-module types for consumers
 export { DeviceConfigSchema, EntityConfigSchema } from "./devices.js";
@@ -78,12 +78,63 @@ export class ConfigStore {
     this.save();
   }
 
-  setRoomCamera(camera: { position: [number, number, number]; target: [number, number, number]; zoom: number }): void {
+  setRoomCamera(camera: { position: number[]; target: number[]; zoom: number }): void {
     this.reload();
     if (this.data.room) {
       this.data.room.camera = camera;
       this.save();
     }
+  }
+
+  /**
+   * Merge partial room updates into the existing room config.
+   * Only provided fields are overwritten; others are preserved.
+   */
+  patchRoom(patch: Partial<Pick<z.infer<typeof RoomSchema>, "dimensions" | "floor" | "furniture" | "lights">>): void {
+    this.reload();
+    if (!this.data.room) {
+      throw new Error("Room not configured — use setRoom first");
+    }
+    if (patch.dimensions !== undefined) this.data.room.dimensions = patch.dimensions;
+    if (patch.floor !== undefined) this.data.room.floor = patch.floor;
+    if (patch.furniture !== undefined) this.data.room.furniture = patch.furniture;
+    if (patch.lights !== undefined) this.data.room.lights = patch.lights;
+    this.save();
+  }
+
+  /**
+   * Find a furniture item by name and replace it, or append if not found.
+   * For groups, matches on the group `name`. For primitives, matches on the optional `name` field.
+   */
+  upsertFurniture(name: string, item: FurnitureItem): void {
+    this.reload();
+    if (!this.data.room) {
+      throw new Error("Room not configured — use setRoom first");
+    }
+    const idx = this.data.room.furniture.findIndex(
+      (f) => ("name" in f && f.name === name),
+    );
+    if (idx >= 0) {
+      this.data.room.furniture[idx] = item;
+    } else {
+      this.data.room.furniture.push(item);
+    }
+    this.save();
+  }
+
+  /**
+   * Remove a furniture item by name. Returns true if found and removed.
+   */
+  removeFurniture(name: string): boolean {
+    this.reload();
+    if (!this.data.room) return false;
+    const idx = this.data.room.furniture.findIndex(
+      (f) => ("name" in f && f.name === name),
+    );
+    if (idx < 0) return false;
+    this.data.room.furniture.splice(idx, 1);
+    this.save();
+    return true;
   }
 
   /**

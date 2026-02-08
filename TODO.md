@@ -10,5 +10,5 @@
   - [x] Furniture groups
 - [ ] Device loading
 - [ ] ZigBee pairing
-- [ ] Room config MCP uses raw JSON
-- [ ] 
+- [x] Room config MCP uses raw JSON
+- [x] Room config live updates

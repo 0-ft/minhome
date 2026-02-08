@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { MqttBridge } from "./mqtt.js";
-import { CameraSchema, RoomSchema, EntityConfigSchema, extractEntitiesFromExposes, buildEntityResponses, resolveEntityPayload } from "./config/config.js";
+import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, buildEntityResponses, resolveEntityPayload } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
@@ -124,6 +124,7 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
       (c) => {
         const room = c.req.valid("json");
         config.setRoom(room);
+        bridge.emit("config_change");
         return c.json({ ok: true });
       },
     )
@@ -136,6 +137,48 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
         return c.json({ ok: true });
       },
     )
+
+    .patch("/api/config/room",
+      zValidator("json", z.object({
+        dimensions: RoomDimensionsSchema.optional(),
+        floor: z.string().optional(),
+        furniture: z.array(FurnitureItemSchema).optional(),
+        lights: z.array(RoomLightSchema).optional(),
+      })),
+      (c) => {
+        const patch = c.req.valid("json");
+        try {
+          config.patchRoom(patch);
+          bridge.emit("config_change");
+          return c.json({ ok: true });
+        } catch (e: unknown) {
+          return c.json({ error: (e as Error).message }, 400);
+        }
+      },
+    )
+
+    .put("/api/config/room/furniture/:name",
+      zValidator("json", FurnitureItemSchema),
+      (c) => {
+        const name = c.req.param("name");
+        const item = c.req.valid("json");
+        try {
+          config.upsertFurniture(name, item);
+          bridge.emit("config_change");
+          return c.json({ ok: true });
+        } catch (e: unknown) {
+          return c.json({ error: (e as Error).message }, 400);
+        }
+      },
+    )
+
+    .delete("/api/config/room/furniture/:name", (c) => {
+      const name = c.req.param("name");
+      const removed = config.removeFurniture(name);
+      if (!removed) return c.json({ error: "Furniture not found" }, 404);
+      bridge.emit("config_change");
+      return c.json({ ok: true });
+    })
 
     // --- Automations ---
     .get("/api/automations", (c) => {
@@ -189,14 +232,17 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
           const onStateChange = (data: unknown) => ws.send(JSON.stringify({ type: "state_change", data }));
           const onDevices = (data: unknown) => ws.send(JSON.stringify({ type: "devices", data }));
           const onAutoFire = (id: string, trigger: string) => ws.send(JSON.stringify({ type: "automation_fired", id, trigger }));
+          const onConfigChange = () => ws.send(JSON.stringify({ type: "config_change" }));
 
           bridge.on("state_change", onStateChange);
           bridge.on("devices", onDevices);
+          bridge.on("config_change", onConfigChange);
 
           // Store cleanup refs on the ws object
           (ws as unknown as Record<string, unknown>).__cleanup = () => {
             bridge.off("state_change", onStateChange);
             bridge.off("devices", onDevices);
+            bridge.off("config_change", onConfigChange);
           };
         },
         onClose(_evt, ws) {
