@@ -9,8 +9,9 @@ import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { createChatRoute } from "./chat/index.js";
 import { authMiddleware, authRoutes } from "./auth.js";
-import { buildDeviceResponse } from "./tools.js";
+import { buildDeviceResponse, type ToolContext } from "./tools.js";
 import { createVoiceWSHandler } from "./voice.js";
+import { processVoiceCommand } from "./voice-pipeline.js";
 
 export interface CreateAppOptions {
   voiceOutputDir?: string;
@@ -240,7 +241,14 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
 
     // --- Voice Bridge WebSocket ---
     .get("/ws/voice", upgradeWebSocket(
-      createVoiceWSHandler(opts?.voiceOutputDir ?? "./voice-recordings")
+      createVoiceWSHandler(opts?.voiceOutputDir ?? "./voice-recordings", {
+        onSessionEnd(session) {
+          const ctx: ToolContext = { bridge, config, automations };
+          processVoiceCommand(session, ctx).catch((err) =>
+            console.error("[voice] Pipeline error:", err),
+          );
+        },
+      })
     ));
 
   return { app, injectWebSocket };

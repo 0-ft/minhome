@@ -1,41 +1,17 @@
 import { Hono } from "hono";
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage, type Tool } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from "ai";
 import type { MqttBridge } from "../mqtt.js";
 import type { ConfigStore } from "../config/config.js";
 import type { AutomationEngine } from "../automations.js";
 import { buildSystemPrompt } from "./context.js";
 import { createTools, type ToolContext } from "../tools.js";
-
-// ── Model configuration ───────────────────────────────────
-
-const openai = createOpenAI({
-  apiKey: process.env.AI_API_KEY ?? "",
-  baseURL: process.env.AI_BASE_URL, // undefined = default OpenAI
-});
-
-const modelId = process.env.AI_MODEL ?? "gpt-4o";
+import { openai, modelId, buildAiTools } from "./ai.js";
 
 // ── Chat route ────────────────────────────────────────────
 
 export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
   const chat = new Hono();
   const ctx: ToolContext = { bridge, config, automations };
-
-  // Build AI SDK tools from shared definitions (direct in-process execution)
-  function buildAiTools(): Record<string, Tool> {
-    const defs = createTools();
-    return Object.fromEntries(
-      Object.entries(defs).map(([name, def]) => [
-        name,
-        {
-          description: def.description,
-          inputSchema: def.parameters,
-          execute: async (params: any) => JSON.stringify(await def.execute(params, ctx)),
-        } satisfies Tool,
-      ]),
-    );
-  }
 
   chat.get("/api/chat/info", (c) => {
     return c.json({
@@ -70,7 +46,7 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automat
 
     const system = buildSystemPrompt(bridge, config, automations);
     const modelMessages = await convertToModelMessages(messages);
-    const tools = buildAiTools();
+    const tools = buildAiTools(ctx);
 
     const result = streamText({
       model: openai.chat(modelId),

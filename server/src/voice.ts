@@ -37,7 +37,7 @@ export interface VoiceHandlers {
 /**
  * Creates a WAV file header for raw PCM data.
  */
-function createWavHeader(dataLength: number): Buffer {
+export function createWavHeader(dataLength: number): Buffer {
   const header = Buffer.alloc(44);
 
   // RIFF header
