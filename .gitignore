@@ -7,3 +7,5 @@ mosquitto/data/
 mosquitto/log/
 z2m-data/
 .env
+.pnpm-store
+.vscode

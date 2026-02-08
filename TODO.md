@@ -17,5 +17,8 @@
 - [ ] Sensors
 - [ ] Types deduplication
 - [ ] Entity/device configurable icons
-- [ ] 404 route
+- [x] 404 route
 - [ ] MCP/prompts should not mention function e.g. zigbee mqtt
+- [ ] Configurable models/API keys
+- [ ] Configurable tunnel
+- [ ] How are crons managed? Should prob be schedule/heartbeat-ish

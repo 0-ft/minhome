@@ -18,28 +18,29 @@ COPY server/src server/src
 COPY server/tsconfig.json server/
 COPY frontend/ frontend/
 
-# Build frontend only (server runs via tsx, no tsc build needed)
+# Build frontend and server
 RUN pnpm --filter @minhome/frontend build
+RUN pnpm --filter @minhome/server build
 
 # Production stage
 FROM node:22-slim
 RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
 
-COPY --from=base /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/tsconfig.base.json ./
+COPY --from=base /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
 COPY --from=base /app/server/package.json server/
 COPY --from=base /app/cli/package.json cli/
 COPY --from=base /app/frontend/package.json frontend/
-COPY --from=base /app/node_modules node_modules/
-COPY --from=base /app/server/node_modules server/node_modules/
 
-COPY --from=base /app/server/src server/src
-COPY --from=base /app/server/tsconfig.json server/
-COPY --from=base /app/tsconfig.base.json ./
+# Install production deps only
+RUN pnpm install --prod --frozen-lockfile
+
+# Copy compiled server output and frontend build
+COPY --from=base /app/server/dist server/dist
 COPY --from=base /app/frontend/dist frontend/dist
 
 ENV NODE_ENV=production
 ENV PORT=3111
 EXPOSE 3111
 
-CMD ["pnpm", "--filter", "@minhome/server", "dev"]
+CMD ["node", "--max-old-space-size=256", "server/dist/index.js"]
