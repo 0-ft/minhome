@@ -56,6 +56,22 @@ export function useSetDevice() {
   });
 }
 
+export function useSetEntity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deviceId, entityKey, payload }: { deviceId: string; entityKey: string; payload: Record<string, unknown> }) => {
+      const res = await api.api.devices[":id"].entities[":entityKey"].set.$post({
+        param: { id: deviceId, entityKey },
+        json: payload,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["devices"] });
+    },
+  });
+}
+
 export function useRenameDevice() {
   const qc = useQueryClient();
   return useMutation({

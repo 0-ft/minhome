@@ -1,14 +1,16 @@
 import { useState, useCallback, useRef } from "react";
-import { useLocation, useNavigate, Routes, Route, Navigate } from "react-router-dom";
+import { useLocation, useNavigate, Routes, Route, Navigate, Link } from "react-router-dom";
 import { useRealtimeUpdates } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
+import { EntitiesView } from "./components/EntitiesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { RoomView } from "./components/RoomView.js";
 import { RoomFullView } from "./components/RoomFullView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { MessageSquare } from "lucide-react";
+import { Logo } from "./components/Logo.js";
 
-const TABS = ["devices", "automations", "room"] as const;
+const TABS = ["entities", "devices", "automations", "room"] as const;
 type Tab = (typeof TABS)[number];
 
 const MIN_CHAT_WIDTH = 300;
@@ -21,6 +23,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/room-full" element={<RoomFullView />} />
+      <Route path="/" element={<Navigate to="/entities" replace />} />
       <Route path="/*" element={<MainLayout />} />
     </Routes>
   );
@@ -29,7 +32,7 @@ export function App() {
 function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const tab = (TABS.find((t) => location.pathname === `/${t}`) ?? "devices") as Tab;
+  const tab = (TABS.find((t) => location.pathname === `/${t}`) ?? "entities") as Tab;
   const [chatOpen, setChatOpen] = useState(
     () => window.matchMedia("(min-width: 768px)").matches,
   );
@@ -67,12 +70,7 @@ function MainLayout() {
       {/* Header */}
       <header className="shrink-0 bg-blood-300/80 backdrop-blur-lg">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-end justify-between">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-sand-50">
-              minhome
-            </h1>
-            <p className="text-[11px] font-mono text-blood-100 mt-0.5">smart room control</p>
-          </div>
+          <Logo />
 
           <div className="flex items-center gap-2">
             <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
@@ -121,13 +119,26 @@ function MainLayout() {
 
         <main className="flex-1 overflow-y-auto">
           <Routes>
+            <Route path="/entities" element={<div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div>} />
             <Route path="/devices" element={<div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div>} />
             <Route path="/automations" element={<div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div>} />
             <Route path="/room" element={<div className="h-full p-4"><RoomView /></div>} />
-            <Route path="*" element={<Navigate to="/devices" replace />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
       </div>
+    </div>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 gap-3">
+      <span className="text-5xl font-bold font-mono text-sand-400">404</span>
+      <p className="text-sm text-sand-600">Page not found.</p>
+      <Link to="/entities" className="text-sm text-teal-500 hover:text-teal-400 underline underline-offset-2">
+        Go home
+      </Link>
     </div>
   );
 }

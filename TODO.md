@@ -4,7 +4,7 @@
 - [ ] Better prompting for mood lighting + brightness calibration (per entity prompts)
 - [x] Room as config
 - [ ] Split config into files (room, devices, llm)
-- [ ] Extract logo to component
+- [x] Extract logo to component
 - [ ] Server side chats
 - [x] MCP for updating room
   - [x] Furniture groups
@@ -12,6 +12,9 @@
 - [ ] ZigBee pairing
 - [x] Room config MCP uses raw JSON
 - [x] Room config live updates
-- [ ] Entities view
+- [x] Entities view
 - [ ] Wifi devices
 - [ ] Sensors
+- [ ] Types deduplication
+- [ ] Entity/device configurable icons
+- [ ] 404 route
