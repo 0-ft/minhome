@@ -13,6 +13,7 @@
 import { OpenAIRealtimeWebSocket } from "openai/realtime/websocket";
 import { z } from "zod";
 import { createTools, type ToolContext } from "./tools.js";
+import { createAutomationTools } from "./automation-tools.js";
 import { buildSystemPrompt } from "./chat/context.js";
 import { debugLog } from "./debug-log.js";
 
@@ -76,7 +77,7 @@ function resample24to48(pcm24: Buffer): Uint8Array {
 // ── Convert Zod tool defs → OpenAI Realtime tool format ──────
 
 function buildRealtimeTools(ctx: ToolContext) {
-  const defs = createTools();
+  const defs = { ...createTools(), ...createAutomationTools() };
   return {
     tools: Object.entries(defs).map(([name, def]) => ({
       type: "function" as const,

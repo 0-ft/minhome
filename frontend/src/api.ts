@@ -285,6 +285,9 @@ export function useRealtimeUpdates() {
         if (msg.type === "config_change") {
           qc.invalidateQueries({ queryKey: ["config"] });
         }
+        if (msg.type === "automations_change") {
+          qc.invalidateQueries({ queryKey: ["automations"] });
+        }
       } catch { /* ignore */ }
     };
 

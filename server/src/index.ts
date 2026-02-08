@@ -4,6 +4,7 @@ import { createApp } from "./app.js";
 import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config/config.js";
 import { AutomationEngine } from "./automations.js";
+import { createTools } from "./tools.js";
 import { createMcpRoute } from "./mcp.js";
 import { debugLog } from "./debug-log.js";
 import { resolve } from "path";
@@ -32,6 +33,12 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
   onFire: (id, trigger) => {
     console.log(`[auto] ${id} fired by ${trigger}`);
     debugLog.add("automation_fired", `Automation ${id} fired by ${trigger}`, { id, trigger });
+  },
+  executeTool: async (name, params): Promise<unknown> => {
+    const tools = createTools();
+    const tool = tools[name];
+    if (!tool) throw new Error(`Unknown tool: ${name}`);
+    return tool.execute(params, { bridge, config, automations: automationEngine });
   },
 });
 

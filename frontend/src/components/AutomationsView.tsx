@@ -11,7 +11,15 @@ import type { Automation, Trigger, Condition, Action } from "@minhome/server/aut
 
 const TRIGGER_TYPES = ["device_state", "device_event", "mqtt", "cron", "time", "interval"] as const;
 const CONDITION_TYPES = ["time_range", "day_of_week", "device_state", "and", "or", "xor"] as const;
-const ACTION_TYPES = ["device_set", "mqtt_publish", "delay", "conditional"] as const;
+const ACTION_TYPES = ["device_set", "mqtt_publish", "delay", "conditional", "tool"] as const;
+
+const TOOL_NAMES = [
+  "list_devices", "get_device", "control_entity", "control_device",
+  "rename_device", "rename_entity",
+  "get_room_config", "set_room_dimensions", "set_room_lights",
+  "update_room_furniture", "upsert_furniture_item", "remove_furniture_item",
+  "set_voice",
+] as const;
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 function defaultTrigger(type: string = "device_state"): Trigger {
@@ -41,6 +49,7 @@ function defaultAction(type: string = "device_set"): Action {
     case "mqtt_publish": return { type: "mqtt_publish", topic: "", payload: "" };
     case "delay":        return { type: "delay", seconds: 5 };
     case "conditional":  return { type: "conditional", condition: defaultCondition(), then: [defaultAction("device_set")] };
+    case "tool":         return { type: "tool", tool: "control_entity", params: {} } as any;
     default:             return { type: "device_set", device: "", entity: "main", payload: {} };
   }
 }
@@ -436,6 +445,28 @@ function ActionEditor({ action, onChange, onRemove, devices, depth = 0 }: {
           </Field>
         )}
 
+        {action.type === "tool" && (
+          <>
+            <Field label="Tool">
+              <select
+                value={(action as any).tool ?? ""}
+                onChange={(e) => onChange({ ...action, tool: e.target.value, params: {} } as any)}
+                className={selectCls}
+              >
+                {TOOL_NAMES.map((t) => (
+                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Params">
+              <PayloadEditor
+                payload={((action as any).params && typeof (action as any).params === "object") ? (action as any).params : {}}
+                onChange={(p) => onChange({ ...action, params: p } as any)}
+              />
+            </Field>
+          </>
+        )}
+
         {action.type === "conditional" && (
           <div className="flex flex-col gap-4 mt-1">
             <div>
@@ -569,6 +600,37 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
       <div className="flex items-center gap-2">
         <span className={labelCls}>ID</span>
         <code className="text-xs font-mono text-sand-600 bg-sand-100 px-2 py-0.5 rounded">{draft.id}</code>
+      </div>
+
+      {/* Max runs */}
+      <div className="flex gap-4 items-end">
+        <div className="flex-1">
+          <Field label="Max runs">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                className={fieldCls + " w-24"}
+                placeholder="∞"
+                value={(draft as any).max_runs ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onChange({ ...draft, max_runs: v === "" ? undefined : Math.max(1, parseInt(v, 10) || 1) } as any);
+                }}
+              />
+              <span className="text-xs text-sand-500">
+                {(draft as any).max_runs
+                  ? `Auto-removes after ${(draft as any).max_runs} run${(draft as any).max_runs === 1 ? "" : "s"}`
+                  : "Unlimited (runs forever)"}
+              </span>
+              {(draft as any).run_count > 0 && (
+                <span className="text-xs text-sand-400 ml-2">
+                  ({(draft as any).run_count} so far)
+                </span>
+              )}
+            </div>
+          </Field>
+        </div>
       </div>
 
       {/* Triggers */}

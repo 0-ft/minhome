@@ -5,6 +5,7 @@ import type { ConfigStore } from "../config/config.js";
 import type { AutomationEngine } from "../automations.js";
 import { buildSystemPrompt } from "./context.js";
 import { createTools, type ToolContext } from "../tools.js";
+import { createAutomationTools } from "../automation-tools.js";
 import { openai, modelId, buildAiTools } from "./ai.js";
 import { debugLog } from "../debug-log.js";
 
@@ -23,7 +24,7 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automat
 
   chat.get("/api/chat/debug", (c) => {
     const system = buildSystemPrompt(bridge, config, automations);
-    const defs = createTools();
+    const defs = { ...createTools(), ...createAutomationTools() };
 
     const toolDefs = Object.fromEntries(
       Object.entries(defs).map(([name, def]) => [name, { description: def.description }]),

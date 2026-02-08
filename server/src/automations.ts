@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Cron } from "croner";
 import type { MqttBridge, DeviceState } from "./mqtt.js";
 import { extractEntitiesFromExposes, resolveCanonicalProperty, resolveEntityPayload } from "./config/devices.js";
+import { toolSchemas } from "./tools.js";
 
 // --- Zod schemas ---
 
@@ -116,7 +117,22 @@ const ActionDelay = z.object({
   seconds: z.number().positive().describe("Number of seconds to wait before executing the next action"),
 }).describe("Action that introduces a delay between subsequent actions");
 
-type Action = z.infer<typeof ActionDeviceSet> | z.infer<typeof ActionMqttPublish> | z.infer<typeof ActionDelay> | ConditionalAction;
+// ── Tool action variants (one per tool, discriminated on 'tool' field) ──
+
+const toolActionVariants = Object.entries(toolSchemas).map(
+  ([name, { description, parameters }]) =>
+    z.object({
+      type: z.literal("tool"),
+      tool: z.literal(name).describe("Tool to invoke"),
+      params: parameters.describe(`Parameters for ${name}`),
+    }).describe(`Tool action: ${description}`)
+) as unknown as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]];
+
+const ActionTool = z.discriminatedUnion("tool", toolActionVariants as any)
+  .describe("Action that invokes an AI tool. Set 'tool' to the tool name and provide its parameters in 'params'.");
+
+type ToolAction = { type: "tool"; tool: string; params: unknown };
+type Action = z.infer<typeof ActionDeviceSet> | z.infer<typeof ActionMqttPublish> | z.infer<typeof ActionDelay> | ToolAction | ConditionalAction;
 
 interface ConditionalAction {
   type: "conditional";
@@ -126,23 +142,28 @@ interface ConditionalAction {
 }
 
 export const ActionSchema: z.ZodType<Action> = z.lazy(() =>
-  z.discriminatedUnion("type", [
-    ActionDeviceSet,
-    ActionMqttPublish,
-    ActionDelay,
-    z.object({
-      type: z.literal("conditional").describe("Action type: conditionally execute different action branches"),
-      condition: ConditionSchema.describe("Condition to evaluate at runtime"),
-      then: z.array(ActionSchema).describe("Actions to execute if the condition is true"),
-      else: z.array(ActionSchema).optional().describe("Actions to execute if the condition is false (optional)"),
-    }).describe("Action that branches based on a runtime condition"),
+  z.union([
+    z.discriminatedUnion("type", [
+      ActionDeviceSet,
+      ActionMqttPublish,
+      ActionDelay,
+      z.object({
+        type: z.literal("conditional").describe("Action type: conditionally execute different action branches"),
+        condition: ConditionSchema.describe("Condition to evaluate at runtime"),
+        then: z.array(ActionSchema).describe("Actions to execute if the condition is true"),
+        else: z.array(ActionSchema).optional().describe("Actions to execute if the condition is false (optional)"),
+      }).describe("Action that branches based on a runtime condition"),
+    ]),
+    ActionTool,
   ])
-).describe("An action to execute. Set 'type' to one of: 'device_set', 'mqtt_publish', 'delay', 'conditional'");
+).describe("An action to execute. Set 'type' to one of: 'device_set', 'mqtt_publish', 'delay', 'conditional', 'tool'");
 
 export const AutomationSchema = z.object({
   id: z.string().describe("Unique identifier for this automation (use a short slug, e.g. 'morning-lights')"),
   name: z.string().describe("Human-readable name for this automation, e.g. 'Turn on morning lights'"),
   enabled: z.boolean().default(true).describe("Whether this automation is active (defaults to true)"),
+  max_runs: z.number().int().positive().optional().describe("Maximum number of times this automation can fire before being auto-removed. Omit for unlimited runs. Set to 1 for single-shot automations."),
+  run_count: z.number().int().default(0).describe("Number of times this automation has fired (managed by the engine, do not set manually)"),
   triggers: z.array(TriggerSchema).min(1).describe("One or more triggers that can cause this automation to fire (OR logic: any trigger can fire it)"),
   conditions: z.array(ConditionSchema).default([]).describe("Optional conditions that must ALL be true for the automation to proceed (AND logic). Defaults to no conditions."),
   actions: z.array(ActionSchema).min(1).describe("Ordered list of actions to execute when the automation fires"),
@@ -177,14 +198,27 @@ export class AutomationEngine {
   private bridge: MqttBridge;
   private filePath: string;
   private onFire?: (automationId: string, triggeredBy: string) => void;
+  private changeListeners = new Set<() => void>();
 
-  constructor(filePath: string, bridge: MqttBridge, opts?: { onFire?: (id: string, trigger: string) => void }) {
+  private executeTool?: (name: string, params: unknown) => Promise<unknown>;
+
+  constructor(filePath: string, bridge: MqttBridge, opts?: {
+    onFire?: (id: string, trigger: string) => void;
+    executeTool?: (name: string, params: unknown) => Promise<unknown>;
+  }) {
     this.filePath = filePath;
     this.bridge = bridge;
     this.onFire = opts?.onFire;
+    this.executeTool = opts?.executeTool;
     this.load();
     this.setupMqttListeners();
   }
+
+  // --- Change listeners ---
+
+  onChanged(fn: () => void): void { this.changeListeners.add(fn); }
+  offChanged(fn: () => void): void { this.changeListeners.delete(fn); }
+  private emitChange(): void { this.changeListeners.forEach(fn => fn()); }
 
   // --- Public API ---
 
@@ -203,6 +237,7 @@ export class AutomationEngine {
     this.automations.push(automation);
     this.save();
     this.reload();
+    this.emitChange();
     return automation;
   }
 
@@ -212,6 +247,7 @@ export class AutomationEngine {
     this.automations[idx] = { ...this.automations[idx], ...patch, id };
     this.save();
     this.reload();
+    this.emitChange();
     return this.automations[idx];
   }
 
@@ -219,6 +255,7 @@ export class AutomationEngine {
     this.automations = this.automations.filter(a => a.id !== id);
     this.save();
     this.reload();
+    this.emitChange();
   }
 
   destroy(): void {
@@ -324,7 +361,18 @@ export class AutomationEngine {
     console.log(`[auto] Firing '${automation.name}' (trigger: ${triggeredBy})`);
     this.onFire?.(automation.id, triggeredBy);
 
+    // Increment run count and persist
+    automation.run_count = (automation.run_count ?? 0) + 1;
+    this.save();
+    this.emitChange();
+
     await this.executeActions(automation.actions);
+
+    // Auto-remove if max_runs reached
+    if (automation.max_runs && automation.run_count >= automation.max_runs) {
+      console.log(`[auto] '${automation.name}' reached max_runs (${automation.max_runs}), removing`);
+      this.remove(automation.id);
+    }
   }
 
   private evaluateCondition(cond: Condition): boolean {
@@ -390,6 +438,17 @@ export class AutomationEngine {
             await this.executeActions(action.then);
           } else if (action.else) {
             await this.executeActions(action.else);
+          }
+          break;
+        case "tool":
+          if (this.executeTool) {
+            try {
+              await this.executeTool(action.tool, action.params);
+            } catch (err) {
+              console.error(`[auto] Tool action '${action.tool}' failed:`, err);
+            }
+          } else {
+            console.warn(`[auto] Tool action '${action.tool}' skipped — no executeTool callback`);
           }
           break;
       }

@@ -6,6 +6,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import type { Tool } from "ai";
 import { createTools, type ToolContext } from "../tools.js";
+import { createAutomationTools } from "../automation-tools.js";
 
 // ── Model configuration ───────────────────────────────────
 
@@ -21,7 +22,7 @@ export const voiceModelId = process.env.AI_VOICE_MODEL ?? modelId;
 
 /** Build AI SDK tools from shared definitions (direct in-process execution). */
 export function buildAiTools(ctx: ToolContext): Record<string, Tool> {
-  const defs = createTools();
+  const defs = { ...createTools(), ...createAutomationTools() };
   return Object.fromEntries(
     Object.entries(defs).map(([name, def]) => [
       name,

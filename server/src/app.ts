@@ -218,18 +218,20 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
         onOpen(_evt, ws) {
           const onStateChange = (data: unknown) => ws.send(JSON.stringify({ type: "state_change", data }));
           const onDevices = (data: unknown) => ws.send(JSON.stringify({ type: "devices", data }));
-          const onAutoFire = (id: string, trigger: string) => ws.send(JSON.stringify({ type: "automation_fired", id, trigger }));
           const onConfigChange = () => ws.send(JSON.stringify({ type: "config_change" }));
+          const onAutomationsChange = () => ws.send(JSON.stringify({ type: "automations_change" }));
 
           bridge.on("state_change", onStateChange);
           bridge.on("devices", onDevices);
           bridge.on("config_change", onConfigChange);
+          automations.onChanged(onAutomationsChange);
 
           // Store cleanup refs on the ws object
           (ws as unknown as Record<string, unknown>).__cleanup = () => {
             bridge.off("state_change", onStateChange);
             bridge.off("devices", onDevices);
             bridge.off("config_change", onConfigChange);
+            automations.offChanged(onAutomationsChange);
           };
         },
         onClose(_evt, ws) {

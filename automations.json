@@ -1,97 +1,10 @@
 {
   "automations": [
     {
-      "id": "ceiling-blink-5s",
-      "name": "Ceiling Light Blink (5s)",
-      "enabled": false,
-      "triggers": [
-        {
-          "type": "interval",
-          "every": 5
-        }
-      ],
-      "conditions": [],
-      "actions": [
-        {
-          "type": "conditional",
-          "condition": {
-            "type": "device_state",
-            "device": "0xc890a81f1ffe0000",
-            "entity": "main",
-            "property": "state",
-            "equals": "ON"
-          },
-          "then": [
-            {
-              "type": "device_set",
-              "device": "0xc890a81f1ffe0000",
-              "entity": "main",
-              "payload": {
-                "state": "OFF"
-              }
-            }
-          ],
-          "else": [
-            {
-              "type": "device_set",
-              "device": "0xc890a81f1ffe0000",
-              "entity": "main",
-              "payload": {
-                "state": "ON"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "ceiling-light-toggle",
-      "name": "Ceiling Light Toggle Every 5 Seconds",
-      "enabled": false,
-      "triggers": [
-        {
-          "type": "interval",
-          "every": 5
-        }
-      ],
-      "conditions": [],
-      "actions": [
-        {
-          "type": "conditional",
-          "condition": {
-            "type": "device_state",
-            "device": "0xc890a81f1ffe0000",
-            "entity": "main",
-            "property": "state",
-            "equals": "OFF"
-          },
-          "then": [
-            {
-              "type": "device_set",
-              "device": "0xc890a81f1ffe0000",
-              "entity": "main",
-              "payload": {
-                "state": "ON"
-              }
-            }
-          ],
-          "else": [
-            {
-              "type": "device_set",
-              "device": "0xc890a81f1ffe0000",
-              "entity": "main",
-              "payload": {
-                "state": "OFF"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "toggle-little-lamp-button",
-      "name": "Toggle Little Lamp when Desk Button Pressed",
+      "id": "desk-button-toggle-lamps",
+      "name": "Toggle Desk and Little Lamp with Desk Button",
       "enabled": true,
+      "run_count": 1,
       "triggers": [
         {
           "type": "device_event",
@@ -109,14 +22,14 @@
             "conditions": [
               {
                 "type": "device_state",
-                "device": "0x44e2f8fffe194350",
+                "device": "0x0cae5ffffe69064a",
                 "entity": "main",
                 "property": "state",
                 "equals": "ON"
               },
               {
                 "type": "device_state",
-                "device": "0x0cae5ffffe69064a",
+                "device": "0x44e2f8fffe194350",
                 "entity": "main",
                 "property": "state",
                 "equals": "ON"
@@ -126,7 +39,7 @@
           "then": [
             {
               "type": "device_set",
-              "device": "0x44e2f8fffe194350",
+              "device": "0x0cae5ffffe69064a",
               "entity": "main",
               "payload": {
                 "state": "OFF"
@@ -134,7 +47,7 @@
             },
             {
               "type": "device_set",
-              "device": "0x0cae5ffffe69064a",
+              "device": "0x44e2f8fffe194350",
               "entity": "main",
               "payload": {
                 "state": "OFF"
@@ -144,7 +57,7 @@
           "else": [
             {
               "type": "device_set",
-              "device": "0x44e2f8fffe194350",
+              "device": "0x0cae5ffffe69064a",
               "entity": "main",
               "payload": {
                 "state": "ON"
@@ -152,13 +65,123 @@
             },
             {
               "type": "device_set",
-              "device": "0x0cae5ffffe69064a",
+              "device": "0x44e2f8fffe194350",
               "entity": "main",
               "payload": {
                 "state": "ON"
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": "turn-on-all-lights-8am-tomorrow",
+      "name": "Turn on all lights at 8 AM tomorrow",
+      "enabled": true,
+      "max_runs": 1,
+      "run_count": 0,
+      "triggers": [
+        {
+          "type": "time",
+          "at": "08:00"
+        }
+      ],
+      "conditions": [],
+      "actions": [
+        {
+          "type": "device_set",
+          "device": "0x44e2f8fffe194350",
+          "entity": "main",
+          "payload": {
+            "state": "ON"
+          }
+        },
+        {
+          "type": "device_set",
+          "device": "0x0cae5ffffe69064a",
+          "entity": "main",
+          "payload": {
+            "state": "ON"
+          }
+        },
+        {
+          "type": "device_set",
+          "device": "0xc890a81f1ffe0000",
+          "entity": "main",
+          "payload": {
+            "state": "ON"
+          }
+        }
+      ]
+    },
+    {
+      "id": "turn-off-all-lights-2158-today",
+      "name": "Turn off all lights at 21:58 today",
+      "enabled": true,
+      "max_runs": 1,
+      "triggers": [
+        {
+          "type": "time",
+          "at": "21:58"
+        }
+      ],
+      "actions": [
+        {
+          "type": "device_set",
+          "device": "0x44e2f8fffe194350",
+          "entity": "main",
+          "payload": {
+            "state": "OFF"
+          }
+        },
+        {
+          "type": "device_set",
+          "device": "0x0cae5ffffe69064a",
+          "entity": "main",
+          "payload": {
+            "state": "OFF"
+          }
+        },
+        {
+          "type": "device_set",
+          "device": "0xc890a81f1ffe0000",
+          "entity": "main",
+          "payload": {
+            "state": "OFF"
+          }
+        },
+        {
+          "type": "device_set",
+          "device": "0xa4c138d2b1cf1389",
+          "entity": "l1",
+          "payload": {
+            "state": "OFF"
+          }
+        },
+        {
+          "type": "device_set",
+          "device": "0xa4c138d2b1cf1389",
+          "entity": "l2",
+          "payload": {
+            "state": "OFF"
+          }
+        },
+        {
+          "type": "device_set",
+          "device": "0xa4c138d2b1cf1389",
+          "entity": "l3",
+          "payload": {
+            "state": "OFF"
+          }
+        },
+        {
+          "type": "device_set",
+          "device": "0xa4c13853da62641a",
+          "entity": "main",
+          "payload": {
+            "state": "OFF"
+          }
         }
       ]
     }
