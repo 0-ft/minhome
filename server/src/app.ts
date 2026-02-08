@@ -10,8 +10,13 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { createChatRoute } from "./chat/index.js";
 import { authMiddleware, authRoutes } from "./auth.js";
 import { buildDeviceResponse } from "./tools.js";
+import { createVoiceWSHandler } from "./voice.js";
 
-export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
+export interface CreateAppOptions {
+  voiceOutputDir?: string;
+}
+
+export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine, opts?: CreateAppOptions) {
   const app = new Hono();
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
@@ -231,7 +236,12 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
           cleanup?.();
         },
       };
-    }));
+    }))
+
+    // --- Voice Bridge WebSocket ---
+    .get("/ws/voice", upgradeWebSocket(
+      createVoiceWSHandler(opts?.voiceOutputDir ?? "./voice-recordings")
+    ));
 
   return { app, injectWebSocket };
 }

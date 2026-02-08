@@ -1,0 +1,9 @@
+[project]
+name = "voice-bridge"
+version = "0.1.0"
+description = "Bridge between HA Voice PE (ESPHome) and minhome server"
+requires-python = ">=3.12"
+dependencies = [
+    "aioesphomeapi>=43.14.0",
+    "websockets>=16.0",
+]

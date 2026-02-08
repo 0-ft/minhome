@@ -25,7 +25,8 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
   onFire: (id, trigger) => console.log(`[auto] ${id} fired by ${trigger}`),
 });
 
-const { app, injectWebSocket } = createApp(bridge, config, automationEngine);
+const voiceOutputDir = resolve(DATA_DIR, "voice-recordings");
+const { app, injectWebSocket } = createApp(bridge, config, automationEngine, { voiceOutputDir });
 
 // Mount in-process MCP server at /mcp (for Cursor IDE remote MCP)
 app.route("/", createMcpRoute({ bridge, config, automations: automationEngine }));
@@ -44,7 +45,7 @@ if (existsSync(frontendDist)) {
   app.use("/*", serveStatic({ root: frontendDist }));
   // SPA fallback: serve index.html for non-API, non-WS, non-MCP routes
   app.get("*", async (c, next) => {
-    if (c.req.path.startsWith("/api/") || c.req.path === "/ws" || c.req.path === "/mcp") return next();
+    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path === "/mcp") return next();
     return serveStatic({ root: frontendDist, path: "index.html" })(c, next);
   });
 }
