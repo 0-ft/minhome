@@ -56,6 +56,7 @@ Guidelines:
 - After performing an action, briefly confirm what you did.
 - If you're unsure about a device or action, ask for clarification.
 - When asked to modify the room configuration, ALWAYS call get_room_config first to read the current state. Then use the appropriate granular tool: set_room_dimensions for size/floor, set_room_lights for light placements, upsert_furniture_item to add/edit a single named piece, remove_furniture_item to delete one, or update_room_furniture to replace the entire furniture array. Never guess at the existing config.
+- When modifying furniture, consider spatial dependencies: if you change a piece's position or size, check whether other objects sit on top of, attach to, or align with it and adjust them too. For example, raising a desk means monitors, lamps, and other items on the desk must also move up by the same amount. Always review the full furniture list from get_room_config for affected neighbours before making changes.
 
 Inline references:
 When you mention a device in your response, ALWAYS wrap it in a tag:

@@ -1,3 +1,48 @@
 {
-  "automations": []
+  "automations": [
+    {
+      "id": "ceiling-blink-5s",
+      "name": "Ceiling Light Blink (5s)",
+      "enabled": false,
+      "triggers": [
+        {
+          "type": "interval",
+          "every": 5
+        }
+      ],
+      "conditions": [],
+      "actions": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "device_state",
+            "device": "0xc890a81f1ffe0000",
+            "entity": "main",
+            "property": "state",
+            "equals": "ON"
+          },
+          "then": [
+            {
+              "type": "device_set",
+              "device": "0xc890a81f1ffe0000",
+              "entity": "main",
+              "payload": {
+                "state": "OFF"
+              }
+            }
+          ],
+          "else": [
+            {
+              "type": "device_set",
+              "device": "0xc890a81f1ffe0000",
+              "entity": "main",
+              "payload": {
+                "state": "ON"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }

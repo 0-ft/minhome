@@ -1,4 +1,4 @@
-- [ ] Entity/device confusion
+- [x] Entity/device confusion
 - [ ] Direct editing of jsons
 - [ ] LLM actions on cron
 - [ ] Better prompting for mood lighting + brightness calibration (per entity prompts)
@@ -12,3 +12,6 @@
 - [ ] ZigBee pairing
 - [x] Room config MCP uses raw JSON
 - [x] Room config live updates
+- [ ] Entities view
+- [ ] Wifi devices
+- [ ] Sensors

@@ -5,10 +5,11 @@ A React 19 single-page application for controlling your minhome smart room. Buil
 ## Features
 
 - **Device controls** — toggle switches, brightness sliders, color temperature sliders; inline renaming of devices and entities
-- **3D room visualization** — interactive Three.js scene with animated light orbs that reflect real device state; click to toggle
-- **Automation editor** — visual editor for triggers, conditions, and actions with nested conditional support
+- **Entity-first model** — every device is displayed with its entities; controls target entities (not devices directly) using canonical property names
+- **3D room visualization** — interactive Three.js scene with animated light orbs that reflect real device state (on/off, brightness, color temperature); click to toggle; furniture rendered from config
+- **Automation editor** — visual editor for triggers, conditions, and actions with entity-aware fields and nested conditional support
 - **AI chat** — natural-language assistant in a resizable side pane (or full-screen overlay on the room view) with streaming responses and rich tool-call display
-- **Real-time updates** — WebSocket connection auto-refreshes device state across all views
+- **Real-time updates** — WebSocket connection auto-refreshes device state and room config across all views
 
 ## Component Architecture
 
@@ -73,9 +74,9 @@ flowchart TD
 
 | Component | File | Description |
 |-----------|------|-------------|
-| `DevicesView` | `components/DevicesView.tsx` | Grid of device cards with power toggles, brightness/color-temp sliders, entity labels, raw state inspector, and inline rename |
-| `AutomationsView` | `components/AutomationsView.tsx` | Accordion list of automations; expand to edit triggers, conditions, and actions in a visual form editor |
-| `RoomView` | `components/RoomView.tsx` | Embedded 3D room with orthographic camera, orbit controls, and clickable light orbs. Reads light positions from `config.json` |
+| `DevicesView` | `components/DevicesView.tsx` | Grid of device cards; each card shows the device's entities with per-entity power toggles, brightness/color-temp sliders, and inline rename |
+| `AutomationsView` | `components/AutomationsView.tsx` | Accordion list of automations; expand to edit triggers, conditions, and actions — all entity-aware with entity key fields |
+| `RoomView` | `components/RoomView.tsx` | Embedded 3D room with orthographic camera, orbit controls, and clickable light orbs. Reads room config (dimensions, furniture, lights) from the API and live-updates via WebSocket |
 | `RoomFullView` | `components/RoomFullView.tsx` | Full-screen 3D room with a floating AI chat overlay — messages appear as translucent text over the scene |
 | `ChatPane` | `components/ChatPane.tsx` | Resizable side panel with chat bubbles, streaming indicators, and an auto-growing textarea input |
 
@@ -107,20 +108,22 @@ Uses [Hono's RPC client](https://hono.dev/docs/guides/rpc) with the server's `Ap
 
 | Hook | Description |
 |------|-------------|
-| `useDevices()` | Fetch all devices (auto-refetch every 10s) |
-| `useDevice(id)` | Fetch a single device |
-| `useSetDevice()` | Send a command to a device |
+| `useDevices()` | Fetch all devices with their entities (auto-refetch every 10s) |
+| `useDevice(id)` | Fetch a single device with entities |
+| `useSetDevice()` | Send a raw command to a device (device-level properties) |
+| `useSetEntity()` | Send a command to a specific entity (canonical property names) |
 | `useRefreshStates()` | Ask the server to re-query all device states from Z2M |
 | `useRenameDevice()` | Update a device's friendly name |
 | `useRenameEntity()` | Update an entity label on a device |
 | `useConfig()` | Fetch the full config (room layout) |
+| `useSaveCamera()` | Save the 3D camera position |
 | `useAutomations()` | Fetch all automations |
 | `useUpdateAutomation()` | Update an existing automation |
 | `useDeleteAutomation()` | Delete an automation |
 
 ### Real-time Updates (`useRealtimeUpdates`)
 
-A WebSocket connection to `/ws` that listens for `state_change` and `devices` events and invalidates the TanStack Query cache, triggering re-renders across all views.
+A WebSocket connection to `/ws` that listens for `state_change`, `devices`, and `config_change` events and invalidates the TanStack Query cache, triggering re-renders across all views. Room config changes (e.g. via MCP tools) are reflected live in the 3D view.
 
 ### AI Chat
 
@@ -130,10 +133,10 @@ Uses the `useChat()` hook from `@ai-sdk/react`, connected to `POST /api/chat`. M
 
 The room scene (`RoomView.tsx`) is built with React Three Fiber:
 
-- **Room shell** — floor plane with configurable dimensions (`ROOM_W=5.4m`, `ROOM_D=3m`, `ROOM_H=2.5m`)
-- **Furniture** — bed, desk, shelving, drawers, rug — all positioned to match a real room layout
-- **Light orbs** — spheres placed at positions defined in `config.json`'s `room.lights` array. Each orb:
-  - Reflects its device's on/off state, brightness, and color temperature
+- **Room shell** — floor plane with configurable dimensions from room config
+- **Furniture** — rendered from the `furniture` array in config; supports box, cylinder, extrude primitives, and named groups of primitives
+- **Light orbs** — spheres placed at positions defined in `room.lights`, each linked to a device entity by IEEE address and entity key. Each orb:
+  - Reflects its entity's on/off state, brightness, and color temperature
   - Smoothly animates between states using `useFrame` lerping
   - Emits a `PointLight` that illuminates the scene
   - Shows a tooltip label on hover
@@ -192,5 +195,3 @@ Key runtime dependencies:
 - **[react-markdown](https://github.com/remarkjs/react-markdown)** + **[rehype-raw](https://github.com/rehypejs/rehype-raw)** — markdown rendering with custom HTML elements
 - **[lucide-react](https://lucide.dev/)** — icon library
 - **[class-variance-authority](https://cva.style/)** + **[clsx](https://github.com/lukeed/clsx)** + **[tailwind-merge](https://github.com/dcastil/tailwind-merge)** — component variant utilities
-
-

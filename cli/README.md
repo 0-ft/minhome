@@ -32,7 +32,7 @@ export MINHOME_URL=http://192.168.1.100:3111
 
 #### `device list`
 
-List all devices with their status, name, IEEE address, vendor/model, and entity labels.
+List all devices with their status, name, IEEE address, vendor/model, and entity names.
 
 ```
 $ minhome device list
@@ -44,11 +44,11 @@ $ minhome device list
 ○  Desk Lamp  (0x0cae5ffffe69064a)
 ```
 
-`●` indicates the device has reported state; `○` means no state has been received yet.
+`●` indicates the device has reported state; `○` means no state has been received yet. Entity names from `config.json` are shown with `→` arrows.
 
 #### `device get <id>`
 
-Show detailed information and full state for a device.
+Show detailed information, full state, and entities for a device.
 
 ```
 $ minhome device get 0xc890a81f1ffe0000
@@ -59,6 +59,8 @@ Ceiling Light  (0xc890a81f1ffe0000)
     state: "ON"
     brightness: 200
     color_temp: 370
+  Entities:
+    main → Ceiling Light
 ```
 
 #### `device rename <id> <name>`
@@ -71,20 +73,19 @@ minhome device rename 0xc890a81f1ffe0000 "Ceiling Light"
 
 #### `device set <id> <payload>`
 
-Send a JSON command payload to a device.
+Send a raw JSON command payload to a device. Use this for device-level properties that don't belong to a specific entity (e.g. `power_on_behavior`). For entity state changes, prefer `entity set` or the API's entity endpoint.
 
 ```bash
 minhome device set 0xc890a81f1ffe0000 '{"state":"ON","brightness":200}'
-minhome device set 0xc890a81f1ffe0000 '{"state":"OFF"}'
 ```
 
 ### `entity` — Manage entities (endpoints within a device)
 
-Some devices expose multiple endpoints (e.g. individual sockets on a multi-plug). Entities let you name these individually.
+Every controllable endpoint on a device is an entity. Single-endpoint devices have one entity keyed `"main"`. Multi-endpoint devices (e.g. a 3-socket smart plug) have one entity per endpoint, keyed by Z2M's endpoint name (e.g. `"l1"`, `"l2"`, `"l3"`).
 
 #### `entity list <device_id>`
 
-List all endpoints of a device and their labels.
+List all entities of a device and their friendly names.
 
 ```
 $ minhome entity list 0xa4c138d2b1cf1389
@@ -103,6 +104,8 @@ minhome entity rename 0xa4c138d2b1cf1389 l3 "Sunrise Lamp"
 ```
 
 ### `automation` — Manage automations
+
+Automations use the entity-first model — all `device_state` triggers/conditions and `device_set` actions include an `entity` field alongside the device IEEE address.
 
 #### `automation list`
 
@@ -128,7 +131,7 @@ minhome automation get morning-lights
 
 #### `automation create <json>`
 
-Create a new automation from a JSON string.
+Create a new automation from a JSON string. Include the `entity` field in all device-related triggers, conditions, and actions.
 
 ```bash
 minhome automation create '{
@@ -137,7 +140,7 @@ minhome automation create '{
   "enabled": true,
   "triggers": [{"type": "time", "at": "08:00"}],
   "conditions": [{"type": "day_of_week", "days": ["mon","tue","wed","thu","fri"]}],
-  "actions": [{"type": "device_set", "device": "0xc890a81f1ffe0000", "payload": {"state": "ON", "brightness": 200}}]
+  "actions": [{"type": "device_set", "device": "0xc890a81f1ffe0000", "entity": "main", "payload": {"state": "ON", "brightness": 200}}]
 }'
 ```
 
@@ -162,5 +165,3 @@ minhome automation delete morning-lights
 - **[commander](https://github.com/tj/commander.js)** — CLI framework
 - **[hono](https://hono.dev/)** — RPC client (shared types with `@minhome/server`)
 - **[@minhome/server](../server/)** — workspace dependency for `AppType` type import
-
-
