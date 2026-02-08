@@ -1,0 +1,6 @@
+- [ ] Entity/device confusion
+- [ ] Direct editing of jsons
+- [ ] LLM actions on cron
+- [ ] Better prompting for mood lighting + brightness calibration (per entity prompts)
+- [ ] 
+- [ ] 

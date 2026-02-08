@@ -19,6 +19,8 @@ const C = {
   desk: "#a69880",
   shelving: "#7d6f5c",
   drawers: "#9b8c76",
+  monitor: "#1a1a1a",
+  rug: "#b5a894",
   lightOff: "#3a3530",
 };
 
@@ -87,18 +89,38 @@ function Furniture() {
         <boxGeometry args={[2.0, 0.04, 0.6]} />
         <meshStandardMaterial color={C.desk} />
       </mesh>
-      {/* Legs */}
-      {[
-        [1.84, 0.08],
-        [3.76, 0.08],
-        [1.84, 0.52],
-        [3.76, 0.52],
-      ].map(([x, z], i) => (
+      {/* Left cylindrical legs */}
+      {[[1.84, 0.08], [1.84, 0.52]].map(([x, z], i) => (
         <mesh key={`dleg${i}`} position={[x, 0.355, z]} castShadow receiveShadow>
-          <boxGeometry args={[0.04, 0.71, 0.04]} />
+          <cylinderGeometry args={[0.03, 0.03, 0.71, 12]} />
           <meshStandardMaterial color={C.desk} />
         </mesh>
       ))}
+      {/* Right-side desk drawers (0.4 × 0.57m, h=0.71m) */}
+      <mesh position={[3.6, 0.355, 0.285]} castShadow receiveShadow>
+        <boxGeometry args={[0.4, 0.71, 0.57]} />
+        <meshStandardMaterial color={C.drawers} />
+      </mesh>
+      {/* Keyboard (wedge: back taller, front thinner, rectangular from above) */}
+      <mesh position={[2.745, 0.75, 0.22]} rotation={[0, -Math.PI / 2, 0]} castShadow receiveShadow>
+        <extrudeGeometry args={[(() => {
+          const shape = new THREE.Shape();
+          // Side profile in local X-Y: X=depth, Y=height
+          shape.moveTo(0, 0);        // back-bottom
+          shape.lineTo(0, 0.02);     // back-top (2cm)
+          shape.lineTo(0.12, 0.008); // front-top (0.8cm)
+          shape.lineTo(0.12, 0);     // front-bottom
+          shape.closePath();
+          return shape;
+        })(), { depth: 0.36, bevelEnabled: false }]} />
+        <meshStandardMaterial color="#2a2a2a" />
+      </mesh>
+
+      {/* Monitor on N wall, 24" 16:9 ≈ 53×30cm, 3cm deep */}
+      <mesh position={[2.565, 1.15, 0.015]} castShadow receiveShadow>
+        <boxGeometry args={[0.53, 0.30, 0.03]} />
+        <meshStandardMaterial color={C.monitor} />
+      </mesh>
 
       {/* ── Shelving NE 0.85 × 0.55m, h=1.9m, 4 posts + 5 shelves ── */}
       {/* Four corner posts (0.03 × 0.03 × 1.9m) */}
@@ -131,6 +153,12 @@ function Furniture() {
       <mesh position={[2.115, 0.285, 2.825]} castShadow receiveShadow>
         <boxGeometry args={[0.4, 0.57, 0.35]} />
         <meshStandardMaterial color={C.shelving} />
+      </mesh>
+
+      {/* ── Rug 1.8 × 1.5m ── */}
+      <mesh position={[3.275, 0.005, 1.6]} receiveShadow>
+        <boxGeometry args={[1.8, 0.01, 1.5]} />
+        <meshStandardMaterial color={C.rug} />
       </mesh>
     </group>
   );
