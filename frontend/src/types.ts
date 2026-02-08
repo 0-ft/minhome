@@ -6,12 +6,24 @@ export interface EntityFeatures {
   colorTempProperty?: string;
 }
 
+export interface SensorProperty {
+  name: string;
+  property: string;
+  type: string;
+  values?: string[];
+  unit?: string;
+  valueMin?: number;
+  valueMax?: number;
+  description?: string;
+}
+
 export interface Entity {
   key: string;
   name: string;
   type: string;
   state: Record<string, unknown>;
   features: EntityFeatures;
+  sensorProperties?: SensorProperty[];
 }
 
 export interface DeviceData {

@@ -33,6 +33,12 @@
       "entities": {
         "main": {}
       }
+    },
+    "0xa4c138f959e3ad1b": {
+      "name": "Desk Button",
+      "entities": {
+        "main": {}
+      }
     }
   },
   "room": {

@@ -36,13 +36,21 @@ const TriggerInterval = z.object({
   every: z.number().positive().describe("Interval in seconds between each firing, e.g. 300 for every 5 minutes"),
 }).describe("Trigger that fires repeatedly at a fixed interval");
 
+const TriggerDeviceEvent = z.object({
+  type: z.literal("device_event").describe("Trigger type: fires when a device emits an event (e.g. button press, sensor update)"),
+  device: z.string().describe("IEEE address of the device, e.g. '0xa4c138f959e3ad1b'"),
+  property: z.string().describe("Raw MQTT property name to match, e.g. 'action' for buttons, 'contact' for door sensors, 'occupancy' for motion sensors"),
+  value: z.unknown().optional().describe("Value the property must equal for the trigger to fire (omit to match any value). Examples: 'single', 'double', 'hold' for buttons; true/false for contact/occupancy sensors"),
+}).describe("Trigger that fires when a device emits an event. Use for input-only devices like buttons, contact sensors, and motion sensors. Operates on raw MQTT properties without entity resolution.");
+
 export const TriggerSchema = z.discriminatedUnion("type", [
   TriggerDeviceState,
+  TriggerDeviceEvent,
   TriggerMqtt,
   TriggerCron,
   TriggerTime,
   TriggerInterval,
-]).describe("A trigger that causes the automation to fire. Set 'type' to one of: 'device_state', 'mqtt', 'cron', 'time', 'interval'");
+]).describe("A trigger that causes the automation to fire. Set 'type' to one of: 'device_state', 'device_event', 'mqtt', 'cron', 'time', 'interval'. Use 'device_event' for buttons/sensors, 'device_state' for controllable devices like lights/switches.");
 
 const ConditionTimeRange = z.object({
   type: z.literal("time_range").describe("Condition type: passes only during a time-of-day window"),
@@ -63,11 +71,32 @@ const ConditionDeviceState = z.object({
   equals: z.unknown().describe("Required value of the property for the condition to pass, e.g. 'ON', 255"),
 }).describe("Condition that passes only when a device entity's state property equals a specific value");
 
-export const ConditionSchema = z.discriminatedUnion("type", [
-  ConditionTimeRange,
-  ConditionDayOfWeek,
-  ConditionDeviceState,
-]).describe("A condition that must be true for the automation to proceed. Set 'type' to one of: 'time_range', 'day_of_week', 'device_state'");
+type Condition = z.infer<typeof ConditionTimeRange> | z.infer<typeof ConditionDayOfWeek> | z.infer<typeof ConditionDeviceState> | LogicCondition;
+
+interface LogicCondition {
+  type: "and" | "or" | "xor";
+  conditions: Condition[];
+}
+
+export const ConditionSchema: z.ZodType<Condition> = z.lazy(() =>
+  z.discriminatedUnion("type", [
+    ConditionTimeRange,
+    ConditionDayOfWeek,
+    ConditionDeviceState,
+    z.object({
+      type: z.literal("and").describe("Condition type: passes only when ALL sub-conditions pass"),
+      conditions: z.array(ConditionSchema).min(1).describe("Sub-conditions that must ALL be true"),
+    }).describe("Logical AND — passes when every sub-condition is true"),
+    z.object({
+      type: z.literal("or").describe("Condition type: passes when ANY sub-condition passes"),
+      conditions: z.array(ConditionSchema).min(1).describe("Sub-conditions where at least one must be true"),
+    }).describe("Logical OR — passes when at least one sub-condition is true"),
+    z.object({
+      type: z.literal("xor").describe("Condition type: passes when exactly one sub-condition passes"),
+      conditions: z.array(ConditionSchema).min(1).describe("Sub-conditions where exactly one must be true"),
+    }).describe("Logical XOR — passes when exactly one sub-condition is true"),
+  ])
+).describe("A condition that must be true for the automation to proceed. Set 'type' to one of: 'time_range', 'day_of_week', 'device_state', 'and', 'or', 'xor'");
 
 const ActionDeviceSet = z.object({
   type: z.literal("device_set").describe("Action type: send a state command to a device entity"),
@@ -91,7 +120,7 @@ type Action = z.infer<typeof ActionDeviceSet> | z.infer<typeof ActionMqttPublish
 
 interface ConditionalAction {
   type: "conditional";
-  condition: z.infer<typeof ConditionSchema>;
+  condition: Condition;
   then: Action[];
   else?: Action[];
 }
@@ -125,8 +154,7 @@ export const AutomationsFileSchema = z.object({
 
 export type Automation = z.infer<typeof AutomationSchema>;
 export type Trigger = z.infer<typeof TriggerSchema>;
-export type Condition = z.infer<typeof ConditionSchema>;
-export type { Action };
+export type { Condition, Action };
 
 // --- Helpers ---
 
@@ -249,18 +277,27 @@ export class AutomationEngine {
       for (const auto of this.automations) {
         if (!auto.enabled) continue;
         for (const trigger of auto.triggers) {
-          if (trigger.type !== "device_state") continue;
-          if (trigger.device !== deviceId) continue;
+          if (trigger.type === "device_state") {
+            if (trigger.device !== deviceId) continue;
 
-          // Resolve canonical property → actual MQTT property
-          const actualProp = resolveProperty(this.bridge, deviceId, trigger.entity, trigger.property);
-          if (!actualProp) continue;
+            // Resolve canonical property → actual MQTT property
+            const actualProp = resolveProperty(this.bridge, deviceId, trigger.entity, trigger.property);
+            if (!actualProp) continue;
 
-          const val = state[actualProp];
-          if (val === undefined) continue;
-          if (trigger.to !== undefined && val !== trigger.to) continue;
-          if (trigger.from !== undefined && (!prev || prev[actualProp] !== trigger.from)) continue;
-          this.fire(auto, `device_state:${deviceId}:${trigger.entity}:${trigger.property}`);
+            const val = state[actualProp];
+            if (val === undefined) continue;
+            if (trigger.to !== undefined && val !== trigger.to) continue;
+            if (trigger.from !== undefined && (!prev || prev[actualProp] !== trigger.from)) continue;
+            this.fire(auto, `device_state:${deviceId}:${trigger.entity}:${trigger.property}`);
+          } else if (trigger.type === "device_event") {
+            if (trigger.device !== deviceId) continue;
+
+            // Direct raw property match — no entity resolution
+            const val = state[trigger.property];
+            if (val === undefined) continue;
+            if (trigger.value !== undefined && val !== trigger.value) continue;
+            this.fire(auto, `device_event:${deviceId}:${trigger.property}=${String(val)}`);
+          }
         }
       }
     });
@@ -313,6 +350,14 @@ export class AutomationEngine {
         if (!actualProp) return false;
         const state = this.bridge.states.get(cond.device);
         return state?.[actualProp] === cond.equals;
+      }
+      case "and":
+        return cond.conditions.every(c => this.evaluateCondition(c));
+      case "or":
+        return cond.conditions.some(c => this.evaluateCondition(c));
+      case "xor": {
+        const trueCount = cond.conditions.filter(c => this.evaluateCondition(c)).length;
+        return trueCount === 1;
       }
     }
   }

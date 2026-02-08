@@ -1,0 +1,10 @@
+---
+description: Build and development workflow conventions
+alwaysApply: true
+---
+
+# Build & Dev Workflow
+
+- **Never run build commands directly** (no `npx`, `npm run build`, `tsc`, etc.). All services run inside Docker containers.
+- The dev environment uses **hot reload** via `make dev` (or `make logs-dev` to tail logs). It is typically already running in a terminal.
+- To check for issues, read linter output or inspect the running dev server logs in the terminal -- do not attempt to compile or build locally.

@@ -3,7 +3,7 @@ import { useDevices, useSetEntity, useRenameEntity, useRefreshStates } from "../
 import { Button } from "./ui/button.js";
 import { DebouncedSlider } from "./ui/slider.js";
 import { Input } from "./ui/input.js";
-import { Lightbulb, Plug, Power, Check, Thermometer, Sun, X } from "lucide-react";
+import { Lightbulb, Plug, Power, Check, Thermometer, Sun, X, Radio } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
 
 // ── Entities View ────────────────────────────────────────
@@ -82,6 +82,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
   onRename: (name: string) => void;
 }) {
   const { features, state } = entity;
+  const isSensor = entity.type === "sensor";
   const isOn = state?.[features.stateProperty] === "ON" ||
     // canonical fallback
     state?.state === "ON";
@@ -89,7 +90,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
   const [nameInput, setNameInput] = useState(entity.name);
 
   const isLight = entity.type === "light";
-  const EntityIcon = isLight ? Lightbulb : Plug;
+  const EntityIcon = isSensor ? Radio : isLight ? Lightbulb : Plug;
 
   // Slider values
   const serverBrightness = features.brightnessProperty && typeof state?.[features.brightnessProperty] === "number"
@@ -113,11 +114,13 @@ function EntityCard({ entity, device, onSet, onRename }: {
 
   return (
     <div className={`flex flex-col gap-2.5 rounded-lg p-3 transition-colors ${
+      isSensor ? "bg-sand-300/60 text-sand-700" :
       isOn ? "bg-sand-200 text-sand-800" : "bg-sand-300/60 text-sand-700"
     }`}>
       {/* Header row: icon, name, toggle */}
       <div className="flex items-center gap-2.5">
         <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+          isSensor ? "bg-sand-400/50 text-sand-600" :
           isOn ? "bg-teal-200/60 text-teal-700" : "bg-sand-400/50 text-sand-600"
         }`}>
           <EntityIcon className="h-4 w-4" />
@@ -150,7 +153,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
               title="Click to rename"
             >
                 <div className={`text-sm font-semibold truncate transition-colors ${
-                  isOn ? "hover:text-teal-700" : "hover:text-sand-900"
+                  isOn && !isSensor ? "hover:text-teal-700" : "hover:text-sand-900"
                 }`}>
                   {entity.name}
                 </div>
@@ -161,22 +164,42 @@ function EntityCard({ entity, device, onSet, onRename }: {
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Button
-            variant={isOn ? "success" : "secondary"}
-            size="sm"
-            onClick={handleToggle}
-            className="gap-1.5"
-          >
-            <Power className="h-3 w-3" />
-            <span className="font-mono text-[10px] uppercase">{isOn ? "on" : "off"}</span>
-          </Button>
-            <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-sand-400"}`} />
-        </div>
+        {!isSensor && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              variant={isOn ? "success" : "secondary"}
+              size="sm"
+              onClick={handleToggle}
+              className="gap-1.5"
+            >
+              <Power className="h-3 w-3" />
+              <span className="font-mono text-[10px] uppercase">{isOn ? "on" : "off"}</span>
+            </Button>
+              <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-sand-400"}`} />
+          </div>
+        )}
       </div>
 
+      {/* Sensor properties (read-only) */}
+      {isSensor && entity.sensorProperties && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 px-0.5">
+          {entity.sensorProperties.map((sp) => {
+            const val = state?.[sp.property];
+            if (val === undefined) return null;
+            return (
+              <div key={sp.property} className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono text-sand-500">{sp.name}</span>
+                <span className="text-xs font-mono font-medium text-sand-800">
+                  {String(val)}{sp.unit ? ` ${sp.unit}` : ""}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Sliders */}
-      {features.brightnessProperty && (
+      {!isSensor && features.brightnessProperty && (
         <DebouncedSlider
           min={1} max={254}
           serverValue={serverBrightness}
@@ -187,7 +210,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
         />
       )}
 
-      {features.colorTempProperty && (
+      {!isSensor && features.colorTempProperty && (
         <DebouncedSlider
           min={142} max={500}
           serverValue={serverColorTemp}

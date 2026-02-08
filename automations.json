@@ -54,6 +54,7 @@
           "every": 5
         }
       ],
+      "conditions": [],
       "actions": [
         {
           "type": "conditional",
@@ -81,6 +82,80 @@
               "entity": "main",
               "payload": {
                 "state": "OFF"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "toggle-little-lamp-button",
+      "name": "Toggle Little Lamp when Desk Button Pressed",
+      "enabled": true,
+      "triggers": [
+        {
+          "type": "device_event",
+          "device": "0xa4c138f959e3ad1b",
+          "property": "action",
+          "value": "single"
+        }
+      ],
+      "conditions": [],
+      "actions": [
+        {
+          "type": "conditional",
+          "condition": {
+            "type": "or",
+            "conditions": [
+              {
+                "type": "device_state",
+                "device": "0x44e2f8fffe194350",
+                "entity": "main",
+                "property": "state",
+                "equals": "ON"
+              },
+              {
+                "type": "device_state",
+                "device": "0x0cae5ffffe69064a",
+                "entity": "main",
+                "property": "state",
+                "equals": "ON"
+              }
+            ]
+          },
+          "then": [
+            {
+              "type": "device_set",
+              "device": "0x44e2f8fffe194350",
+              "entity": "main",
+              "payload": {
+                "state": "OFF"
+              }
+            },
+            {
+              "type": "device_set",
+              "device": "0x0cae5ffffe69064a",
+              "entity": "main",
+              "payload": {
+                "state": "OFF"
+              }
+            }
+          ],
+          "else": [
+            {
+              "type": "device_set",
+              "device": "0x44e2f8fffe194350",
+              "entity": "main",
+              "payload": {
+                "state": "ON"
+              }
+            },
+            {
+              "type": "device_set",
+              "device": "0x0cae5ffffe69064a",
+              "entity": "main",
+              "payload": {
+                "state": "ON"
               }
             }
           ]

@@ -9,13 +9,14 @@ import type { Automation, Trigger, Condition, Action } from "@minhome/server/aut
 
 // ── Defaults ──────────────────────────────────────────────
 
-const TRIGGER_TYPES = ["device_state", "mqtt", "cron", "time", "interval"] as const;
-const CONDITION_TYPES = ["time_range", "day_of_week", "device_state"] as const;
+const TRIGGER_TYPES = ["device_state", "device_event", "mqtt", "cron", "time", "interval"] as const;
+const CONDITION_TYPES = ["time_range", "day_of_week", "device_state", "and", "or", "xor"] as const;
 const ACTION_TYPES = ["device_set", "mqtt_publish", "delay", "conditional"] as const;
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
 function defaultTrigger(type: string = "device_state"): Trigger {
   switch (type) {
+    case "device_event": return { type: "device_event", device: "", property: "action" };
     case "mqtt":         return { type: "mqtt", topic: "" };
     case "cron":         return { type: "cron", expression: "0 * * * *" };
     case "time":         return { type: "time", at: "08:00" };
@@ -28,6 +29,9 @@ function defaultCondition(type: string = "time_range"): Condition {
   switch (type) {
     case "day_of_week":  return { type: "day_of_week", days: [] };
     case "device_state": return { type: "device_state", device: "", entity: "main", property: "state", equals: "ON" };
+    case "and":          return { type: "and", conditions: [defaultCondition("time_range")] };
+    case "or":           return { type: "or", conditions: [defaultCondition("time_range")] };
+    case "xor":          return { type: "xor", conditions: [defaultCondition("time_range")] };
     default:             return { type: "time_range", after: "08:00", before: "22:00" };
   }
 }
@@ -188,6 +192,22 @@ function TriggerEditor({ trigger, onChange, onRemove, devices }: {
           </>
         )}
 
+        {trigger.type === "device_event" && (
+          <>
+            <Field label="Device">
+              <DeviceSelect value={trigger.device} onChange={(v) => onChange({ ...trigger, device: v })} devices={devices} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Property">
+                <input className={fieldCls} value={trigger.property} onChange={(e) => onChange({ ...trigger, property: e.target.value })} placeholder="action" />
+              </Field>
+              <Field label="Value (opt)">
+                <SmartInput value={trigger.value} onChange={(v) => onChange({ ...trigger, value: v })} placeholder="any" />
+              </Field>
+            </div>
+          </>
+        )}
+
         {trigger.type === "mqtt" && (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Topic">
@@ -295,6 +315,29 @@ function ConditionEditor({ condition, onChange, onRemove, devices }: {
               </Field>
             </div>
           </>
+        )}
+
+        {(condition.type === "and" || condition.type === "or" || condition.type === "xor") && (
+          <div className="flex flex-col gap-2">
+            <SectionHeader
+              icon={Shield}
+              label={`${condition.type.toUpperCase()} sub-conditions`}
+              onAdd={() => onChange({ ...condition, conditions: [...condition.conditions, defaultCondition("time_range")] })}
+            />
+            {condition.conditions.map((sub, i) => (
+              <ConditionEditor
+                key={i}
+                condition={sub}
+                onChange={(updated) => {
+                  const copy = [...condition.conditions];
+                  copy[i] = updated;
+                  onChange({ ...condition, conditions: copy });
+                }}
+                onRemove={() => onChange({ ...condition, conditions: condition.conditions.filter((_, j) => j !== i) })}
+                devices={devices}
+              />
+            ))}
+          </div>
         )}
       </div>
     </ItemCard>
@@ -470,29 +513,33 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
   isSaving: boolean;
   devices: DeviceData[];
 }) {
+  const triggers = draft.triggers ?? [];
+  const conditions = draft.conditions ?? [];
+  const actions = draft.actions ?? [];
+
   const updateTrigger = (i: number, t: Trigger) => {
-    const triggers = [...draft.triggers];
-    triggers[i] = t;
-    onChange({ ...draft, triggers });
+    const copy = [...triggers];
+    copy[i] = t;
+    onChange({ ...draft, triggers: copy });
   };
-  const removeTrigger = (i: number) => onChange({ ...draft, triggers: draft.triggers.filter((_, j) => j !== i) });
-  const addTrigger = () => onChange({ ...draft, triggers: [...draft.triggers, defaultTrigger()] });
+  const removeTrigger = (i: number) => onChange({ ...draft, triggers: triggers.filter((_, j) => j !== i) });
+  const addTrigger = () => onChange({ ...draft, triggers: [...triggers, defaultTrigger()] });
 
   const updateCondition = (i: number, c: Condition) => {
-    const conditions = [...draft.conditions];
-    conditions[i] = c;
-    onChange({ ...draft, conditions });
+    const copy = [...conditions];
+    copy[i] = c;
+    onChange({ ...draft, conditions: copy });
   };
-  const removeCondition = (i: number) => onChange({ ...draft, conditions: draft.conditions.filter((_, j) => j !== i) });
-  const addCondition = () => onChange({ ...draft, conditions: [...draft.conditions, defaultCondition()] });
+  const removeCondition = (i: number) => onChange({ ...draft, conditions: conditions.filter((_, j) => j !== i) });
+  const addCondition = () => onChange({ ...draft, conditions: [...conditions, defaultCondition()] });
 
   const updateAction = (i: number, a: Action) => {
-    const actions = [...draft.actions];
-    actions[i] = a;
-    onChange({ ...draft, actions });
+    const copy = [...actions];
+    copy[i] = a;
+    onChange({ ...draft, actions: copy });
   };
-  const removeAction = (i: number) => onChange({ ...draft, actions: draft.actions.filter((_, j) => j !== i) });
-  const addAction = () => onChange({ ...draft, actions: [...draft.actions, defaultAction()] });
+  const removeAction = (i: number) => onChange({ ...draft, actions: actions.filter((_, j) => j !== i) });
+  const addAction = () => onChange({ ...draft, actions: [...actions, defaultAction()] });
 
   return (
     <div className="mt-4 flex flex-col gap-6">
@@ -528,10 +575,10 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
       <section>
         <SectionHeader icon={Radio} label="Triggers" onAdd={addTrigger} />
         <div className="flex flex-col gap-2">
-          {draft.triggers.map((t, i) => (
+          {triggers.map((t, i) => (
             <TriggerEditor key={i} trigger={t} onChange={(v) => updateTrigger(i, v)} onRemove={() => removeTrigger(i)} devices={devices} />
           ))}
-          {draft.triggers.length === 0 && (
+          {triggers.length === 0 && (
             <p className="text-xs text-sand-400 italic py-2">No triggers. Add at least one.</p>
           )}
         </div>
@@ -541,10 +588,10 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
       <section>
         <SectionHeader icon={Shield} label="Conditions" onAdd={addCondition} />
         <div className="flex flex-col gap-2">
-          {draft.conditions.map((c, i) => (
+          {conditions.map((c, i) => (
             <ConditionEditor key={i} condition={c} onChange={(v) => updateCondition(i, v)} onRemove={() => removeCondition(i)} devices={devices} />
           ))}
-          {draft.conditions.length === 0 && (
+          {conditions.length === 0 && (
             <p className="text-xs text-sand-400 italic py-2">No conditions — automation always runs when triggered.</p>
           )}
         </div>
@@ -554,10 +601,10 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
       <section>
         <SectionHeader icon={Zap} label="Actions" onAdd={addAction} />
         <div className="flex flex-col gap-2">
-          {draft.actions.map((a, i) => (
+          {actions.map((a, i) => (
             <ActionEditor key={i} action={a} onChange={(v) => updateAction(i, v)} onRemove={() => removeAction(i)} devices={devices} />
           ))}
-          {draft.actions.length === 0 && (
+          {actions.length === 0 && (
             <p className="text-xs text-sand-400 italic py-2">No actions. Add at least one.</p>
           )}
         </div>

@@ -22,6 +22,7 @@ export function buildSystemPrompt(bridge: MqttBridge, config: ConfigStore, autom
           name: e.name,
           type: e.type,
           state: e.state,
+          ...(e.sensorProperties ? { sensorProperties: e.sensorProperties } : {}),
         })),
         type: d.type,
         vendor: d.definition?.vendor ?? null,
@@ -52,7 +53,8 @@ Guidelines:
 - Only use control_device for device-level properties that don't belong to any entity (e.g. power_on_behavior).
 - Refer to devices by their friendly name, not their IEEE address.
 - If a device has named entities (e.g. individual sockets on a multi-plug), refer to them by their entity name.
-- When creating automations, always include the "entity" field for device_state triggers/conditions and device_set actions.
+- When creating automations for controllable devices (lights, switches), use "device_state" triggers/conditions with the "entity" field and canonical property names.
+- When creating automations for input-only devices (buttons, contact sensors, motion sensors), use "device_event" triggers with the raw MQTT property name. For example, a button press trigger: {"type":"device_event","device":"<ieee>","property":"action","value":"single"}. Common properties: "action" (buttons), "contact" (door sensors), "occupancy" (motion sensors). Omit "value" to match any value.
 - After performing an action, briefly confirm what you did.
 - If you're unsure about a device or action, ask for clarification.
 - When asked to modify the room configuration, ALWAYS call get_room_config first to read the current state. Then use the appropriate granular tool: set_room_dimensions for size/floor, set_room_lights for light placements, upsert_furniture_item to add/edit a single named piece, remove_furniture_item to delete one, or update_room_furniture to replace the entire furniture array. Never guess at the existing config.

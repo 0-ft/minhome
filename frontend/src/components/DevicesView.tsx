@@ -5,7 +5,7 @@ import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { DebouncedSlider } from "./ui/slider.js";
 import { Input } from "./ui/input.js";
-import { Lightbulb, Plug, Power, Check, Thermometer, Sun, ChevronRight, X } from "lucide-react";
+import { Lightbulb, Plug, Power, Check, Thermometer, Sun, ChevronRight, X, Radio } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
 
 // ── Devices View ────────────────────────────────────────
@@ -71,8 +71,9 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
   const [nameInput, setNameInput] = useState(device.name);
   const [showRaw, setShowRaw] = useState(false);
 
+  const isSensor = entities.some(e => e.type === "sensor");
   const isLight = entities.some(e => e.type === "light");
-  const DeviceIcon = isLight ? Lightbulb : Plug;
+  const DeviceIcon = isSensor ? Radio : isLight ? Lightbulb : Plug;
 
   return (
     <Card className="transition-all duration-200">
@@ -182,6 +183,7 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
   onRenameEntity: (entityId: string, name: string) => void;
 }) {
   const { features, state } = entity;
+  const isSensor = entity.type === "sensor";
   const isOn = state?.[features.stateProperty] === "ON";
   const [editingEntity, setEditingEntity] = useState(false);
   const [entityInput, setEntityInput] = useState(entity.name);
@@ -206,6 +208,36 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
       });
     }
   };
+
+  // Sensor entities: read-only display
+  if (isSensor) {
+    return (
+      <div className="flex flex-col gap-1.5 rounded-lg p-3 bg-blood-500/40 text-blood-100">
+        {showLabel && (
+          <span className="text-[10px] font-mono font-medium uppercase tracking-wider text-blood-200">
+            {entity.name}
+          </span>
+        )}
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          {entity.sensorProperties?.map((sp) => {
+            const val = state?.[sp.property];
+            if (val === undefined) return null;
+            return (
+              <div key={sp.property} className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono text-blood-200">{sp.name}</span>
+                <span className="text-xs font-mono font-medium text-sand-50">
+                  {String(val)}{sp.unit ? ` ${sp.unit}` : ""}
+                </span>
+              </div>
+            );
+          })}
+          {(!entity.sensorProperties || entity.sensorProperties.length === 0) && (
+            <span className="text-[10px] font-mono text-blood-200">No data</span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col gap-2 rounded-lg p-3 transition-colors ${
