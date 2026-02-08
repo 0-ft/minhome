@@ -163,3 +163,4 @@ minhome automation delete morning-lights
 - **[hono](https://hono.dev/)** — RPC client (shared types with `@minhome/server`)
 - **[@minhome/server](../server/)** — workspace dependency for `AppType` type import
 
+

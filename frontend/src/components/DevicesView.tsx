@@ -6,8 +6,7 @@ import { Badge } from "./ui/badge.js";
 import { DebouncedSlider } from "./ui/slider.js";
 import { Input } from "./ui/input.js";
 import { Lightbulb, Plug, Power, Check, Thermometer, Sun, ChevronRight, X } from "lucide-react";
-import type { DeviceData, Control } from "../types.js";
-import { extractControls } from "../types.js";
+import type { DeviceData, Entity } from "../types.js";
 
 // ── Devices View ────────────────────────────────────────
 
@@ -67,12 +66,12 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
   onRename: (name: string) => void;
   onRenameEntity: (entityId: string, name: string) => void;
 }) {
-  const controls = extractControls(device.exposes);
+  const entities = device.entities ?? [];
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState(device.name);
   const [showRaw, setShowRaw] = useState(false);
 
-  const isLight = controls.some(c => c.type === "light");
+  const isLight = entities.some(e => e.type === "light");
   const DeviceIcon = isLight ? Lightbulb : Plug;
 
   return (
@@ -128,14 +127,15 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
       </CardHeader>
 
       <CardContent>
-        {/* Controls */}
-        {controls.length > 0 ? (
+        {/* Entity controls */}
+        {entities.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {controls.map((ctrl) => (
-              <ControlRow
-                key={ctrl.stateProperty}
-                ctrl={ctrl}
+            {entities.map((entity) => (
+              <EntityControlRow
+                key={entity.key}
+                entity={entity}
                 device={device}
+                showLabel={entities.length > 1}
                 onSet={onSet}
                 onRenameEntity={onRenameEntity}
               />
@@ -172,37 +172,37 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
   );
 }
 
-// ── Control Row ─────────────────────────────────────────
+// ── Entity Control Row ──────────────────────────────────
 
-function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
-  ctrl: Control;
+function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: {
+  entity: Entity;
   device: DeviceData;
+  showLabel: boolean;
   onSet: (payload: Record<string, unknown>) => void;
   onRenameEntity: (entityId: string, name: string) => void;
 }) {
-  const isOn = device.state?.[ctrl.stateProperty] === "ON";
-  const endpoint = ctrl.endpoint;
-  const entityLabel = endpoint ? (device.entities?.[endpoint] ?? endpoint) : undefined;
+  const { features, state } = entity;
+  const isOn = state?.[features.stateProperty] === "ON";
   const [editingEntity, setEditingEntity] = useState(false);
-  const [entityInput, setEntityInput] = useState(entityLabel ?? "");
+  const [entityInput, setEntityInput] = useState(entity.name);
 
   // Lift slider values so we can bundle them into the ON command
-  const serverBrightness = ctrl.brightnessProperty && typeof device.state?.[ctrl.brightnessProperty] === "number"
-    ? device.state[ctrl.brightnessProperty] as number : 127;
-  const serverColorTemp = ctrl.colorTempProperty && typeof device.state?.[ctrl.colorTempProperty] === "number"
-    ? device.state[ctrl.colorTempProperty] as number : 370;
+  const serverBrightness = features.brightnessProperty && typeof state?.[features.brightnessProperty] === "number"
+    ? state[features.brightnessProperty] as number : 127;
+  const serverColorTemp = features.colorTempProperty && typeof state?.[features.colorTempProperty] === "number"
+    ? state[features.colorTempProperty] as number : 370;
   const [brightness, setBrightness] = useState(serverBrightness);
   const [colorTemp, setColorTemp] = useState(serverColorTemp);
 
   const handleToggle = () => {
     if (isOn) {
-      onSet({ [ctrl.stateProperty]: "OFF" });
+      onSet({ [features.stateProperty]: "OFF" });
     } else {
       // Bundle current slider values so the device turns on at the visible position
       onSet({
-        [ctrl.stateProperty]: "ON",
-        ...(ctrl.brightnessProperty && { [ctrl.brightnessProperty]: brightness }),
-        ...(ctrl.colorTempProperty && { [ctrl.colorTempProperty]: colorTemp }),
+        [features.stateProperty]: "ON",
+        ...(features.brightnessProperty && { [features.brightnessProperty]: brightness }),
+        ...(features.colorTempProperty && { [features.colorTempProperty]: colorTemp }),
       });
     }
   };
@@ -212,11 +212,11 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
       isOn ? "bg-sand-200 text-sand-800" : "bg-blood-500/40 text-blood-100"
     }`}>
       <div className="flex items-center gap-2.5">
-        {/* Entity label */}
-        {endpoint && (
+        {/* Entity label (always show for multi-entity, hidden for single-entity) */}
+        {showLabel && (
           editingEntity ? (
             <form
-              onSubmit={(e) => { e.preventDefault(); onRenameEntity(endpoint, entityInput); setEditingEntity(false); }}
+              onSubmit={(e) => { e.preventDefault(); onRenameEntity(entity.key, entityInput); setEditingEntity(false); }}
               className="flex gap-1 items-center"
             >
               <Input
@@ -236,10 +236,10 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
               className={`text-[10px] font-mono font-medium uppercase tracking-wider min-w-8 cursor-pointer transition-colors ${
                 isOn ? "text-teal-600 hover:text-teal-700" : "text-blood-200 hover:text-sand-50"
               }`}
-              onClick={() => { setEntityInput(entityLabel ?? endpoint); setEditingEntity(true); }}
+              onClick={() => { setEntityInput(entity.name); setEditingEntity(true); }}
               title="Click to rename"
             >
-              {entityLabel}
+              {entity.name}
             </span>
           )
         )}
@@ -260,28 +260,27 @@ function ControlRow({ ctrl, device, onSet, onRenameEntity }: {
       </div>
 
       {/* Sliders */}
-      {ctrl.brightnessProperty && (
+      {features.brightnessProperty && (
         <DebouncedSlider
           min={1} max={254}
           serverValue={serverBrightness}
           value={brightness}
           onValueChange={setBrightness}
-          onCommit={(val) => onSet({ [ctrl.brightnessProperty!]: val })}
+          onCommit={(val) => onSet({ [features.brightnessProperty!]: val })}
           label={<Sun className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
         />
       )}
 
-      {ctrl.colorTempProperty && (
+      {features.colorTempProperty && (
         <DebouncedSlider
           min={142} max={500}
           serverValue={serverColorTemp}
           value={colorTemp}
           onValueChange={setColorTemp}
-          onCommit={(val) => onSet({ [ctrl.colorTempProperty!]: val })}
+          onCommit={(val) => onSet({ [features.colorTempProperty!]: val })}
           label={<Thermometer className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
         />
       )}
     </div>
   );
 }
-

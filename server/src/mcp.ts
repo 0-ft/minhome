@@ -34,11 +34,29 @@ server.tool(
 );
 
 server.tool(
-  "control_device",
-  'Send a command to a device (e.g. turn on/off, set brightness, change color)',
+  "control_entity",
+  "Send a command to a specific entity on a device (e.g. turn on/off, set brightness, change color). Use canonical property names (state, brightness, color_temp) — the server resolves suffixed names automatically. For single-entity devices, use entity='main'.",
   {
     id: z.string().describe("Device IEEE address"),
-    payload: z.record(z.string(), z.unknown()).describe('Command payload, e.g. {"state":"ON","brightness":200}'),
+    entity: z.string().describe("Entity key, e.g. 'main' for single-entity devices, 'l1'/'l2'/'l3' for multi-entity"),
+    payload: z.record(z.string(), z.unknown()).describe('Command payload with canonical property names, e.g. {"state":"ON","brightness":200}'),
+  },
+  async ({ id, entity, payload }) => {
+    const res = await api.api.devices[":id"].entities[":entityKey"].set.$post({
+      param: { id, entityKey: entity },
+      json: payload,
+    });
+    const body = await res.json();
+    return { content: [{ type: "text", text: JSON.stringify(body) }] };
+  },
+);
+
+server.tool(
+  "control_device",
+  "Send a raw command to a device for device-level properties that don't belong to any entity (e.g. power_on_behavior). For entity state changes (on/off, brightness, color), use control_entity instead.",
+  {
+    id: z.string().describe("Device IEEE address"),
+    payload: z.record(z.string(), z.unknown()).describe('Command payload, e.g. {"power_on_behavior":"previous"}'),
   },
   async ({ id, payload }) => {
     const res = await api.api.devices[":id"].set.$post({ param: { id }, json: payload });
@@ -72,7 +90,7 @@ server.tool(
   async ({ id, entity_id, name }) => {
     const res = await api.api.devices[":id"].config.$put({
       param: { id },
-      json: { entities: { [entity_id]: name } },
+      json: { entities: { [entity_id]: { name } } },
     });
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
@@ -101,7 +119,7 @@ The room config has this structure:
     - "extrude": { name?, position (base), points (2D polygon, min 3), depth, color, rotation? }
     Group (collects related primitives into a named piece of furniture):
     - "group": { name (required), items: [ ...primitives ] }
-- lights: array of { deviceId (IEEE address), entityId? (endpoint), position [x,y,z], type ("ceiling"|"desk"|"table"|"floor") }
+- lights: array of { deviceId (IEEE address), entityId (entity key, e.g. 'main'), position [x,y,z], type ("ceiling"|"desk"|"table"|"floor") }
 - camera: optional, will be preserved automatically — do not include it.
 
 All positions/sizes are in metres. Colours are CSS strings. Use groups to keep multi-part furniture (e.g. a desk with legs, a shelving unit) logically organised.`,
@@ -172,4 +190,3 @@ main().catch((err) => {
   console.error("[mcp] Fatal:", err);
   process.exit(1);
 });
-

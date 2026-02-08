@@ -20,14 +20,14 @@ function defaultTrigger(type: string = "device_state"): Trigger {
     case "cron":         return { type: "cron", expression: "0 * * * *" };
     case "time":         return { type: "time", at: "08:00" };
     case "interval":     return { type: "interval", every: 300 };
-    default:             return { type: "device_state", device: "", property: "state" };
+    default:             return { type: "device_state", device: "", entity: "main", property: "state" };
   }
 }
 
 function defaultCondition(type: string = "time_range"): Condition {
   switch (type) {
     case "day_of_week":  return { type: "day_of_week", days: [] };
-    case "device_state": return { type: "device_state", device: "", property: "state", equals: "ON" };
+    case "device_state": return { type: "device_state", device: "", entity: "main", property: "state", equals: "ON" };
     default:             return { type: "time_range", after: "08:00", before: "22:00" };
   }
 }
@@ -37,7 +37,7 @@ function defaultAction(type: string = "device_set"): Action {
     case "mqtt_publish": return { type: "mqtt_publish", topic: "", payload: "" };
     case "delay":        return { type: "delay", seconds: 5 };
     case "conditional":  return { type: "conditional", condition: defaultCondition(), then: [defaultAction("device_set")] };
-    default:             return { type: "device_set", device: "", payload: {} };
+    default:             return { type: "device_set", device: "", entity: "main", payload: {} };
   }
 }
 
@@ -66,6 +66,22 @@ function DeviceSelect({ value, onChange, devices }: { value: string; onChange: (
       <option value="">Select device…</option>
       {devices.map((d) => (
         <option key={d.id} value={d.id}>{d.name}</option>
+      ))}
+    </select>
+  );
+}
+
+function EntitySelect({ value, onChange, device, devices }: { value: string; onChange: (v: string) => void; device: string; devices: DeviceData[] }) {
+  const entities = useMemo(() => {
+    const d = devices.find(d => d.id === device);
+    return d?.entities ?? [];
+  }, [device, devices]);
+
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={selectCls}>
+      {entities.length === 0 && <option value="main">main</option>}
+      {entities.map((e) => (
+        <option key={e.key} value={e.key}>{e.name} ({e.key})</option>
       ))}
     </select>
   );
@@ -150,9 +166,14 @@ function TriggerEditor({ trigger, onChange, onRemove, devices }: {
 
         {trigger.type === "device_state" && (
           <>
-            <Field label="Device">
-              <DeviceSelect value={trigger.device} onChange={(v) => onChange({ ...trigger, device: v })} devices={devices} />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Device">
+                <DeviceSelect value={trigger.device} onChange={(v) => onChange({ ...trigger, device: v })} devices={devices} />
+              </Field>
+              <Field label="Entity">
+                <EntitySelect value={trigger.entity} onChange={(v) => onChange({ ...trigger, entity: v })} device={trigger.device} devices={devices} />
+              </Field>
+            </div>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Property">
                 <input className={fieldCls} value={trigger.property} onChange={(e) => onChange({ ...trigger, property: e.target.value })} />
@@ -257,9 +278,14 @@ function ConditionEditor({ condition, onChange, onRemove, devices }: {
 
         {condition.type === "device_state" && (
           <>
-            <Field label="Device">
-              <DeviceSelect value={condition.device} onChange={(v) => onChange({ ...condition, device: v })} devices={devices} />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Device">
+                <DeviceSelect value={condition.device} onChange={(v) => onChange({ ...condition, device: v })} devices={devices} />
+              </Field>
+              <Field label="Entity">
+                <EntitySelect value={condition.entity} onChange={(v) => onChange({ ...condition, entity: v })} device={condition.device} devices={devices} />
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Property">
                 <input className={fieldCls} value={condition.property} onChange={(e) => onChange({ ...condition, property: e.target.value })} />
@@ -336,9 +362,14 @@ function ActionEditor({ action, onChange, onRemove, devices, depth = 0 }: {
 
         {action.type === "device_set" && (
           <>
-            <Field label="Device">
-              <DeviceSelect value={action.device} onChange={(v) => onChange({ ...action, device: v })} devices={devices} />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Device">
+                <DeviceSelect value={action.device} onChange={(v) => onChange({ ...action, device: v })} devices={devices} />
+              </Field>
+              <Field label="Entity">
+                <EntitySelect value={action.entity} onChange={(v) => onChange({ ...action, entity: v })} device={action.device} devices={devices} />
+              </Field>
+            </div>
             <Field label="Payload">
               <PayloadEditor payload={action.payload} onChange={(p) => onChange({ ...action, payload: p })} />
             </Field>

@@ -2,16 +2,18 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { z } from "zod";
 import { Cron } from "croner";
 import type { MqttBridge, DeviceState } from "./mqtt.js";
+import { extractEntitiesFromExposes, resolveCanonicalProperty, resolveEntityPayload } from "./config/devices.js";
 
 // --- Zod schemas ---
 
 const TriggerDeviceState = z.object({
   type: z.literal("device_state").describe("Trigger type: fires when a device's state property changes"),
   device: z.string().describe("IEEE address of the device to watch, e.g. '0xa4c138d2b1cf1389'"),
-  property: z.string().describe("State property name to monitor, e.g. 'state', 'brightness', 'temperature'"),
+  entity: z.string().describe("Entity key, e.g. 'main' for single-entity devices, 'l1'/'l2'/'l3' for multi-entity"),
+  property: z.string().describe("Canonical property name to monitor, e.g. 'state', 'brightness', 'color_temp'"),
   to: z.unknown().optional().describe("Value the property must change TO for the trigger to fire (omit to match any new value)"),
   from: z.unknown().optional().describe("Value the property must change FROM for the trigger to fire (omit to match any previous value)"),
-}).describe("Trigger that fires when a device's state property changes");
+}).describe("Trigger that fires when a device entity's state property changes");
 
 const TriggerMqtt = z.object({
   type: z.literal("mqtt").describe("Trigger type: fires on a raw MQTT message"),
@@ -54,11 +56,12 @@ const ConditionDayOfWeek = z.object({
 }).describe("Condition that passes only on the specified days of the week");
 
 const ConditionDeviceState = z.object({
-  type: z.literal("device_state").describe("Condition type: passes only when a device property has a specific value"),
+  type: z.literal("device_state").describe("Condition type: passes only when a device entity property has a specific value"),
   device: z.string().describe("IEEE address of the device to check"),
-  property: z.string().describe("State property name to check, e.g. 'state', 'brightness'"),
+  entity: z.string().describe("Entity key, e.g. 'main' or 'l3'"),
+  property: z.string().describe("Canonical property name to check, e.g. 'state', 'brightness'"),
   equals: z.unknown().describe("Required value of the property for the condition to pass, e.g. 'ON', 255"),
-}).describe("Condition that passes only when a device's state property equals a specific value");
+}).describe("Condition that passes only when a device entity's state property equals a specific value");
 
 export const ConditionSchema = z.discriminatedUnion("type", [
   ConditionTimeRange,
@@ -67,10 +70,11 @@ export const ConditionSchema = z.discriminatedUnion("type", [
 ]).describe("A condition that must be true for the automation to proceed. Set 'type' to one of: 'time_range', 'day_of_week', 'device_state'");
 
 const ActionDeviceSet = z.object({
-  type: z.literal("device_set").describe("Action type: send a state command to a device"),
+  type: z.literal("device_set").describe("Action type: send a state command to a device entity"),
   device: z.string().describe("IEEE address of the target device"),
-  payload: z.looseObject({}).describe("Key-value payload to send to the device, e.g. {\"state\":\"ON\",\"brightness\":200,\"color_temp\":350}"),
-}).describe("Action that sends a state command to a Zigbee device");
+  entity: z.string().describe("Entity key, e.g. 'main' or 'l3'"),
+  payload: z.looseObject({}).describe("Key-value payload with canonical property names, e.g. {\"state\":\"ON\",\"brightness\":200,\"color_temp\":350}"),
+}).describe("Action that sends a state command to a Zigbee device entity");
 
 const ActionMqttPublish = z.object({
   type: z.literal("mqtt_publish").describe("Action type: publish a raw MQTT message"),
@@ -123,6 +127,18 @@ export type Automation = z.infer<typeof AutomationSchema>;
 export type Trigger = z.infer<typeof TriggerSchema>;
 export type Condition = z.infer<typeof ConditionSchema>;
 export type { Action };
+
+// --- Helpers ---
+
+/** Resolve canonical property name to actual MQTT property name for a device entity */
+function resolveProperty(bridge: MqttBridge, deviceId: string, entityKey: string, canonical: string): string | null {
+  const device = bridge.devices.get(deviceId);
+  const exposes = device?.definition?.exposes ?? [];
+  const extracted = extractEntitiesFromExposes(exposes);
+  const entityDef = extracted.find(e => e.key === entityKey);
+  if (!entityDef) return null;
+  return resolveCanonicalProperty(entityDef, canonical);
+}
 
 // --- Engine ---
 
@@ -235,11 +251,16 @@ export class AutomationEngine {
         for (const trigger of auto.triggers) {
           if (trigger.type !== "device_state") continue;
           if (trigger.device !== deviceId) continue;
-          const val = state[trigger.property];
+
+          // Resolve canonical property → actual MQTT property
+          const actualProp = resolveProperty(this.bridge, deviceId, trigger.entity, trigger.property);
+          if (!actualProp) continue;
+
+          const val = state[actualProp];
           if (val === undefined) continue;
           if (trigger.to !== undefined && val !== trigger.to) continue;
-          if (trigger.from !== undefined && (!prev || prev[trigger.property] !== trigger.from)) continue;
-          this.fire(auto, `device_state:${deviceId}:${trigger.property}`);
+          if (trigger.from !== undefined && (!prev || prev[actualProp] !== trigger.from)) continue;
+          this.fire(auto, `device_state:${deviceId}:${trigger.entity}:${trigger.property}`);
         }
       }
     });
@@ -288,8 +309,10 @@ export class AutomationEngine {
         return cond.days.includes(days[now.getDay()]);
       }
       case "device_state": {
+        const actualProp = resolveProperty(this.bridge, cond.device, cond.entity, cond.property);
+        if (!actualProp) return false;
         const state = this.bridge.states.get(cond.device);
-        return state?.[cond.property] === cond.equals;
+        return state?.[actualProp] === cond.equals;
       }
     }
   }
@@ -297,9 +320,20 @@ export class AutomationEngine {
   private async executeActions(actions: Action[]): Promise<void> {
     for (const action of actions) {
       switch (action.type) {
-        case "device_set":
-          this.bridge.setDeviceState(action.device, action.payload as Record<string, unknown>);
+        case "device_set": {
+          const device = this.bridge.devices.get(action.device);
+          const exposes = device?.definition?.exposes ?? [];
+          const extracted = extractEntitiesFromExposes(exposes);
+          const entityDef = extracted.find(e => e.key === action.entity);
+          if (entityDef) {
+            const resolved = resolveEntityPayload(entityDef, action.payload as Record<string, unknown>);
+            this.bridge.setDeviceState(action.device, resolved);
+          } else {
+            // Fallback: send payload as-is
+            this.bridge.setDeviceState(action.device, action.payload as Record<string, unknown>);
+          }
           break;
+        }
         case "mqtt_publish":
           this.bridge.publish(action.topic, action.payload);
           break;
@@ -330,4 +364,3 @@ function mqttTopicMatch(pattern: string, topic: string): boolean {
   }
   return patParts.length === topParts.length;
 }
-

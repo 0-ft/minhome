@@ -75,7 +75,7 @@ export function useRenameEntity() {
     mutationFn: async ({ deviceId, entityId, name }: { deviceId: string; entityId: string; name: string }) => {
       const res = await api.api.devices[":id"].config.$put({
         param: { id: deviceId },
-        json: { entities: { [entityId]: name } },
+        json: { entities: { [entityId]: { name } } },
       });
       return res.json();
     },

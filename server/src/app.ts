@@ -2,12 +2,37 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { MqttBridge } from "./mqtt.js";
-import { CameraSchema, RoomSchema } from "./config/config.js";
+import { CameraSchema, RoomSchema, EntityConfigSchema, extractEntitiesFromExposes, buildEntityResponses, resolveEntityPayload } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { createChatRoute } from "./chat/index.js";
+
+function buildDeviceResponse(bridge: MqttBridge, config: ConfigStore, id: string) {
+  const d = bridge.devices.get(id);
+  if (!d) return null;
+  const custom = config.getDevice(id);
+  const state = bridge.states.get(id) ?? {};
+  const exposes = d.definition?.exposes ?? [];
+  const extracted = extractEntitiesFromExposes(exposes);
+  const deviceName = custom?.name ?? d.friendly_name;
+  const entities = buildEntityResponses(extracted, deviceName, custom?.entities, state);
+
+  return {
+    id: d.ieee_address,
+    friendly_name: d.friendly_name,
+    name: deviceName,
+    entities,
+    type: d.type,
+    vendor: d.definition?.vendor ?? null,
+    model: d.definition?.model ?? null,
+    description: d.definition?.description ?? null,
+    supported: d.supported ?? false,
+    state,
+    exposes,
+  };
+}
 
 export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
   const app = new Hono();
@@ -22,45 +47,16 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
     .get("/api/devices", (c) => {
       const devices = [...bridge.devices.values()]
         .filter(d => d.type !== "Coordinator")
-        .map(d => {
-          const custom = config.getDevice(d.ieee_address);
-          const state = bridge.states.get(d.ieee_address);
-          return {
-            id: d.ieee_address,
-            friendly_name: d.friendly_name,
-            name: custom?.name ?? d.friendly_name,
-            entities: custom?.entities ?? {},
-            type: d.type,
-            vendor: d.definition?.vendor ?? null,
-            model: d.definition?.model ?? null,
-            description: d.definition?.description ?? null,
-            supported: d.supported ?? false,
-            state: state ?? {},
-            exposes: d.definition?.exposes ?? [],
-          };
-        });
+        .map(d => buildDeviceResponse(bridge, config, d.ieee_address))
+        .filter(Boolean);
       return c.json(devices);
     })
 
     .get("/api/devices/:id", (c) => {
       const id = c.req.param("id");
-      const d = bridge.devices.get(id);
-      if (!d) return c.json({ error: "Device not found" }, 404);
-      const custom = config.getDevice(id);
-      const state = bridge.states.get(id);
-      return c.json({
-        id: d.ieee_address,
-        friendly_name: d.friendly_name,
-        name: custom?.name ?? d.friendly_name,
-        entities: custom?.entities ?? {},
-        type: d.type,
-        vendor: d.definition?.vendor ?? null,
-        model: d.definition?.model ?? null,
-        description: d.definition?.description ?? null,
-        supported: d.supported ?? false,
-        state: state ?? {},
-        exposes: d.definition?.exposes ?? [],
-      });
+      const device = buildDeviceResponse(bridge, config, id);
+      if (!device) return c.json({ error: "Device not found" }, 404);
+      return c.json(device);
     })
 
     .post("/api/devices/refresh", (c) => {
@@ -79,10 +75,30 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
       },
     )
 
+    .post("/api/devices/:id/entities/:entityKey/set",
+      zValidator("json", z.record(z.string(), z.unknown())),
+      (c) => {
+        const id = c.req.param("id");
+        const entityKey = c.req.param("entityKey");
+        const device = bridge.devices.get(id);
+        if (!device) return c.json({ error: "Device not found" }, 404);
+
+        const exposes = device.definition?.exposes ?? [];
+        const extracted = extractEntitiesFromExposes(exposes);
+        const entity = extracted.find(e => e.key === entityKey);
+        if (!entity) return c.json({ error: "Entity not found" }, 404);
+
+        const canonical = c.req.valid("json") as Record<string, unknown>;
+        const resolved = resolveEntityPayload(entity, canonical);
+        bridge.setDeviceState(id, resolved);
+        return c.json({ ok: true });
+      },
+    )
+
     .put("/api/devices/:id/config",
       zValidator("json", z.object({
         name: z.string().optional(),
-        entities: z.record(z.string(), z.string()).optional(),
+        entities: z.record(z.string(), EntityConfigSchema).optional(),
       })),
       (c) => {
         const id = c.req.param("id");
@@ -194,4 +210,3 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
 }
 
 export type AppType = ReturnType<typeof createApp>["app"];
-

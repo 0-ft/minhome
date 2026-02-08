@@ -3,8 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { useDevices, useConfig, useRefreshStates, useSetDevice } from "../api.js";
-import type { DeviceData } from "../types.js";
-import { extractControls } from "../types.js";
+import type { DeviceData, Entity } from "../types.js";
 
 // ── Types matching server config/room.ts ─────────────────
 export interface RoomDimensions {
@@ -24,7 +23,7 @@ export type FurnitureItem = FurniturePrimitive | FurnitureGroup;
 
 export interface RoomLightDef {
   deviceId: string;
-  entityId?: string;
+  entityId: string;
   position: [number, number, number];
   type: "ceiling" | "desk" | "table" | "floor";
 }
@@ -156,6 +155,12 @@ function Furniture({ items }: { items: FurnitureItem[] }) {
   );
 }
 
+// ── Find entity for a room light ────────────────────────
+function findEntityForLight(device: DeviceData | undefined, entityId: string): Entity | undefined {
+  if (!device) return undefined;
+  return device.entities?.find(e => e.key === entityId);
+}
+
 // ── Animated light orb ──────────────────────────────────
 function LightOrb({
   light,
@@ -170,34 +175,32 @@ function LightOrb({
   const [showLabel, setShowLabel] = useReactState(false);
   const hovered = useRef(false);
 
+  const entity = useMemo(() => findEntityForLight(device, light.entityId), [device, light.entityId]);
+
   const label = useMemo(() => {
-    if (!device) return light.deviceId;
-    if (light.entityId && device.entities?.[light.entityId]) return device.entities[light.entityId];
-    return device.name;
-  }, [device, light.deviceId, light.entityId]);
+    if (entity) return entity.name;
+    if (device) return device.name;
+    return light.deviceId;
+  }, [entity, device, light.deviceId]);
 
   const { isOn, brightness, colorTemp, stateProperty } = useMemo(() => {
-    if (!device) return { isOn: false, brightness: 0, colorTemp: 370, stateProperty: "state" };
-    const controls = extractControls(device.exposes);
-    const ctrl = light.entityId
-      ? controls.find((c) => c.endpoint === light.entityId)
-      : controls[0];
-    if (!ctrl) return { isOn: false, brightness: 0, colorTemp: 370, stateProperty: "state" };
+    if (!entity) return { isOn: false, brightness: 0, colorTemp: 370, stateProperty: "state" };
 
-    const on = device.state?.[ctrl.stateProperty] === "ON";
+    const { features, state } = entity;
+    const on = state?.[features.stateProperty] === "ON";
     const br =
-      ctrl.brightnessProperty &&
-      typeof device.state?.[ctrl.brightnessProperty] === "number"
-        ? (device.state[ctrl.brightnessProperty] as number)
+      features.brightnessProperty &&
+      typeof state?.[features.brightnessProperty] === "number"
+        ? (state[features.brightnessProperty] as number)
         : 127;
     const ct =
-      ctrl.colorTempProperty &&
-      typeof device.state?.[ctrl.colorTempProperty] === "number"
-        ? (device.state[ctrl.colorTempProperty] as number)
+      features.colorTempProperty &&
+      typeof state?.[features.colorTempProperty] === "number"
+        ? (state[features.colorTempProperty] as number)
         : 370;
 
-    return { isOn: on, brightness: br, colorTemp: ct, stateProperty: ctrl.stateProperty };
-  }, [device, light.entityId]);
+    return { isOn: on, brightness: br, colorTemp: ct, stateProperty: features.stateProperty };
+  }, [entity]);
 
   const targetColor = useMemo(() => miredToColor(colorTemp), [colorTemp]);
   const normalizedBr = brightness / 254;

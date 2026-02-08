@@ -27,6 +27,13 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
 
 const { app, injectWebSocket } = createApp(bridge, config, automationEngine);
 
+// Auto-populate entity configs when Z2M device list arrives
+bridge.on("devices", (devices: unknown) => {
+  if (Array.isArray(devices)) {
+    config.autoPopulateEntities(devices);
+  }
+});
+
 // Serve frontend static files in production
 const frontendDist = resolve(import.meta.dirname, "../../frontend/dist");
 if (existsSync(frontendDist)) {

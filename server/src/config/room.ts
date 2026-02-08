@@ -69,10 +69,10 @@ export type FurnitureItem = z.infer<typeof FurnitureItemSchema>;
 
 export const RoomLightSchema = z.object({
   deviceId: z.string().describe("IEEE address of the Zigbee device that controls this light, e.g. '0xa4c138d2b1cf1389'."),
-  entityId: z.string().optional().describe("Entity/endpoint ID if the device has multiple endpoints, e.g. 'l1', 'l2'. Omit for single-endpoint devices."),
+  entityId: z.string().default("main").describe("Entity key for the light entity on this device, e.g. 'main' for single-entity devices, 'l1', 'l2' for multi-entity. Defaults to 'main'."),
   position: Vec3.describe("Position [x, y, z] of the light orb in the 3D scene, in metres."),
   type: z.enum(["ceiling", "desk", "table", "floor"]).describe("Light mounting type. Affects visual rendering style."),
-}).describe("A light source in the 3D room scene, linked to a real Zigbee device. Its visual state (on/off, brightness, colour temperature) is driven by live device data.");
+}).describe("A light source in the 3D room scene, linked to a real Zigbee device entity. Its visual state (on/off, brightness, colour temperature) is driven by live device data.");
 
 export type RoomLight = z.infer<typeof RoomLightSchema>;
 

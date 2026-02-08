@@ -1,11 +1,12 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { z } from "zod";
-import { DeviceConfigSchema } from "./devices.js";
+import { DeviceConfigSchema, EntityConfigSchema, extractEntitiesFromExposes } from "./devices.js";
 import { RoomSchema } from "./room.js";
 
 // Re-export sub-module types for consumers
-export { DeviceConfigSchema } from "./devices.js";
-export type { DeviceConfig } from "./devices.js";
+export { DeviceConfigSchema, EntityConfigSchema } from "./devices.js";
+export type { DeviceConfig, EntityConfig, ExtractedEntity, EntityFeatures, EntityResponse } from "./devices.js";
+export { extractEntitiesFromExposes, buildEntityResponses, resolveEntityPayload, resolveCanonicalProperty, partitionEntityState } from "./devices.js";
 export { RoomSchema, RoomDimensionsSchema, FurniturePrimitiveSchema, FurnitureGroupSchema, FurnitureItemSchema, RoomLightSchema, CameraSchema } from "./room.js";
 export type { RoomConfig, RoomDimensions, FurniturePrimitive, FurnitureGroup, FurnitureItem, RoomLight, CameraConfig } from "./room.js";
 
@@ -85,8 +86,49 @@ export class ConfigStore {
     }
   }
 
+  /**
+   * Auto-populate missing entities in config from Z2M exposes.
+   * Called when Z2M device list arrives. Writes back to config file
+   * if any entities were added.
+   */
+  autoPopulateEntities(z2mDevices: Array<{ ieee_address: string; type: string; definition?: { exposes?: unknown[] } | null }>): void {
+    this.reload();
+    let changed = false;
+
+    for (const d of z2mDevices) {
+      if (d.type === "Coordinator") continue;
+
+      const exposes = d.definition?.exposes ?? [];
+      const extracted = extractEntitiesFromExposes(exposes);
+      if (extracted.length === 0) continue;
+
+      const existing = this.data.devices[d.ieee_address];
+      const existingEntities = existing?.entities ?? {};
+
+      // Check if all extracted entities are already present in config
+      const missing = extracted.filter(e => !(e.key in existingEntities));
+      if (missing.length === 0) continue;
+
+      // Add missing entities with empty config (no name override)
+      const newEntities = { ...existingEntities };
+      for (const e of missing) {
+        newEntities[e.key] = {};
+      }
+
+      this.data.devices[d.ieee_address] = {
+        ...existing,
+        entities: newEntities,
+      };
+      changed = true;
+    }
+
+    if (changed) {
+      this.save();
+      console.log("[config] Auto-populated missing entities from Z2M exposes");
+    }
+  }
+
   private save(): void {
     writeFileSync(this.filePath, JSON.stringify(this.data, null, 2) + "\n");
   }
 }
-

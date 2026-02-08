@@ -193,3 +193,4 @@ Key runtime dependencies:
 - **[lucide-react](https://lucide.dev/)** — icon library
 - **[class-variance-authority](https://cva.style/)** + **[clsx](https://github.com/lukeed/clsx)** + **[tailwind-merge](https://github.com/dcastil/tailwind-merge)** — component variant utilities
 
+

@@ -1,6 +1,5 @@
 import { Lightbulb, Plug, Zap } from "lucide-react";
 import { useDevices, useAutomations } from "../api.js";
-import { extractControls } from "../types.js";
 import type { DeviceData } from "../types.js";
 import type { ReactNode } from "react";
 
@@ -12,7 +11,7 @@ function findDevice(devices: DeviceData[] | undefined, id: string): DeviceData |
 }
 
 function isLight(device: DeviceData): boolean {
-  return extractControls(device.exposes).some((c) => c.type === "light");
+  return (device.entities ?? []).some((e) => e.type === "light");
 }
 
 // ── DeviceBadge ──────────────────────────────────────────
@@ -72,4 +71,3 @@ export function AutomationBadge({ id, children }: { id?: string; children?: Reac
     </span>
   );
 }
-
