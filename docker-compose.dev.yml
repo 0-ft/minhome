@@ -24,3 +24,12 @@ services:
       - VITE_API_TARGET=http://server:3111
     depends_on:
       - server
+
+  # Override voice-bridge: mount source for hot-reload instead of building an image
+  voice-bridge:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    build: !reset null
+    command: sh -c "uv sync && uv run watchfiles 'python -u bridge.py' ."
+    working_dir: /app
+    volumes:
+      - ./voice-bridge:/app

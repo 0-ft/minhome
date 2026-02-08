@@ -23,4 +23,6 @@
 - [ ] Configurable tunnel
 - [ ] How are crons managed? Should prob be schedule/heartbeat-ish
 - [ ] Error if no zigbee
-- [ ] Config page: mqtt messages, mqtt pairing, config state, zigbee devices/state
+- [ ] Config page: mqtt messages, mqtt pairing, config state, zigbee devices/state, voice devices+state
+- [ ] Auto find voice PE devices
+- [ ] Openai Realtime API

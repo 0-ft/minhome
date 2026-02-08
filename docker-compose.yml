@@ -50,3 +50,19 @@ services:
       - AUTH_SECRET=${AUTH_SECRET:-}
     depends_on:
       - mqtt
+
+  voice-bridge:
+    container_name: minhome-voice-bridge
+    build:
+      context: voice-bridge
+    restart: unless-stopped
+    environment:
+      - VOICE_PE_HOST=${VOICE_PE_HOST:-192.168.0.20}
+      - VOICE_PE_PORT=${VOICE_PE_PORT:-6053}
+      - VOICE_PE_PASSWORD=${VOICE_PE_PASSWORD:-}
+      - VOICE_PE_NOISE_PSK=${VOICE_PE_NOISE_PSK:-}
+      - MINHOME_WS_URL=ws://server:3111/ws/voice
+      - MAX_PIPELINE_DURATION=${MAX_PIPELINE_DURATION:-10}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - server

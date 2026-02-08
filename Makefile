@@ -1,4 +1,4 @@
-.PHONY: up up-tunnel up-dev down down-tunnel down-dev logs logs-dev reload
+.PHONY: up up-tunnel up-dev down down-tunnel down-dev logs logs-dev reload reload-bridge logs-bridge
 
 up:
 	docker compose up -d $(if $(BUILD),--build)
@@ -26,5 +26,11 @@ logs-dev:
 
 reload:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml restart server
+
+reload-bridge:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml restart voice-bridge
+
+logs-bridge:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f voice-bridge
 
 
