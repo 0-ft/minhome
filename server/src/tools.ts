@@ -22,10 +22,10 @@ export interface ToolContext {
 
 // ── Tool definition type ──────────────────────────────────
 
-export interface ToolDef<T extends z.ZodType = z.ZodType> {
+export interface ToolDef {
   description: string;
-  parameters: T;
-  execute: (params: z.infer<T>, ctx: ToolContext) => Promise<unknown>;
+  parameters: z.ZodType;
+  execute: (params: any, ctx: ToolContext) => Promise<unknown>;
 }
 
 // ── Helper: build full device response (shared with app.ts) ─

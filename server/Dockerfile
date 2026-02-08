@@ -11,7 +11,8 @@ COPY cli/package.json cli/
 COPY frontend/package.json frontend/
 
 # Install all deps
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Copy source
 COPY server/src server/src
@@ -33,7 +34,8 @@ COPY --from=base /app/cli/package.json cli/
 COPY --from=base /app/frontend/package.json frontend/
 
 # Install production deps only
-RUN pnpm install --prod --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --prod --frozen-lockfile
 
 # Copy compiled server output and frontend build
 COPY --from=base /app/server/dist server/dist

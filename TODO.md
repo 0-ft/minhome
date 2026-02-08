@@ -22,3 +22,4 @@
 - [ ] Configurable models/API keys
 - [ ] Configurable tunnel
 - [ ] How are crons managed? Should prob be schedule/heartbeat-ish
+- [ ] Error if no zigbee

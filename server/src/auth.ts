@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { z } from "zod";
@@ -53,11 +54,8 @@ function passwordMatches(input: string): boolean {
 
 // ── Middleware ────────────────────────────────────────────
 
-export function authMiddleware() {
-  return async (
-    c: Parameters<Parameters<Hono["use"]>[0]>[0],
-    next: () => Promise<void>,
-  ) => {
+export function authMiddleware(): MiddlewareHandler {
+  return async (c, next) => {
     // Auth disabled — let everything through
     if (!authEnabled) return next();
 
