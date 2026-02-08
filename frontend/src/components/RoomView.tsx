@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState as useReactState } from "react";
+import { useCallback, useMemo, useRef, useEffect, useState as useReactState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -6,23 +6,17 @@ import { useDevices, useConfig, useRefreshStates, useSetDevice } from "../api.js
 import type { DeviceData } from "../types.js";
 import { extractControls } from "../types.js";
 
-// ── Room dimensions ──────────────────────────────────────
-export const ROOM_W = 5.4;
-const ROOM_H = 2.5;
-export const ROOM_D = 3;
-// ── Palette (muted earth tones) ─────────────────────────
-const C = {
-  floor: "#cdc0ae",
-  wall: "#ddd5c8",
-  bed: "#8b7355",
-  bedding: "#b8a690",
-  desk: "#a69880",
-  shelving: "#7d6f5c",
-  drawers: "#9b8c76",
-  monitor: "#1a1a1a",
-  rug: "#b5a894",
-  lightOff: "#3a3530",
-};
+// ── Types matching server config/room.ts ─────────────────
+export interface RoomDimensions {
+  width: number;
+  height: number;
+  depth: number;
+}
+
+export type FurnitureItem =
+  | { type: "box"; position: [number, number, number]; rotation?: [number, number, number]; size: [number, number, number]; color: string }
+  | { type: "cylinder"; position: [number, number, number]; rotation?: [number, number, number]; radius: number; height: number; color: string }
+  | { type: "extrude"; position: [number, number, number]; rotation?: [number, number, number]; points: [number, number][]; depth: number; color: string };
 
 export interface RoomLightDef {
   deviceId: string;
@@ -30,6 +24,23 @@ export interface RoomLightDef {
   position: [number, number, number];
   type: "ceiling" | "desk" | "table" | "floor";
 }
+
+export interface CameraConfig {
+  position: [number, number, number];
+  target: [number, number, number];
+  zoom: number;
+}
+
+export interface RoomConfig {
+  dimensions: RoomDimensions;
+  floor: string;
+  furniture: FurnitureItem[];
+  lights: RoomLightDef[];
+  camera?: CameraConfig;
+}
+
+// Default off-state light colour
+const LIGHT_OFF_COLOR = "#3a3530";
 
 // ── Color temp (mired) → warm/cool white ────────────────
 function miredToColor(mired: number): THREE.Color {
@@ -42,124 +53,87 @@ function miredToColor(mired: number): THREE.Color {
 }
 
 // ── Room shell ──────────────────────────────────────────
-function Room() {
-  const wireframeGeo = useMemo(() => new THREE.BoxGeometry(ROOM_W, ROOM_H, ROOM_D), []);
-  const wireframeEdges = useMemo(() => new THREE.EdgesGeometry(wireframeGeo), [wireframeGeo]);
-
+function Room({ dimensions, floorColor }: { dimensions: RoomDimensions; floorColor: string }) {
   return (
     <group>
       {/* Floor */}
-      <mesh position={[ROOM_W / 2, 0, ROOM_D / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[ROOM_W, ROOM_D]} />
-        <meshStandardMaterial color={C.floor} />
+      <mesh
+        position={[dimensions.width / 2, 0, dimensions.depth / 2]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        receiveShadow
+      >
+        <planeGeometry args={[dimensions.width, dimensions.depth]} />
+        <meshStandardMaterial color={floorColor} />
       </mesh>
-
-      {/* Wireframe outline of room (hidden for now) */}
-      {/* <lineSegments geometry={wireframeEdges} position={[ROOM_W / 2, ROOM_H / 2, ROOM_D / 2]}>
-        <lineBasicMaterial color="#d6625c" transparent opacity={0.3} />
-      </lineSegments> */}
     </group>
   );
 }
 
-// ── Furniture ───────────────────────────────────────────
-function Furniture() {
+// ── Single furniture mesh from config ───────────────────
+function FurniturePiece({ item }: { item: FurnitureItem }) {
+  const rotation: [number, number, number] | undefined = item.rotation;
+
+  switch (item.type) {
+    case "box":
+      return (
+        <mesh
+          position={item.position}
+          rotation={rotation}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={item.size} />
+          <meshStandardMaterial color={item.color} />
+        </mesh>
+      );
+
+    case "cylinder":
+      return (
+        <mesh
+          position={item.position}
+          rotation={rotation}
+          castShadow
+          receiveShadow
+        >
+          <cylinderGeometry args={[item.radius, item.radius, item.height, 16]} />
+          <meshStandardMaterial color={item.color} />
+        </mesh>
+      );
+
+    case "extrude": {
+      const shape = useMemo(() => {
+        const s = new THREE.Shape();
+        const pts = item.points;
+        s.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) {
+          s.lineTo(pts[i][0], pts[i][1]);
+        }
+        s.closePath();
+        return s;
+      }, [item.points]);
+
+      return (
+        <mesh
+          position={item.position}
+          rotation={rotation}
+          castShadow
+          receiveShadow
+        >
+          <extrudeGeometry args={[shape, { depth: item.depth, bevelEnabled: false }]} />
+          <meshStandardMaterial color={item.color} />
+        </mesh>
+      );
+    }
+  }
+}
+
+// ── All furniture from config ───────────────────────────
+function Furniture({ items }: { items: FurnitureItem[] }) {
   return (
     <group>
-      {/* ── Bed (NW) 1.5 × 2m, h≈0.45 ── */}
-      {/* Frame */}
-      <mesh position={[0.75, 0.18, 1.0]} castShadow receiveShadow>
-        <boxGeometry args={[1.5, 0.36, 2.0]} />
-        <meshStandardMaterial color={C.bed} />
-      </mesh>
-      {/* Mattress / bedding */}
-      <mesh position={[0.75, 0.4, 1.05]} castShadow receiveShadow>
-        <boxGeometry args={[1.4, 0.1, 1.85]} />
-        <meshStandardMaterial color={C.bedding} />
-      </mesh>
-      {/* Headboard */}
-      <mesh position={[0.75, 0.5, 0.04]} castShadow receiveShadow>
-        <boxGeometry args={[1.5, 0.65, 0.06]} />
-        <meshStandardMaterial color={C.bed} />
-      </mesh>
-
-      {/* ── Desk (N edge) 2.0 × 0.6m, top at 0.75m ── */}
-      {/* Top surface */}
-      <mesh position={[2.8, 0.73, 0.3]} castShadow receiveShadow>
-        <boxGeometry args={[2.0, 0.04, 0.6]} />
-        <meshStandardMaterial color={C.desk} />
-      </mesh>
-      {/* Left cylindrical legs */}
-      {[[1.84, 0.08], [1.84, 0.52]].map(([x, z], i) => (
-        <mesh key={`dleg${i}`} position={[x, 0.355, z]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.03, 0.03, 0.71, 12]} />
-          <meshStandardMaterial color={C.desk} />
-        </mesh>
+      {items.map((item, i) => (
+        <FurniturePiece key={i} item={item} />
       ))}
-      {/* Right-side desk drawers (0.4 × 0.57m, h=0.71m) */}
-      <mesh position={[3.6, 0.355, 0.285]} castShadow receiveShadow>
-        <boxGeometry args={[0.4, 0.71, 0.57]} />
-        <meshStandardMaterial color={C.drawers} />
-      </mesh>
-      {/* Keyboard (wedge: back taller, front thinner, rectangular from above) */}
-      <mesh position={[2.745, 0.75, 0.22]} rotation={[0, -Math.PI / 2, 0]} castShadow receiveShadow>
-        <extrudeGeometry args={[(() => {
-          const shape = new THREE.Shape();
-          // Side profile in local X-Y: X=depth, Y=height
-          shape.moveTo(0, 0);        // back-bottom
-          shape.lineTo(0, 0.02);     // back-top (2cm)
-          shape.lineTo(0.12, 0.008); // front-top (0.8cm)
-          shape.lineTo(0.12, 0);     // front-bottom
-          shape.closePath();
-          return shape;
-        })(), { depth: 0.36, bevelEnabled: false }]} />
-        <meshStandardMaterial color="#2a2a2a" />
-      </mesh>
-
-      {/* Monitor on N wall, 24" 16:9 ≈ 53×30cm, 3cm deep */}
-      <mesh position={[2.565, 1.15, 0.015]} castShadow receiveShadow>
-        <boxGeometry args={[0.53, 0.30, 0.03]} />
-        <meshStandardMaterial color={C.monitor} />
-      </mesh>
-
-      {/* ── Shelving NE 0.85 × 0.55m, h=1.9m, 4 posts + 5 shelves ── */}
-      {/* Four corner posts (0.03 × 0.03 × 1.9m) */}
-      {[
-        [4.565, 0.02],
-        [5.385, 0.02],
-        [4.565, 0.53],
-        [5.385, 0.53],
-      ].map(([x, z], i) => (
-        <mesh key={`nepost${i}`} position={[x, 0.95, z]} castShadow receiveShadow>
-          <boxGeometry args={[0.03, 1.9, 0.03]} />
-          <meshStandardMaterial color={C.shelving} />
-        </mesh>
-      ))}
-      {/* 5 shelves (bottom, 3 middle, top) — each 6cm thick */}
-      {[0.03, 0.49, 0.95, 1.41, 1.87].map((y, i) => (
-        <mesh key={`neshelf${i}`} position={[4.975, y, 0.275]} castShadow receiveShadow>
-          <boxGeometry args={[0.85, 0.06, 0.55]} />
-          <meshStandardMaterial color={C.shelving} />
-        </mesh>
-      ))}
-
-      {/* ── Drawers (center S) 0.77 × 0.39m, h≈0.41m ── */}
-      <mesh position={[2.7, 0.205, 2.805]} castShadow receiveShadow>
-        <boxGeometry args={[0.77, 0.41, 0.39]} />
-        <meshStandardMaterial color={C.drawers} />
-      </mesh>
-
-      {/* ── Small shelving (W of drawers) 0.40 × 0.35m, h≈0.57m ── */}
-      <mesh position={[2.115, 0.285, 2.825]} castShadow receiveShadow>
-        <boxGeometry args={[0.4, 0.57, 0.35]} />
-        <meshStandardMaterial color={C.shelving} />
-      </mesh>
-
-      {/* ── Rug 1.8 × 1.5m ── */}
-      <mesh position={[3.275, 0.005, 1.6]} receiveShadow>
-        <boxGeometry args={[1.8, 0.01, 1.5]} />
-        <meshStandardMaterial color={C.rug} />
-      </mesh>
     </group>
   );
 }
@@ -216,7 +190,7 @@ function LightOrb({
 
   // Smooth transition refs — lerp toward targets each frame (~150ms at 60fps)
   const pointLightRef = useRef<THREE.PointLight>(null);
-  const curColor = useRef(isOn ? targetColor.clone() : new THREE.Color(C.lightOff));
+  const curColor = useRef(isOn ? targetColor.clone() : new THREE.Color(LIGHT_OFF_COLOR));
   const curIntensity = useRef(targetIntensity);
   const curEmissive = useRef(targetEmissive);
   const curOpacity = useRef(targetOpacity);
@@ -227,7 +201,7 @@ function LightOrb({
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
 
     // Lerp color, intensity, emissive, opacity toward targets
-    const tgtCol = isOn ? targetColor : new THREE.Color(C.lightOff);
+    const tgtCol = isOn ? targetColor : new THREE.Color(LIGHT_OFF_COLOR);
     curColor.current.lerp(tgtCol, LERP);
     curIntensity.current = THREE.MathUtils.lerp(curIntensity.current, targetIntensity, LERP);
     curEmissive.current = THREE.MathUtils.lerp(curEmissive.current, targetEmissive, LERP);
@@ -298,28 +272,54 @@ function LightOrb({
   );
 }
 
+// ── Camera state getter type ────────────────────────────
+export type GetCameraState = () => CameraConfig;
+
 // ── Scene (inside Canvas) ───────────────────────────────
 export function Scene({
-  roomLights,
+  roomConfig,
   deviceMap,
   onToggle,
   orbitTarget,
+  cameraRef,
 }: {
-  roomLights: RoomLightDef[];
+  roomConfig: RoomConfig;
   deviceMap: Map<string, DeviceData>;
   onToggle: (deviceId: string, stateProperty: string, isOn: boolean) => void;
   orbitTarget?: [number, number, number];
+  cameraRef?: React.MutableRefObject<GetCameraState | null>;
 }) {
+  const { dimensions, floor, furniture, lights, camera } = roomConfig;
+  const controlsRef = useRef<any>(null);
+
+  // Wire up camera state getter — reads from OrbitControls + camera
+  useEffect(() => {
+    if (!cameraRef) return;
+    cameraRef.current = () => {
+      const ctrl = controlsRef.current;
+      if (!ctrl) return { position: [0, 0, 0], target: [0, 0, 0], zoom: 100 };
+      const cam = ctrl.object as THREE.OrthographicCamera;
+      return {
+        position: cam.position.toArray() as [number, number, number],
+        target: ctrl.target.toArray() as [number, number, number],
+        zoom: cam.zoom,
+      };
+    };
+  }, [cameraRef]);
+
+  const defaultTarget: [number, number, number] = orbitTarget ?? [dimensions.width / 2, 0.5, dimensions.depth / 2];
+  const initialTarget = camera?.target ?? defaultTarget;
+
   return (
     <>
       <color attach="background" args={["#100e0c"]} />
       <ambientLight intensity={0.25} color="#f5efe6" />
       <directionalLight position={[4, 6, 2]} intensity={0.15} color="#fff8ee" />
 
-      <Room />
-      <Furniture />
+      <Room dimensions={dimensions} floorColor={floor} />
+      <Furniture items={furniture} />
 
-      {roomLights.map((light, i) => (
+      {lights.map((light, i) => (
         <LightOrb
           key={`${light.deviceId}-${light.entityId ?? i}`}
           light={light}
@@ -329,7 +329,8 @@ export function Scene({
       ))}
 
       <OrbitControls
-        target={orbitTarget ?? [ROOM_W / 2, 0.5, ROOM_D / 2]}
+        ref={controlsRef}
+        target={initialTarget}
         maxPolarAngle={Math.PI / 2.05}
         minDistance={2}
         maxDistance={14}
@@ -340,8 +341,16 @@ export function Scene({
   );
 }
 
-// ── Exported view ───────────────────────────────────────
-export function RoomView() {
+// ── Helper to parse room config from API response ───────
+function parseRoomConfig(config: unknown): RoomConfig | null {
+  const c = config as Record<string, unknown> | undefined;
+  const room = c?.room as RoomConfig | undefined;
+  if (!room?.dimensions || !room?.floor || !room?.furniture || !room?.lights) return null;
+  return room;
+}
+
+// ── Shared data hook for room views ─────────────────────
+export function useRoomData() {
   const { data: devices, isLoading: devicesLoading } = useDevices();
   const { data: config, isLoading: configLoading } = useConfig();
   const refreshStates = useRefreshStates();
@@ -363,14 +372,27 @@ export function RoomView() {
     return map;
   }, [devices]);
 
-  const roomLights: RoomLightDef[] = useMemo(
-    () => (config as Record<string, unknown>)?.room
-      ? ((config as Record<string, unknown>).room as { lights: RoomLightDef[] }).lights ?? []
-      : [],
-    [config],
+  const roomConfig = useMemo(() => parseRoomConfig(config), [config]);
+
+  const onToggle = useCallback(
+    (deviceId: string, stateProperty: string, isOn: boolean) =>
+      setDevice.mutate({ id: deviceId, payload: { [stateProperty]: isOn ? "OFF" : "ON" } }),
+    [setDevice],
   );
 
-  if (devicesLoading || configLoading) {
+  return {
+    deviceMap,
+    roomConfig,
+    onToggle,
+    isLoading: devicesLoading || configLoading,
+  };
+}
+
+// ── Exported view ───────────────────────────────────────
+export function RoomView() {
+  const { deviceMap, roomConfig, onToggle, isLoading } = useRoomData();
+
+  if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
@@ -379,18 +401,32 @@ export function RoomView() {
     );
   }
 
+  if (!roomConfig) {
+    return (
+      <div className="flex items-center justify-center py-12 text-sm text-sand-500 font-mono">
+        Room not configured
+      </div>
+    );
+  }
+
+  const cam = roomConfig.camera;
+
   return (
     <div className="w-full h-full min-h-[500px] rounded-xl overflow-hidden bg-sand-200/60 border border-sand-300">
-      <Canvas orthographic camera={{ position: [2.7, 5.5, 8], zoom: 100 }} shadows={{ type: THREE.VSMShadowMap }}>
+      <Canvas
+        orthographic
+        camera={{
+          position: cam?.position ?? [2.7, 5.5, 8],
+          zoom: cam?.zoom ?? 100,
+        }}
+        shadows={{ type: THREE.VSMShadowMap }}
+      >
         <Scene
-          roomLights={roomLights}
+          roomConfig={roomConfig}
           deviceMap={deviceMap}
-          onToggle={(deviceId, stateProperty, isOn) =>
-            setDevice.mutate({ id: deviceId, payload: { [stateProperty]: isOn ? "OFF" : "ON" } })
-          }
+          onToggle={onToggle}
         />
       </Canvas>
     </div>
   );
 }
-

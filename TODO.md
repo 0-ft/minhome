@@ -2,5 +2,6 @@
 - [ ] Direct editing of jsons
 - [ ] LLM actions on cron
 - [ ] Better prompting for mood lighting + brightness calibration (per entity prompts)
-- [ ] 
+- [x] Room as config
+- [ ] Split config into files (room, devices, llm)
 - [ ] 

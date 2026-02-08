@@ -1,5 +1,5 @@
 import type { MqttBridge } from "../mqtt.js";
-import type { ConfigStore } from "../config.js";
+import type { ConfigStore } from "../config/config.js";
 import type { AutomationEngine } from "../automations.js";
 
 export function buildSystemPrompt(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine): string {

@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createApp } from "./app.js";
 import { createMqttBridge } from "./mqtt.js";
-import { ConfigStore } from "./config.js";
+import { ConfigStore } from "./config/config.js";
 import { AutomationEngine } from "./automations.js";
 import { initMCPClient, destroyMCPClient } from "./chat/index.js";
 import { resolve, join } from "path";

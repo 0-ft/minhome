@@ -14,10 +14,29 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
+// ── Helpers ──────────────────────────────────────────────
+
+/** Check response status and throw with a descriptive message on failure. */
+async function assertOk(res: Response, action: string): Promise<void> {
+  if (!res.ok) {
+    let detail: string;
+    try {
+      const body = await res.json();
+      detail = typeof body === "object" && body !== null && "error" in body
+        ? String((body as Record<string, unknown>).error)
+        : JSON.stringify(body);
+    } catch {
+      detail = await res.text().catch(() => res.statusText);
+    }
+    throw new Error(`${action} failed (${res.status}): ${detail}`);
+  }
+}
+
 // --- Tools ---
 
 server.tool("list_devices", "List all Zigbee devices with their current state", {}, async () => {
   const res = await api.api.devices.$get();
+  await assertOk(res, "list_devices");
   const devices = await res.json();
   return { content: [{ type: "text", text: JSON.stringify(devices, null, 2) }] };
 });
@@ -28,6 +47,7 @@ server.tool(
   { id: z.string().describe("Device IEEE address, e.g. 0xa4c138d2b1cf1389") },
   async ({ id }) => {
     const res = await api.api.devices[":id"].$get({ param: { id } });
+    await assertOk(res, `get_device(${id})`);
     const device = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(device, null, 2) }] };
   },
@@ -42,6 +62,7 @@ server.tool(
   },
   async ({ id, payload }) => {
     const res = await api.api.devices[":id"].set.$post({ param: { id }, json: payload });
+    await assertOk(res, `control_device(${id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },
@@ -56,6 +77,7 @@ server.tool(
   },
   async ({ id, name }) => {
     const res = await api.api.devices[":id"].config.$put({ param: { id }, json: { name } });
+    await assertOk(res, `rename_device(${id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },
@@ -74,6 +96,7 @@ server.tool(
       param: { id },
       json: { entities: { [entity_id]: name } },
     });
+    await assertOk(res, `rename_entity(${id}/${entity_id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },
@@ -81,6 +104,7 @@ server.tool(
 
 server.tool("list_automations", "List all automation rules", {}, async () => {
   const res = await api.api.automations.$get();
+  await assertOk(res, "list_automations");
   const automations = await res.json();
   return { content: [{ type: "text", text: JSON.stringify(automations, null, 2) }] };
 });
@@ -91,6 +115,7 @@ server.tool(
   AutomationSchema.shape,
   async (automation) => {
     const res = await api.api.automations.$post({ json: automation });
+    await assertOk(res, "create_automation");
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
   },
@@ -105,6 +130,7 @@ server.tool(
   },
   async ({ id, ...patch }) => {
     const res = await api.api.automations[":id"].$put({ param: { id }, json: patch });
+    await assertOk(res, `update_automation(${id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body, null, 2) }] };
   },
@@ -116,6 +142,7 @@ server.tool(
   { id: z.string().describe("Automation ID") },
   async ({ id }) => {
     const res = await api.api.automations[":id"].$delete({ param: { id } });
+    await assertOk(res, `delete_automation(${id})`);
     const body = await res.json();
     return { content: [{ type: "text", text: JSON.stringify(body) }] };
   },

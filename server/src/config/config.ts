@@ -1,27 +1,24 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { z } from "zod";
+import { DeviceConfigSchema } from "./devices.js";
+import { RoomSchema } from "./room.js";
 
-const DeviceConfigSchema = z.object({
-  name: z.string().optional(),
-  entities: z.record(z.string(), z.string()).optional(),
-});
+// Re-export sub-module types for consumers
+export { DeviceConfigSchema } from "./devices.js";
+export type { DeviceConfig } from "./devices.js";
+export { RoomSchema, RoomDimensionsSchema, FurnitureItemSchema, RoomLightSchema, CameraSchema } from "./room.js";
+export type { RoomConfig, RoomDimensions, FurnitureItem, RoomLight, CameraConfig } from "./room.js";
 
-const RoomLightSchema = z.object({
-  deviceId: z.string(),
-  entityId: z.string().optional(),
-  position: z.tuple([z.number(), z.number(), z.number()]),
-  type: z.enum(["ceiling", "desk", "table", "floor"]),
-});
+// ── Combined config ──────────────────────────────────────
 
 const ConfigSchema = z.object({
   devices: z.record(z.string(), DeviceConfigSchema).default({}),
-  room: z.object({
-    lights: z.array(RoomLightSchema).default([]),
-  }).default({ lights: [] }),
+  room: RoomSchema.optional(),
 });
 
-export type DeviceConfig = z.infer<typeof DeviceConfigSchema>;
 export type Config = z.infer<typeof ConfigSchema>;
+
+// ── Config store ─────────────────────────────────────────
 
 export class ConfigStore {
   private data: Config;
@@ -31,7 +28,7 @@ export class ConfigStore {
       const raw = readFileSync(filePath, "utf-8");
       this.data = ConfigSchema.parse(JSON.parse(raw));
     } else {
-      this.data = { devices: {}, room: { lights: [] } };
+      this.data = { devices: {} };
       this.save();
     }
   }
@@ -49,12 +46,12 @@ export class ConfigStore {
     return this.data;
   }
 
-  getDevice(id: string): DeviceConfig | undefined {
+  getDevice(id: string): z.infer<typeof DeviceConfigSchema> | undefined {
     this.reload();
     return this.data.devices[id];
   }
 
-  setDevice(id: string, update: Partial<DeviceConfig>): void {
+  setDevice(id: string, update: Partial<z.infer<typeof DeviceConfigSchema>>): void {
     const existing = this.data.devices[id] ?? {};
     this.data.devices[id] = {
       ...existing,
@@ -63,6 +60,14 @@ export class ConfigStore {
       entities: { ...existing.entities, ...update.entities },
     };
     this.save();
+  }
+
+  setRoomCamera(camera: { position: [number, number, number]; target: [number, number, number]; zoom: number }): void {
+    this.reload();
+    if (this.data.room) {
+      this.data.room.camera = camera;
+      this.save();
+    }
   }
 
   private save(): void {

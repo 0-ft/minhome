@@ -207,23 +207,30 @@ export function ToolCallPart({ part }: { part: ToolPart }) {
   const [expanded, setExpanded] = useState(false);
   const { data: devices } = useDevices();
 
+  const isError = part.state === "output-error";
   const borderColor =
     part.state === "output-available"
       ? "border-teal-200"
-      : part.state === "output-error"
-        ? "border-blood-200"
+      : isError
+        ? "border-blood-300"
         : "border-sand-300";
+  const bgColor = isError ? "bg-blood-50/40" : "";
 
   return (
-    <div className={`my-1.5 rounded-lg border ${borderColor} overflow-hidden`}>
+    <div className={`my-1.5 rounded-lg border ${borderColor} ${bgColor} overflow-hidden`}>
       {/* Summary row */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[11px] hover:bg-sand-100/60 transition-colors cursor-pointer"
+        className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[11px] transition-colors cursor-pointer ${
+          isError ? "hover:bg-blood-100/40" : "hover:bg-sand-100/60"
+        }`}
       >
         <StatusIcon state={part.state} />
         <div className="flex-1 min-w-0">
           <ToolSummary part={part} devices={devices as DeviceData[] | undefined} />
+          {isError && part.errorText && (
+            <p className="text-[10px] text-blood-500/80 mt-0.5 truncate">{part.errorText}</p>
+          )}
         </div>
         <ChevronDown
           className={`h-3 w-3 shrink-0 text-sand-400 transition-transform ${expanded ? "rotate-180" : ""}`}

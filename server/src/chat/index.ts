@@ -4,7 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport as StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import type { MqttBridge } from "../mqtt.js";
-import type { ConfigStore } from "../config.js";
+import type { ConfigStore } from "../config/config.js";
 import type { AutomationEngine } from "../automations.js";
 import { buildSystemPrompt } from "./context.js";
 import { resolve } from "path";
@@ -68,9 +68,39 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automat
     const body = await c.req.json<{ messages: UIMessage[] }>();
     const { messages } = body;
 
-    const tools = await mcpClient.tools();
+    const rawTools = await mcpClient.tools();
     const system = buildSystemPrompt(bridge, config, automations);
     const modelMessages = await convertToModelMessages(messages);
+
+    // Wrap tool execute functions to surface MCP `isError` as thrown errors.
+    // The @ai-sdk/mcp adapter returns MCP results (including isError: true)
+    // without throwing, so the AI SDK treats them as successes. Wrapping
+    // ensures the AI SDK creates proper tool-error parts for the frontend.
+    const tools = Object.fromEntries(
+      Object.entries(rawTools).map(([name, tool]) => {
+        if (!tool.execute) return [name, tool];
+        const origExecute = tool.execute.bind(tool);
+        return [name, {
+          ...tool,
+          execute: async (...args: Parameters<typeof origExecute>) => {
+            const result = await origExecute(...args);
+            if (result && typeof result === "object" && "isError" in result && (result as Record<string, unknown>).isError) {
+              // Extract error text from MCP content array
+              const content = (result as Record<string, unknown>).content;
+              let errorMsg = "Tool execution failed";
+              if (Array.isArray(content)) {
+                const texts = content
+                  .filter((p: unknown) => p && typeof p === "object" && (p as Record<string, unknown>).type === "text")
+                  .map((p: unknown) => (p as Record<string, string>).text);
+                if (texts.length > 0) errorMsg = texts.join("\n");
+              }
+              throw new Error(errorMsg);
+            }
+            return result;
+          },
+        }];
+      }),
+    );
 
     const result = streamText({
       model: openai.chat(modelId),

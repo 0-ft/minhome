@@ -95,6 +95,19 @@ export function useConfig() {
   });
 }
 
+export function useSaveRoomCamera() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (camera: { position: [number, number, number]; target: [number, number, number]; zoom: number }) => {
+      const res = await api.api.config.room.camera.$put({ json: camera });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["config"] });
+    },
+  });
+}
+
 export function useAutomations() {
   return useQuery({
     queryKey: ["automations"],

@@ -1,17 +1,16 @@
-import { useMemo, useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { useChat } from "@ai-sdk/react";
-import { Send, X, Home, Loader2, Check } from "lucide-react";
+import { Send, X, Home, Loader2, Check, Camera } from "lucide-react";
 import type { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
 import { ToolCallPart } from "./ToolCallDisplay.js";
 import type { ToolPart } from "./ToolCallDisplay.js";
-import { useDevices, useConfig, useRefreshStates, useSetDevice } from "../api.js";
-import type { DeviceData } from "../types.js";
-import { Scene, ROOM_W, ROOM_D } from "./RoomView.js";
-import type { RoomLightDef } from "./RoomView.js";
+import { Scene, useRoomData } from "./RoomView.js";
+import type { GetCameraState } from "./RoomView.js";
+import { useSaveRoomCamera } from "../api.js";
 
 // ── Floating message ──────────────────────────────────────
 
@@ -52,20 +51,24 @@ function FloatingMessage({ message }: { message: UIMessage }) {
               const done = tp.state === "output-available";
               const errored = tp.state === "output-error";
               return (
-                <div
-                  key={i}
-                  className={`flex items-center gap-1.5 text-[12px] py-0.5 font-mono transition-opacity duration-300 ${
-                    done ? "text-sand-500/30" : errored ? "text-blood-400/70" : "text-sand-400/60"
-                  }`}
-                >
-                  {done ? (
-                    <Check className="h-3 w-3 text-teal-400/50" />
-                  ) : errored ? (
-                    <X className="h-3 w-3 text-blood-400/70" />
-                  ) : (
-                    <Loader2 className="h-3 w-3 animate-spin text-teal-400/40" />
+                <div key={i} className="transition-opacity duration-300">
+                  <div
+                    className={`flex items-center gap-1.5 text-[12px] py-0.5 font-mono ${
+                      done ? "text-sand-500/30" : errored ? "text-blood-400/70" : "text-sand-400/60"
+                    }`}
+                  >
+                    {done ? (
+                      <Check className="h-3 w-3 text-teal-400/50" />
+                    ) : errored ? (
+                      <X className="h-3 w-3 text-blood-400/70" />
+                    ) : (
+                      <Loader2 className="h-3 w-3 animate-spin text-teal-400/40" />
+                    )}
+                    <span>{tp.toolName}</span>
+                  </div>
+                  {errored && tp.errorText && (
+                    <p className="text-[10px] text-blood-400/50 ml-[18px] truncate max-w-xs">{tp.errorText}</p>
                   )}
-                  <span>{tp.toolName}</span>
                 </div>
               );
             }
@@ -84,34 +87,25 @@ export function RoomFullView() {
   const navigate = useNavigate();
 
   // ── Room data ─────────────────────────────────────────
-  const { data: devices, isLoading: devicesLoading } = useDevices();
-  const { data: config, isLoading: configLoading } = useConfig();
-  const refreshStates = useRefreshStates();
-  const setDevice = useSetDevice();
+  const { deviceMap, roomConfig, onToggle, isLoading: roomLoading } = useRoomData();
+  const cameraRef = useRef<GetCameraState | null>(null);
+  const saveCamera = useSaveRoomCamera();
+  const [cameraSaved, setCameraSaved] = useState(false);
 
-  const hasRefreshed = useRef(false);
-  useEffect(() => {
-    if (!hasRefreshed.current) {
-      hasRefreshed.current = true;
-      refreshStates.mutate();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const deviceMap = useMemo(() => {
-    const map = new Map<string, DeviceData>();
-    if (devices && Array.isArray(devices)) {
-      for (const d of devices as DeviceData[]) map.set(d.id, d);
-    }
-    return map;
-  }, [devices]);
-
-  const roomLights: RoomLightDef[] = useMemo(
-    () =>
-      (config as Record<string, unknown>)?.room
-        ? ((config as Record<string, unknown>).room as { lights: RoomLightDef[] }).lights ?? []
-        : [],
-    [config],
-  );
+  const handleSaveCamera = () => {
+    const getter = cameraRef.current;
+    if (!getter) return;
+    const state = getter();
+    // Round values for cleaner config.json
+    const round = (v: number) => Math.round(v * 100) / 100;
+    saveCamera.mutate({
+      position: state.position.map(round) as [number, number, number],
+      target: state.target.map(round) as [number, number, number],
+      zoom: round(state.zoom),
+    });
+    setCameraSaved(true);
+    setTimeout(() => setCameraSaved(false), 2000);
+  };
 
   // ── Chat ──────────────────────────────────────────────
   const { messages, sendMessage, status, stop, error } = useChat();
@@ -147,36 +141,53 @@ export function RoomFullView() {
     }
   };
 
-  const loading = devicesLoading || configLoading;
+  const loading = roomLoading;
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-[#0d0b09]">
       {/* Full-screen 3D Canvas */}
-      {!loading && (
+      {!loading && roomConfig && (
         <Canvas
           orthographic
-          camera={{ position: [0.7, 5.5, 8], zoom: 100 }}
+          camera={{
+            position: roomConfig.camera?.position ?? [0.7, 5.5, 8],
+            zoom: roomConfig.camera?.zoom ?? 100,
+          }}
           shadows={{ type: THREE.VSMShadowMap }}
           className="!absolute inset-0"
         >
           <Scene
-            roomLights={roomLights}
+            roomConfig={roomConfig}
             deviceMap={deviceMap}
-            onToggle={(deviceId, stateProperty, isOn) =>
-              setDevice.mutate({
-                id: deviceId,
-                payload: { [stateProperty]: isOn ? "OFF" : "ON" },
-              })
-            }
-            orbitTarget={[ROOM_W / 2 - 2, 0.5, ROOM_D / 2]}
+            onToggle={onToggle}
+            orbitTarget={[roomConfig.dimensions.width / 2 - 2, 0.5, roomConfig.dimensions.depth / 2]}
+            cameraRef={cameraRef}
           />
         </Canvas>
       )}
 
+      {/* Not configured message */}
+      {!loading && !roomConfig && (
+        <div className="absolute inset-0 flex items-center justify-center text-sand-500/50 font-mono text-sm">
+          Room not configured
+        </div>
+      )}
+
       {/* Floating UI overlay */}
       <div className="absolute inset-0 pointer-events-none flex flex-col">
-        {/* Home button */}
-        <div className="flex justify-end px-5 py-5 pointer-events-auto shrink-0">
+        {/* Top bar buttons */}
+        <div className="flex justify-end gap-2 px-5 py-5 pointer-events-auto shrink-0">
+          <button
+            onClick={handleSaveCamera}
+            className={`p-2 rounded-lg backdrop-blur-sm border transition-all cursor-pointer ${
+              cameraSaved
+                ? "bg-teal-400/15 border-teal-400/20 text-teal-300"
+                : "bg-white/[0.04] border-white/[0.06] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08]"
+            }`}
+            title="Save camera position"
+          >
+            {cameraSaved ? <Check className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+          </button>
           <button
             onClick={() => navigate("/room")}
             className="p-2 rounded-lg bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08] transition-all cursor-pointer"
