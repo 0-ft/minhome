@@ -19,11 +19,12 @@
 - [ ] Entity/device configurable icons
 - [x] 404 route
 - [ ] MCP/prompts should not mention function e.g. zigbee mqtt
-- [ ] Configurable models/API keys
-- [ ] Configurable tunnel
+- [x] Configurable models/API keys
+- [x] Configurable tunnel
 - [ ] How are crons managed? Should prob be schedule/heartbeat-ish
 - [ ] Error if no zigbee
-- [ ] Config page: mqtt messages, mqtt pairing, config state, zigbee devices/state, voice devices+state
+- [ ] Config page: config state, zigbee interface connected & state, voice device+state
 - [ ] Auto find voice PE devices
 - [ ] Openai Realtime API
 - [ ] voice endpoint auth check
+- [ ] Automations to invoke the tools

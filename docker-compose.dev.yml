@@ -33,3 +33,4 @@ services:
     working_dir: /app
     volumes:
       - ./voice-bridge:/app
+    network_mode: host

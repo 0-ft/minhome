@@ -58,14 +58,12 @@ services:
     build:
       context: voice-bridge
     restart: unless-stopped
+    network_mode: host
     environment:
-      - VOICE_PE_HOST=${VOICE_PE_HOST:-192.168.0.20}
-      - VOICE_PE_PORT=${VOICE_PE_PORT:-6053}
-      - VOICE_PE_PASSWORD=${VOICE_PE_PASSWORD:-}
-      - VOICE_PE_NOISE_PSK=${VOICE_PE_NOISE_PSK:-}
-      - MINHOME_WS_URL=ws://server:3111/ws/voice
+      - MINHOME_WS_URL=ws://localhost:3111/ws/voice
       - MINHOME_AUDIO_BASE_URL=${MINHOME_AUDIO_BASE_URL:-http://192.168.0.128:3111}
+      - ESPHOME_PASSWORD=${ESPHOME_PASSWORD:-}
+      - ESPHOME_NOISE_PSK=${ESPHOME_NOISE_PSK:-}
+      - ESPHOME_PORT=${ESPHOME_PORT:-6053}
       - MAX_PIPELINE_DURATION=${MAX_PIPELINE_DURATION:-30}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    depends_on:
-      - server

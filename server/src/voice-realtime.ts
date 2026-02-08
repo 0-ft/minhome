@@ -14,6 +14,7 @@ import { OpenAIRealtimeWebSocket } from "openai/realtime/websocket";
 import { z } from "zod";
 import { createTools, type ToolContext } from "./tools.js";
 import { buildSystemPrompt } from "./chat/context.js";
+import { debugLog } from "./debug-log.js";
 
 // ── Audio constants ──────────────────────────────────────────
 
@@ -156,6 +157,7 @@ export class RealtimeSession {
 
     const model = process.env.OPENAI_REALTIME_MODEL ?? "gpt-realtime";
     console.log(`[realtime] Opening session ${this.sessionId} (model: ${model})`);
+    debugLog.add("voice_session_start", `Voice session: ${this.sessionId}`, { sessionId: this.sessionId, model });
 
     this.rt = new OpenAIRealtimeWebSocket(
       { model },
@@ -255,7 +257,7 @@ export class RealtimeSession {
           },
           output: {
             format: { type: "audio/pcm", rate: 24000 },
-            voice: "ash",
+            voice: this.toolCtx.config.getVoice(),
           },
         },
         tools,
@@ -283,12 +285,14 @@ export class RealtimeSession {
     });
     this.rt.on("input_audio_buffer.speech_stopped", (e) => {
       console.log(`[realtime] Speech stopped at ${e.audio_end_ms}ms`);
+      debugLog.add("voice_speech", `Speech stopped at ${e.audio_end_ms}ms`, { sessionId: this.sessionId, audioEndMs: e.audio_end_ms });
       this.callbacks.onSpeechStopped();
     });
 
     // Input transcription
     this.rt.on("conversation.item.input_audio_transcription.completed" as any, (e: any) => {
       console.log(`[realtime] User said: "${e.transcript}"`);
+      debugLog.add("voice_transcript", `User: "${e.transcript}"`, { sessionId: this.sessionId, role: "user", transcript: e.transcript });
     });
 
     // Audio output
@@ -300,7 +304,10 @@ export class RealtimeSession {
       if (e.delta) process.stdout.write(e.delta);
     });
     this.rt.on("response.output_audio_transcript.done", (e) => {
-      if (e.transcript) console.log(`\n[realtime] Response transcript: "${e.transcript}"`);
+      if (e.transcript) {
+        console.log(`\n[realtime] Response transcript: "${e.transcript}"`);
+        debugLog.add("voice_transcript", `Assistant: "${e.transcript}"`, { sessionId: this.sessionId, role: "assistant", transcript: e.transcript });
+      }
     });
 
     // Response completion (tool calls or final)
@@ -311,6 +318,7 @@ export class RealtimeSession {
     // Errors
     this.rt.on("error", (err) => {
       console.error("[realtime] Error:", err.message);
+      debugLog.add("voice_error", `Voice error: ${err.message}`, { sessionId: this.sessionId, error: err.message });
       this.callbacks.onError(new Error(err.message));
     });
 
@@ -358,8 +366,10 @@ export class RealtimeSession {
 
       for (const call of functionCalls) {
         console.log(`[realtime] Calling tool: ${call.name}(${call.arguments})`);
+        debugLog.add("voice_tool_call", `Voice tool: ${call.name}`, { sessionId: this.sessionId, tool: call.name, args: tryParseJSON(call.arguments) });
         const result = await executeTool(call.name, call.arguments);
         console.log(`[realtime] Tool result [${call.name}]: ${result}`);
+        debugLog.add("voice_tool_result", `Voice tool result: ${call.name}`, { sessionId: this.sessionId, tool: call.name, result: tryParseJSON(result) });
 
         // Send tool result back to OpenAI
         this.rt?.send({
@@ -389,7 +399,14 @@ export class RealtimeSession {
     try { this.audioController?.close(); } catch { /* already closed */ }
 
     console.log(`[realtime] Session ${this.sessionId} finalized`);
+    debugLog.add("voice_session_end", `Voice session ended: ${this.sessionId}`, { sessionId: this.sessionId });
     this.callbacks.onVoiceDone();
     this.close();
   }
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+function tryParseJSON(s: string): unknown {
+  try { return JSON.parse(s); } catch { return s; }
 }

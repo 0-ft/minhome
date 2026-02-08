@@ -12,9 +12,16 @@ export type { RoomConfig, RoomDimensions, FurniturePrimitive, FurnitureGroup, Fu
 
 // ── Combined config ──────────────────────────────────────
 
+export const VoiceOptions = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"] as const;
+export const VoiceSchema = z.enum(VoiceOptions);
+export type Voice = z.infer<typeof VoiceSchema>;
+
 const ConfigSchema = z.object({
   devices: z.record(z.string(), DeviceConfigSchema).default({}),
   room: RoomSchema.optional(),
+  voice: VoiceSchema.optional(),
+  /** Maximum debug log file size in MB before old entries are dropped. Default 10. */
+  debugLogMaxSizeMB: z.number().positive().default(10),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -60,6 +67,17 @@ export class ConfigStore {
       // Deep-merge entities so setting one doesn't wipe others
       entities: { ...existing.entities, ...update.entities },
     };
+    this.save();
+  }
+
+  getVoice(): Voice {
+    this.reload();
+    return this.data.voice ?? "ash";
+  }
+
+  setVoice(voice: Voice): void {
+    this.reload();
+    this.data.voice = voice;
     this.save();
   }
 

@@ -386,6 +386,7 @@ dependencies = [
     { name = "aioesphomeapi" },
     { name = "numpy" },
     { name = "websockets" },
+    { name = "zeroconf" },
 ]
 
 [package.dev-dependencies]
@@ -398,6 +399,7 @@ requires-dist = [
     { name = "aioesphomeapi", specifier = ">=43.14.0" },
     { name = "numpy", specifier = ">=2.0.0" },
     { name = "websockets", specifier = ">=16.0" },
+    { name = "zeroconf", specifier = ">=0.131.0" },
 ]
 
 [package.metadata.requires-dev]

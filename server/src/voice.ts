@@ -1,15 +1,17 @@
 /**
  * Voice module — handles the bridge WebSocket connection and coordinates
- * with the OpenAI Realtime session for speech-to-speech interaction.
+ * with OpenAI Realtime sessions for speech-to-speech interaction.
+ *
+ * Supports multiple voice devices simultaneously via device_id routing.
  *
  * Protocol (bridge → server):
- *   - JSON: { type: "voice_start", conversation_id, wake_word }
- *   - Binary: raw 24kHz 16-bit PCM audio chunks (resampled by bridge from 16kHz)
+ *   - JSON: { type: "voice_start", device_id, conversation_id, wake_word }
+ *   - Binary: raw 24kHz 16-bit PCM audio chunks (for the active streaming device)
  *
  * Protocol (server → bridge):
- *   - JSON: { type: "speech_stopped" }
- *   - JSON: { type: "tts_start", audio_path: "/audio/{sessionId}" }
- *   - JSON: { type: "voice_done" }
+ *   - JSON: { type: "speech_stopped", device_id }
+ *   - JSON: { type: "tts_start", device_id, audio_path }
+ *   - JSON: { type: "voice_done", device_id, conversation_id }
  */
 
 import { RealtimeSession, type RealtimeCallbacks } from "./voice-realtime.js";
@@ -30,7 +32,11 @@ export interface VoiceWSOptions {
 export function createVoiceWSHandler(opts: VoiceWSOptions) {
   return () => {
     let bridgeWs: { send: (data: string | ArrayBuffer) => void } | null = null;
-    let activeSession: RealtimeSession | null = null;
+
+    // Track sessions by device_id
+    const sessions = new Map<string, RealtimeSession>();
+    // Track which device_id is currently streaming audio
+    let activeStreamingDevice: string | null = null;
 
     return {
       onOpen(_evt: unknown, ws: { send: (data: string | ArrayBuffer) => void }) {
@@ -43,12 +49,11 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
 
         // Binary message = audio chunk from bridge (24kHz PCM)
         if (data instanceof ArrayBuffer || Buffer.isBuffer(data)) {
-          if (!activeSession) {
-            // No session yet — might be early audio before voice_start, ignore
-            return;
-          }
+          if (!activeStreamingDevice) return;
+          const session = sessions.get(activeStreamingDevice);
+          if (!session) return;
           const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data);
-          activeSession.feedAudio(chunk);
+          session.feedAudio(chunk);
           return;
         }
 
@@ -64,58 +69,86 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
 
           switch (msg.type) {
             case "voice_start": {
+              const deviceId = String(msg.device_id ?? "unknown");
               const conversationId = String(msg.conversation_id ?? "");
               const wakeWord = String(msg.wake_word ?? "");
               console.log(
-                `[voice] Session starting — conversation=${conversationId} wake_word="${wakeWord}"`,
+                `[voice] Session starting — device=${deviceId} conversation=${conversationId} wake_word="${wakeWord}"`,
               );
 
-              // Create a new Realtime session
               const sessionId = conversationId || `voice-${Date.now()}`;
+
+              // Track active streaming device
+              activeStreamingDevice = deviceId;
+
               const callbacks: RealtimeCallbacks = {
                 onSpeechStopped: () => {
-                  console.log("[voice] → bridge: speech_stopped");
-                  bridgeWs?.send(JSON.stringify({ type: "speech_stopped" }));
+                  console.log(`[voice] → bridge: speech_stopped (device=${deviceId})`);
+                  bridgeWs?.send(JSON.stringify({
+                    type: "speech_stopped",
+                    device_id: deviceId,
+                  }));
                 },
                 onTtsStart: (audioPath: string) => {
-                  console.log(`[voice] → bridge: tts_start (${audioPath})`);
-                  bridgeWs?.send(JSON.stringify({ type: "tts_start", audio_path: audioPath }));
+                  console.log(`[voice] → bridge: tts_start (device=${deviceId}, ${audioPath})`);
+                  bridgeWs?.send(JSON.stringify({
+                    type: "tts_start",
+                    device_id: deviceId,
+                    audio_path: audioPath,
+                  }));
                 },
                 onVoiceDone: () => {
-                  console.log("[voice] → bridge: voice_done");
-                  bridgeWs?.send(
-                    JSON.stringify({ type: "voice_done", conversation_id: sessionId }),
-                  );
-                  // Clean up audio stream after a delay (give device time to finish fetching)
+                  console.log(`[voice] → bridge: voice_done (device=${deviceId})`);
+                  bridgeWs?.send(JSON.stringify({
+                    type: "voice_done",
+                    device_id: deviceId,
+                    conversation_id: sessionId,
+                  }));
+                  // Clear active streamer
+                  if (activeStreamingDevice === deviceId) {
+                    activeStreamingDevice = null;
+                  }
+                  sessions.delete(deviceId);
+                  // Clean up audio stream after a delay
                   setTimeout(() => {
                     opts.audioStreams.delete(sessionId);
                     console.log(`[voice] Cleaned up audio stream for ${sessionId}`);
                   }, 30_000);
                 },
                 onError: (err: Error) => {
-                  console.error("[voice] Realtime session error:", err.message);
-                  // Send voice_done so the bridge doesn't hang
-                  bridgeWs?.send(
-                    JSON.stringify({ type: "voice_done", conversation_id: sessionId }),
-                  );
+                  console.error(`[voice] Realtime session error (device=${deviceId}):`, err.message);
+                  bridgeWs?.send(JSON.stringify({
+                    type: "voice_done",
+                    device_id: deviceId,
+                    conversation_id: sessionId,
+                  }));
+                  if (activeStreamingDevice === deviceId) {
+                    activeStreamingDevice = null;
+                  }
+                  sessions.delete(deviceId);
                   opts.audioStreams.delete(sessionId);
                 },
               };
 
               const session = new RealtimeSession(sessionId, callbacks, opts.toolCtx);
-              activeSession = session;
+              sessions.set(deviceId, session);
 
               // Register the audio stream for HTTP serving
               opts.audioStreams.set(sessionId, session.audioStream);
 
               // Open the OpenAI Realtime connection
               session.open().catch((err) => {
-                console.error("[voice] Failed to open Realtime session:", err);
-                bridgeWs?.send(
-                  JSON.stringify({ type: "voice_done", conversation_id: sessionId }),
-                );
+                console.error(`[voice] Failed to open Realtime session (device=${deviceId}):`, err);
+                bridgeWs?.send(JSON.stringify({
+                  type: "voice_done",
+                  device_id: deviceId,
+                  conversation_id: sessionId,
+                }));
+                if (activeStreamingDevice === deviceId) {
+                  activeStreamingDevice = null;
+                }
+                sessions.delete(deviceId);
                 opts.audioStreams.delete(sessionId);
-                activeSession = null;
               });
 
               break;
@@ -129,10 +162,12 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
 
       onClose() {
         console.log("[voice] Bridge disconnected");
-        if (activeSession) {
-          activeSession.close();
-          activeSession = null;
+        for (const [deviceId, session] of sessions) {
+          console.log(`[voice] Cleaning up session for device=${deviceId}`);
+          session.close();
         }
+        sessions.clear();
+        activeStreamingDevice = null;
         bridgeWs = null;
       },
 

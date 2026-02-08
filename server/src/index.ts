@@ -5,6 +5,7 @@ import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config/config.js";
 import { AutomationEngine } from "./automations.js";
 import { createMcpRoute } from "./mcp.js";
+import { debugLog } from "./debug-log.js";
 import { resolve } from "path";
 import { existsSync } from "fs";
 
@@ -14,15 +15,24 @@ const DATA_DIR = process.env.DATA_DIR ?? resolve(import.meta.dirname, "../..");
 
 const configPath = resolve(DATA_DIR, "config.json");
 const automationsPath = resolve(DATA_DIR, "automations.json");
+const debugLogPath = resolve(DATA_DIR, "debug.jsonl");
 
 console.log(`[server] MQTT_URL=${MQTT_URL}`);
 console.log(`[server] Config: ${configPath}`);
 console.log(`[server] Automations: ${automationsPath}`);
 
-const bridge = createMqttBridge(MQTT_URL);
+// Load config first so we can read debugLogMaxSizeMB
 const config = new ConfigStore(configPath);
+
+// Initialise file-backed debug log before anything else uses it
+debugLog.init(debugLogPath, config.get().debugLogMaxSizeMB);
+
+const bridge = createMqttBridge(MQTT_URL);
 const automationEngine = new AutomationEngine(automationsPath, bridge, {
-  onFire: (id, trigger) => console.log(`[auto] ${id} fired by ${trigger}`),
+  onFire: (id, trigger) => {
+    console.log(`[auto] ${id} fired by ${trigger}`);
+    debugLog.add("automation_fired", `Automation ${id} fired by ${trigger}`, { id, trigger });
+  },
 });
 
 const { app, injectWebSocket } = createApp(bridge, config, automationEngine);

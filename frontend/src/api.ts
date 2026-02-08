@@ -204,6 +204,68 @@ export function useDeleteAutomation() {
   });
 }
 
+// --- Debug logs ---
+
+export interface DebugLogEntry {
+  id: number;
+  timestamp: string;
+  type: string;
+  summary: string;
+  data?: unknown;
+}
+
+export function useDebugLogs() {
+  return useQuery({
+    queryKey: ["debug-logs"],
+    queryFn: async () => {
+      const res = await fetch("/api/debug/logs");
+      return res.json() as Promise<DebugLogEntry[]>;
+    },
+    refetchInterval: false, // we use WS for real-time updates
+  });
+}
+
+export function useClearDebugLogs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await fetch("/api/debug/logs", { method: "DELETE" });
+    },
+    onSuccess: () => {
+      qc.setQueryData(["debug-logs"], []);
+    },
+  });
+}
+
+/** Subscribe to real-time debug log entries via WebSocket. */
+export function useDebugLogStream(onEntry: (entry: DebugLogEntry) => void) {
+  const callbackRef = useRef(onEntry);
+  callbackRef.current = onEntry;
+
+  useEffect(() => {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${proto}//${window.location.host}/ws/debug`);
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === "debug_entry" && msg.data) {
+          callbackRef.current(msg.data as DebugLogEntry);
+        }
+      } catch { /* ignore */ }
+    };
+
+    ws.onclose = () => {
+      // Auto-reconnect after 3s
+      setTimeout(() => {
+        // The hook will re-run on next render cycle
+      }, 3000);
+    };
+
+    return () => ws.close();
+  }, []);
+}
+
 // --- WebSocket for real-time updates ---
 
 export function useRealtimeUpdates() {

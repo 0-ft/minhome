@@ -11,6 +11,7 @@ import { createChatRoute } from "./chat/index.js";
 import { authMiddleware, authRoutes } from "./auth.js";
 import { buildDeviceResponse, type ToolContext } from "./tools.js";
 import { createVoiceWSHandler, type AudioStreamRegistry } from "./voice.js";
+import { debugLog, type DebugLogType } from "./debug-log.js";
 
 export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
   const app = new Hono();
@@ -258,7 +259,49 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
           "Cache-Control": "no-cache, no-store",
         },
       });
-    });
+    })
+
+    // --- Debug log ---
+    .get("/api/debug/logs", (c) => {
+      const type = c.req.query("type") as DebugLogType | undefined;
+      const since = c.req.query("since") ? Number(c.req.query("since")) : undefined;
+      return c.json(debugLog.getAll({ type, since }));
+    })
+
+    .delete("/api/debug/logs", (c) => {
+      debugLog.clear();
+      return c.json({ ok: true });
+    })
+
+    // --- Debug log WebSocket ---
+    .get("/ws/debug", upgradeWebSocket(() => {
+      return {
+        onOpen(_evt, ws) {
+          const onEntry = (entry: unknown) => {
+            ws.send(JSON.stringify({ type: "debug_entry", data: entry }));
+          };
+          debugLog.on("entry", onEntry);
+          (ws as unknown as Record<string, unknown>).__debugCleanup = () => {
+            debugLog.off("entry", onEntry);
+          };
+        },
+        onClose(_evt, ws) {
+          const cleanup = (ws as unknown as Record<string, unknown>).__debugCleanup as (() => void) | undefined;
+          cleanup?.();
+        },
+      };
+    }));
+
+  // --- Instrument MQTT bridge for debug logging ---
+  bridge.on("state_change", (data: unknown) => {
+    const d = data as { deviceId: string; friendlyName: string; state: unknown };
+    debugLog.add("mqtt_state_change", `State: ${d.friendlyName}`, d);
+  });
+
+  bridge.on("mqtt_message", (data: unknown) => {
+    const d = data as { topic: string; payload: string };
+    debugLog.add("mqtt_message", `MQTT: ${d.topic}`, d);
+  });
 
   return { app, injectWebSocket };
 }

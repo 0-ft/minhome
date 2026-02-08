@@ -9,3 +9,4 @@ z2m-data/
 .env
 .pnpm-store
 .vscode
+debug.jsonl

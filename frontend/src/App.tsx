@@ -6,6 +6,7 @@ import { EntitiesView } from "./components/EntitiesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { RoomView } from "./components/RoomView.js";
 import { RoomFullView } from "./components/RoomFullView.js";
+import { DebugView } from "./components/DebugView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { LoginPage } from "./components/LoginPage.js";
 import { MessageSquare, LogOut } from "lucide-react";
@@ -38,6 +39,7 @@ function AuthenticatedApp({ showLogout }: { showLogout: boolean }) {
   return (
     <Routes>
       <Route path="/room-full" element={<RoomFullView />} />
+      <Route path="/log" element={<DebugLayout showLogout={showLogout} />} />
       <Route path="/" element={<Navigate to="/entities" replace />} />
       <Route path="/*" element={<MainLayout showLogout={showLogout} />} />
     </Routes>
@@ -153,6 +155,53 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
           </Routes>
         </main>
       </div>
+    </div>
+  );
+}
+
+function DebugLayout({ showLogout }: { showLogout: boolean }) {
+  const navigate = useNavigate();
+  const logout = useLogout();
+
+  return (
+    <div className="h-screen flex flex-col bg-sand-100">
+      {/* Header */}
+      <header className="shrink-0 bg-blood-300/80 backdrop-blur-lg">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-end justify-between">
+          <Logo />
+
+          <div className="flex items-center gap-2">
+            <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
+              {TABS.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => navigate(`/${t}`)}
+                  className="px-3.5 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
+                >
+                  {t}
+                </button>
+              ))}
+            </nav>
+
+            {showLogout && (
+              <button
+                onClick={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+                className="p-2 rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <DebugView />
+        </div>
+      </main>
     </div>
   );
 }

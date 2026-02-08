@@ -7,6 +7,7 @@ import {
   RoomDimensionsSchema,
   RoomLightSchema,
   FurnitureItemSchema,
+  VoiceSchema,
   extractEntitiesFromExposes,
   buildEntityResponses,
   resolveEntityPayload,
@@ -272,6 +273,21 @@ export function createTools(): Record<string, ToolDef> {
       execute: async ({ id }, { automations }) => {
         automations.remove(id);
         return { ok: true };
+      },
+    },
+
+    // --- Voice ---
+
+    set_voice: {
+      description:
+        "Change the voice used for spoken responses. " +
+        "Available voices: alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar.",
+      parameters: z.object({
+        voice: VoiceSchema.describe("The voice to use for spoken responses"),
+      }),
+      execute: async ({ voice }, { config }) => {
+        config.setVoice(voice);
+        return { ok: true, voice };
       },
     },
   };

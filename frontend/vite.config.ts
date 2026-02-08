@@ -12,6 +12,7 @@ export default defineConfig({
     proxy: {
       "/api": apiTarget,
       "/ws": { target: apiTarget.replace(/^http/, "ws"), ws: true },
+      "/ws/debug": { target: apiTarget.replace(/^http/, "ws"), ws: true },
     },
   },
 });
