@@ -1,8 +1,5 @@
 import { Hono } from "hono";
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from "ai";
-import type { MqttBridge } from "../mqtt.js";
-import type { ConfigStore } from "../config/config.js";
-import type { AutomationEngine } from "../automations.js";
 import { buildSystemPrompt } from "./context.js";
 import { createTools, type ToolContext } from "../tools.js";
 import { createAutomationTools } from "../automation-tools.js";
@@ -11,9 +8,9 @@ import { debugLog } from "../debug-log.js";
 
 // ── Chat route ────────────────────────────────────────────
 
-export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
+export function createChatRoute(ctx: ToolContext) {
   const chat = new Hono();
-  const ctx: ToolContext = { bridge, config, automations };
+  const { bridge, config, automations, voiceDevices } = ctx;
 
   chat.get("/api/chat/info", (c) => {
     return c.json({
@@ -23,7 +20,7 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automat
   });
 
   chat.get("/api/chat/debug", (c) => {
-    const system = buildSystemPrompt(bridge, config, automations);
+    const system = buildSystemPrompt(bridge, config, automations, voiceDevices);
     const defs = { ...createTools(), ...createAutomationTools() };
 
     const toolDefs = Object.fromEntries(
@@ -46,7 +43,7 @@ export function createChatRoute(bridge: MqttBridge, config: ConfigStore, automat
     const body = await c.req.json<{ messages: UIMessage[] }>();
     const { messages } = body;
 
-    const system = buildSystemPrompt(bridge, config, automations);
+    const system = buildSystemPrompt(bridge, config, automations, voiceDevices);
     const modelMessages = await convertToModelMessages(messages);
 
     // Wrap tools to intercept tool calls and results

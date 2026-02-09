@@ -106,6 +106,7 @@ class DeviceHandler:
         )
         self._audio_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
         self._reconnect: ReconnectLogic | None = None
+        self._device_info: dict[str, str] | None = None  # cached info for WS reconnects
 
     async def start(self) -> None:
         """Start the reconnection logic for this device."""
@@ -144,6 +145,13 @@ class DeviceHandler:
             device_info.esphome_version,
         )
 
+        # Cache device info so we can re-send it on WS reconnects
+        self._device_info = {
+            "name": device_info.name,
+            "model": device_info.model,
+            "version": device_info.esphome_version,
+        }
+
         self.cli.subscribe_voice_assistant(
             handle_start=self._handle_pipeline_start,
             handle_stop=self._handle_pipeline_stop,
@@ -151,10 +159,24 @@ class DeviceHandler:
         )
         log.info("[%s] Subscribed to voice assistant events", self.device_id)
 
+        # Notify the server that this device is connected
+        await self.manager.ws_send_json({
+            "type": "device_connected",
+            "device_id": self.device_id,
+            "name": device_info.name,
+            "model": device_info.model,
+            "version": device_info.esphome_version,
+        })
+
     async def _on_disconnect(self, expected_disconnect: bool) -> None:
         log.warning(
             "[%s] Disconnected (expected=%s)", self.device_id, expected_disconnect
         )
+        # Notify the server that this device is disconnected
+        await self.manager.ws_send_json({
+            "type": "device_disconnected",
+            "device_id": self.device_id,
+        })
 
     async def _on_connect_error(self, exc: Exception) -> None:
         log.error("[%s] Connection error: %s", self.device_id, exc)
@@ -293,8 +315,38 @@ class DeviceHandler:
             # Clear active streamer if it's this device
             self.manager.clear_active_streamer(self.device_id)
 
+        elif msg_type == "announce":
+            audio_path = msg.get("audio_path", "")
+            audio_url = f"{MINHOME_AUDIO_BASE_URL}{audio_path}"
+            announce_id = msg.get("announce_id", "")
+            log.info("[%s] Server: announce (id=%s, url=%s)", self.device_id, announce_id, audio_url)
+            asyncio.get_event_loop().create_task(
+                self._play_announcement(audio_url, announce_id)
+            )
+
         else:
             log.debug("[%s] Unknown server message: %s", self.device_id, msg_type)
+
+    async def _play_announcement(self, audio_url: str, announce_id: str) -> None:
+        """Play an announcement on the device and report back to the server."""
+        success = False
+        try:
+            result = await self.cli.send_voice_assistant_announcement_await_response(
+                media_id=audio_url,
+                timeout=300,
+                text="",
+            )
+            success = result.success
+            log.info("[%s] Announcement %s finished (success=%s)", self.device_id, announce_id, success)
+        except Exception as exc:
+            log.error("[%s] Announcement %s failed: %s", self.device_id, announce_id, exc)
+
+        await self.manager.ws_send_json({
+            "type": "announce_done",
+            "device_id": self.device_id,
+            "announce_id": announce_id,
+            "success": success,
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -338,33 +390,70 @@ class BridgeManager:
                     self._ws_reader_task = asyncio.get_running_loop().create_task(
                         self._ws_reader()
                     )
+                # Send the current list of connected devices so the server
+                # knows about them immediately (important on reconnect)
+                await self._send_devices_list()
             except Exception as exc:
                 log.error("Failed to connect to minhome: %s", exc)
                 self._ws = None
             return self._ws
+
+    async def _send_devices_list(self) -> None:
+        """Send the list of currently connected devices to the server."""
+        devices = []
+        for device_id, handler in self._devices.items():
+            if handler._device_info is not None:
+                devices.append({
+                    "device_id": device_id,
+                    **handler._device_info,
+                })
+        if not devices:
+            return
+        msg = json.dumps({"type": "devices_list", "devices": devices})
+        log.info("Sending devices_list with %d device(s) to server", len(devices))
+        try:
+            await self._ws.send(msg)
+        except Exception as exc:
+            log.error("Failed to send devices_list: %s", exc)
 
     async def _ws_reader(self) -> None:
         """Read incoming messages from the minhome WebSocket (server → bridge)."""
         while True:
             ws = self._ws
             if ws is None:
-                await asyncio.sleep(1)
-                continue
+                log.info("WS reader: reconnecting to minhome...")
+                ws = await self._ensure_ws()
+                if ws is None:
+                    await asyncio.sleep(3)
+                    continue
             try:
                 raw = await ws.recv()
                 if isinstance(raw, str):
                     msg = json.loads(raw)
+                    msg_type = msg.get("type")
+
+                    # Broadcast messages go to all devices
+                    if msg_type == "announce_all":
+                        log.info("Broadcasting announce to %d device(s)", len(self._devices))
+                        for handler in self._devices.values():
+                            handler.handle_server_message({
+                                **msg,
+                                "type": "announce",
+                                "device_id": handler.device_id,
+                            })
+                        continue
+
                     device_id = msg.get("device_id")
                     if device_id and device_id in self._devices:
                         self._devices[device_id].handle_server_message(msg)
                     elif device_id:
                         log.warning("Server message for unknown device: %s", device_id)
                     else:
-                        log.warning("Server message without device_id: %s", msg.get("type"))
+                        log.warning("Server message without device_id: %s", msg_type)
             except Exception as exc:
-                log.warning("WS reader error: %s", exc)
+                log.warning("WS reader error: %s — will reconnect", exc)
                 self._ws = None
-                await asyncio.sleep(1)
+                await asyncio.sleep(3)
 
     async def ws_send_json(self, msg: dict) -> None:
         ws = await self._ensure_ws()
@@ -476,8 +565,13 @@ class BridgeManager:
         log.info("Audio base URL: %s", MINHOME_AUDIO_BASE_URL)
         log.info("minhome WS: %s", MINHOME_WS_URL)
 
-        # Pre-connect to minhome WebSocket
-        await self._ensure_ws()
+        # Connect to minhome WebSocket (retry until successful)
+        while True:
+            ws = await self._ensure_ws()
+            if ws is not None:
+                break
+            log.info("Retrying minhome WS connection in 3s...")
+            await asyncio.sleep(3)
 
         # Start mDNS discovery
         self.zeroconf = AsyncZeroconf()

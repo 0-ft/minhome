@@ -448,6 +448,22 @@
         "type": "table"
       }
     ],
+    "sensors": [
+      {
+        "deviceId": "0xa4c138f959e3ad1b",
+        "entityId": "main",
+        "position": [4.2, 1.6, 2.995],
+        "type": "generic",
+        "shape": {
+          "type": "cylinder",
+          "position": [0, 0, 0],
+          "rotation": [1.5708, 0, 0],
+          "radius": 0.0375,
+          "height": 0.015,
+          "color": "#e8e0d8"
+        }
+      }
+    ],
     "camera": {
       "position": [
         5.52,

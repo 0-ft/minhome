@@ -2,7 +2,8 @@ import { useCallback, useMemo, useRef, useEffect, useState as useReactState } fr
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
-import { useDevices, useConfig, useRefreshStates, useSetDevice } from "../api.js";
+import { Zap as ZapIcon } from "lucide-react";
+import { useDevices, useConfig, useRefreshStates, useSetDevice, useDeviceEvent } from "../api.js";
 import type { DeviceData, Entity } from "../types.js";
 
 // ── Types matching server config/room.ts ─────────────────
@@ -28,6 +29,15 @@ export interface RoomLightDef {
   type: "ceiling" | "desk" | "table" | "floor";
 }
 
+export interface RoomSensorDef {
+  deviceId: string;
+  entityId: string;
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  type: "motion" | "contact" | "temperature" | "generic";
+  shape?: FurniturePrimitive;
+}
+
 export interface CameraConfig {
   position: [number, number, number];
   target: [number, number, number];
@@ -39,6 +49,7 @@ export interface RoomConfig {
   floor: string;
   furniture: FurnitureItem[];
   lights: RoomLightDef[];
+  sensors?: RoomSensorDef[];
   camera?: CameraConfig;
 }
 
@@ -293,6 +304,187 @@ function LightOrb({
   );
 }
 
+// ── Sensor type → color map ─────────────────────────────
+const SENSOR_COLORS: Record<RoomSensorDef["type"], string> = {
+  motion: "#4a9eff",
+  contact: "#4adb8a",
+  temperature: "#ff8a4a",
+  generic: "#a78bfa",
+};
+
+// ── Sensor event pop animation (2D lightning bolt) ──────
+const EVENT_DURATION = 0.9; // seconds
+const EVENT_COLOR = "#00e5ff";
+
+function SensorEventPop({ startTime }: { startTime: number }) {
+  const divRef = useRef<HTMLDivElement>(null);
+
+  useFrame(({ clock }) => {
+    if (!divRef.current) return;
+    const elapsed = clock.getElapsedTime() - startTime;
+    const t = Math.min(elapsed / EVENT_DURATION, 1);
+
+    // Quick fade in (first 15%), hold, then fade out
+    const fadeIn = Math.min(t / 0.15, 1);
+    const fadeOut = t > 0.5 ? 1 - (t - 0.5) / 0.5 : 1;
+    const opacity = fadeIn * fadeOut;
+
+    // Small bounce: rise up then settle
+    const bounce = t < 0.3
+      ? t / 0.3             // rise
+      : 1 - Math.sin((t - 0.3) / 0.7 * Math.PI) * 0.3; // settle with overshoot
+    const y = -bounce * 12; // px upward
+
+    divRef.current.style.opacity = String(Math.max(0, opacity));
+    divRef.current.style.transform = `translateY(${y}px) scale(${0.8 + fadeIn * 0.2})`;
+  });
+
+  return (
+    <Html position={[0, 0.08, 0]} center style={{ pointerEvents: "none" }}>
+      <div
+        ref={divRef}
+        style={{ opacity: 0, willChange: "transform, opacity" }}
+        className="flex items-center justify-center drop-shadow-[0_0_6px_rgba(0,229,255,0.7)]"
+      >
+        <ZapIcon size={18} color={EVENT_COLOR} fill={EVENT_COLOR} strokeWidth={2} />
+      </div>
+    </Html>
+  );
+}
+
+// ── Find entity for a room sensor ───────────────────────
+function findEntityForSensor(device: DeviceData | undefined, entityId: string): Entity | undefined {
+  if (!device) return undefined;
+  return device.entities?.find(e => e.key === entityId);
+}
+
+// ── Animated sensor with ripple ─────────────────────────
+function SensorOrb({
+  sensor,
+  device,
+}: {
+  sensor: RoomSensorDef;
+  device?: DeviceData;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [showLabel, setShowLabel] = useReactState(false);
+  const hovered = useRef(false);
+
+  const entity = useMemo(() => findEntityForSensor(device, sensor.entityId), [device, sensor.entityId]);
+
+  const label = useMemo(() => {
+    if (entity) return entity.name;
+    if (device) return device.name;
+    return sensor.deviceId;
+  }, [entity, device, sensor.deviceId]);
+
+  // Build a display string for the label
+  const stateDisplay = useMemo(() => {
+    if (!entity?.sensorProperties || !entity.state) return "";
+    const parts: string[] = [];
+    for (const sp of entity.sensorProperties) {
+      const val = entity.state[sp.property];
+      if (val !== undefined && val !== null) {
+        if (typeof val === "boolean") {
+          parts.push(`${sp.name}: ${val ? "yes" : "no"}`);
+        } else {
+          parts.push(`${sp.name}: ${val}${sp.unit ?? ""}`);
+        }
+      }
+    }
+    return parts.join(" · ");
+  }, [entity]);
+
+  // Ripple state
+  const [ripples, setRipples] = useReactState<number[]>([]);
+  const clockRef = useRef(0);
+
+  // The set of MQTT property names we care about for this sensor
+  const sensorProps = useMemo(() => {
+    if (!entity?.sensorProperties) return new Set<string>();
+    return new Set(entity.sensorProperties.map(sp => sp.property));
+  }, [entity?.sensorProperties]);
+
+  // Store the clock time each frame so we can reference it outside useFrame
+  useFrame(({ clock }) => {
+    clockRef.current = clock.getElapsedTime();
+
+    // Hover scale for default orb
+    if (meshRef.current) {
+      const targetScale = hovered.current ? 1.35 : 1;
+      meshRef.current.scale.setScalar(THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale, 0.15));
+    }
+  });
+
+  // Subscribe to raw WebSocket state_change events → spawn ripple on any
+  // incoming MQTT message that contains a relevant sensor property
+  useDeviceEvent(sensor.deviceId, useCallback((state: Record<string, unknown>) => {
+    if (sensorProps.size === 0) return;
+    const hasRelevant = Object.keys(state).some(k => sensorProps.has(k));
+    if (hasRelevant) {
+      setRipples(prev => [...prev, clockRef.current]);
+    }
+  }, [sensorProps]));
+
+  // Clean up finished ripples
+  useEffect(() => {
+    if (ripples.length === 0) return;
+    const timer = setTimeout(() => {
+      const now = clockRef.current;
+      setRipples(prev => prev.filter(t => now - t < EVENT_DURATION));
+    }, EVENT_DURATION * 1000 + 100);
+    return () => clearTimeout(timer);
+  }, [ripples]);
+
+  const color = SENSOR_COLORS[sensor.type];
+
+  return (
+    <group position={sensor.position} rotation={sensor.rotation}>
+      {/* Visual body — custom shape or default orb */}
+      {sensor.shape ? (
+        <FurniturePrimitiveMesh item={sensor.shape} />
+      ) : (
+        <mesh
+          ref={meshRef}
+          onPointerOver={(e) => { e.stopPropagation(); hovered.current = true; setShowLabel(true); document.body.style.cursor = "pointer"; }}
+          onPointerOut={() => { hovered.current = false; setShowLabel(false); document.body.style.cursor = ""; }}
+        >
+          <sphereGeometry args={[0.05, 16, 16]} />
+          <meshStandardMaterial color={color} transparent opacity={0.7} emissive={color} emissiveIntensity={0.3} />
+        </mesh>
+      )}
+
+      {/* Hover interaction overlay for custom shapes */}
+      {sensor.shape && (
+        <mesh
+          visible={false}
+          onPointerOver={(e) => { e.stopPropagation(); hovered.current = true; setShowLabel(true); document.body.style.cursor = "pointer"; }}
+          onPointerOut={() => { hovered.current = false; setShowLabel(false); document.body.style.cursor = ""; }}
+        >
+          <sphereGeometry args={[0.12, 8, 8]} />
+          <meshBasicMaterial />
+        </mesh>
+      )}
+
+      {/* Name + state label on hover */}
+      <Html position={[0, 0.2, 0]} center style={{ pointerEvents: "none" }}>
+        <div
+          className={`px-2 py-0.5 rounded bg-blood-500/90 text-sand-50 text-[10px] font-mono whitespace-nowrap shadow-lg transition-all duration-200 ${
+            showLabel ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
+          }`}
+        >
+          {label}{stateDisplay ? ` — ${stateDisplay}` : ""}
+        </div>
+      </Html>
+
+      {/* Event pop animations */}
+      {ripples.map((t) => (
+        <SensorEventPop key={t} startTime={t} />
+      ))}
+    </group>
+  );
+}
+
 // ── Camera state getter type ────────────────────────────
 export type GetCameraState = () => CameraConfig;
 
@@ -310,7 +502,7 @@ export function Scene({
   orbitTarget?: [number, number, number];
   cameraRef?: React.MutableRefObject<GetCameraState | null>;
 }) {
-  const { dimensions, floor, furniture, lights, camera } = roomConfig;
+  const { dimensions, floor, furniture, lights, sensors, camera } = roomConfig;
   const controlsRef = useRef<any>(null);
 
   // Wire up camera state getter — reads from OrbitControls + camera
@@ -349,6 +541,14 @@ export function Scene({
         />
       ))}
 
+      {(sensors ?? []).map((sensor, i) => (
+        <SensorOrb
+          key={`sensor-${sensor.deviceId}-${sensor.entityId ?? i}`}
+          sensor={sensor}
+          device={deviceMap.get(sensor.deviceId)}
+        />
+      ))}
+
       <OrbitControls
         ref={controlsRef}
         target={initialTarget}
@@ -367,7 +567,7 @@ function parseRoomConfig(config: unknown): RoomConfig | null {
   const c = config as Record<string, unknown> | undefined;
   const room = c?.room as RoomConfig | undefined;
   if (!room?.dimensions || !room?.floor || !room?.furniture || !room?.lights) return null;
-  return room;
+  return { ...room, sensors: room.sensors ?? [] };
 }
 
 // ── Shared data hook for room views ─────────────────────

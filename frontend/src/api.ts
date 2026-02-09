@@ -266,6 +266,32 @@ export function useDebugLogStream(onEntry: (entry: DebugLogEntry) => void) {
   }, []);
 }
 
+// --- Device event bus (fires on every raw state_change from WebSocket) ---
+
+export const deviceEventBus = new EventTarget();
+
+export interface DeviceStateChangeDetail {
+  deviceId: string;
+  state: Record<string, unknown>;
+}
+
+/** Subscribe to raw state_change events for a specific device. */
+export function useDeviceEvent(deviceId: string, onEvent: (state: Record<string, unknown>) => void) {
+  const callbackRef = useRef(onEvent);
+  callbackRef.current = onEvent;
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<DeviceStateChangeDetail>).detail;
+      if (detail.deviceId === deviceId) {
+        callbackRef.current(detail.state);
+      }
+    };
+    deviceEventBus.addEventListener("state_change", handler);
+    return () => deviceEventBus.removeEventListener("state_change", handler);
+  }, [deviceId]);
+}
+
 // --- WebSocket for real-time updates ---
 
 export function useRealtimeUpdates() {
@@ -281,6 +307,12 @@ export function useRealtimeUpdates() {
         const msg = JSON.parse(evt.data);
         if (msg.type === "state_change" || msg.type === "devices") {
           qc.invalidateQueries({ queryKey: ["devices"] });
+        }
+        if (msg.type === "state_change" && msg.data) {
+          const { deviceId, state } = msg.data as { deviceId: string; state: Record<string, unknown> };
+          deviceEventBus.dispatchEvent(new CustomEvent("state_change", {
+            detail: { deviceId, state } satisfies DeviceStateChangeDetail,
+          }));
         }
         if (msg.type === "config_change") {
           qc.invalidateQueries({ queryKey: ["config"] });

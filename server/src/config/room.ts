@@ -78,6 +78,19 @@ export const RoomLightSchema = z.object({
 
 export type RoomLight = z.infer<typeof RoomLightSchema>;
 
+// ── Room sensors ──────────────────────────────────────────
+
+export const RoomSensorSchema = z.object({
+  deviceId: z.string().describe("IEEE address of the Zigbee sensor device, e.g. '0xa4c138f959e3ad1b'."),
+  entityId: z.string().default("main").describe("Entity key on this device. Defaults to 'main'."),
+  position: Vec3.describe("Position [x, y, z] of the sensor in the 3D scene, in metres."),
+  rotation: Vec3.optional().describe("Euler rotation [rx, ry, rz] in radians. Optional, defaults to no rotation."),
+  type: z.enum(["motion", "contact", "temperature", "generic"]).describe("Sensor category. Affects default colour of the visual and ripple."),
+  shape: FurniturePrimitiveSchema.optional().describe("Optional custom shape for the sensor visual. If omitted, defaults to a small orb (sphere). Use a box/cylinder/extrude to represent physical sensor hardware like a button disc. The shape's position is relative to the sensor's position."),
+}).describe("A sensor placed in the 3D room scene, linked to a real Zigbee sensor device. Triggers a ripple animation when its state changes.");
+
+export type RoomSensor = z.infer<typeof RoomSensorSchema>;
+
 // ── Room dimensions ───────────────────────────────────────
 
 export const RoomDimensionsSchema = z.object({
@@ -105,7 +118,8 @@ export const RoomSchema = z.object({
   floor: z.string().describe("CSS colour string for the floor surface, e.g. '#cdc0ae'."),
   furniture: z.array(FurnitureItemSchema).describe("Array of furniture pieces to render in the room."),
   lights: z.array(RoomLightSchema).describe("Array of light sources placed in the room, each linked to a real Zigbee device."),
+  sensors: z.array(RoomSensorSchema).optional().describe("Array of sensor devices placed in the room. Each triggers a ripple animation on state change."),
   camera: CameraSchema.optional().describe("Saved camera position. Optional — omit to use the default viewpoint. Preserved automatically when updating room config."),
-}).describe("Full 3D room configuration. Defines the room geometry, furniture layout, and light placements for the room visualisation.");
+}).describe("Full 3D room configuration. Defines the room geometry, furniture layout, light placements, and sensor placements for the room visualisation.");
 
 export type RoomConfig = z.infer<typeof RoomSchema>;

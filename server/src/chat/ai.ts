@@ -29,7 +29,10 @@ export function buildAiTools(ctx: ToolContext): Record<string, Tool> {
       {
         description: def.description,
         inputSchema: def.parameters,
-        execute: async (params: any) => JSON.stringify(await def.execute(params, ctx)),
+        execute: async (params: any) => {
+          const parsed = def.parameters.parse(params);
+          return JSON.stringify(await def.execute(parsed, ctx));
+        },
       } satisfies Tool,
     ]),
   );

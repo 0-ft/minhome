@@ -16,63 +16,7 @@ import { createTools, type ToolContext } from "./tools.js";
 import { createAutomationTools } from "./automation-tools.js";
 import { buildSystemPrompt } from "./chat/context.js";
 import { debugLog } from "./debug-log.js";
-
-// ── Audio constants ──────────────────────────────────────────
-
-const OPENAI_SAMPLE_RATE = 24000;
-const OUTPUT_SAMPLE_RATE = 48000;
-const BITS_PER_SAMPLE = 16;
-const NUM_CHANNELS = 1;
-
-// ── WAV header for streaming ─────────────────────────────────
-
-function createStreamingWavHeader(): Uint8Array {
-  const header = new ArrayBuffer(44);
-  const view = new DataView(header);
-  const enc = new TextEncoder();
-
-  // RIFF header
-  const riff = enc.encode("RIFF");
-  new Uint8Array(header, 0, 4).set(riff);
-  view.setUint32(4, 0x7fffffff, true); // large file size for streaming
-  const wave = enc.encode("WAVE");
-  new Uint8Array(header, 8, 4).set(wave);
-
-  // fmt sub-chunk
-  const fmt = enc.encode("fmt ");
-  new Uint8Array(header, 12, 4).set(fmt);
-  view.setUint32(16, 16, true); // sub-chunk size
-  view.setUint16(20, 1, true); // PCM format
-  view.setUint16(22, NUM_CHANNELS, true);
-  view.setUint32(24, OUTPUT_SAMPLE_RATE, true);
-  view.setUint32(28, OUTPUT_SAMPLE_RATE * NUM_CHANNELS * (BITS_PER_SAMPLE / 8), true);
-  view.setUint16(32, NUM_CHANNELS * (BITS_PER_SAMPLE / 8), true);
-  view.setUint16(34, BITS_PER_SAMPLE, true);
-
-  // data sub-chunk
-  const data = enc.encode("data");
-  new Uint8Array(header, 36, 4).set(data);
-  view.setUint32(40, 0x7fffffff, true); // large data size for streaming
-
-  return new Uint8Array(header);
-}
-
-// ── Resample 24kHz → 48kHz (2× linear interpolation) ────────
-
-function resample24to48(pcm24: Buffer): Uint8Array {
-  const sampleCount = pcm24.length / 2; // 16-bit samples
-  const output = new ArrayBuffer(sampleCount * 4); // 2× samples, 2 bytes each
-  const out = new DataView(output);
-
-  for (let i = 0; i < sampleCount; i++) {
-    const sample = pcm24.readInt16LE(i * 2);
-    const nextSample = i + 1 < sampleCount ? pcm24.readInt16LE((i + 1) * 2) : sample;
-    out.setInt16(i * 4, sample, true);
-    out.setInt16(i * 4 + 2, Math.round((sample + nextSample) / 2), true);
-  }
-
-  return new Uint8Array(output);
-}
+import { createStreamingWavHeader, resample24to48 } from "./audio-utils.js";
 
 // ── Convert Zod tool defs → OpenAI Realtime tool format ──────
 
@@ -89,7 +33,7 @@ function buildRealtimeTools(ctx: ToolContext) {
       const def = defs[name];
       if (!def) return JSON.stringify({ error: `Unknown tool: ${name}` });
       try {
-        const args = JSON.parse(argsJson);
+        const args = def.parameters.parse(JSON.parse(argsJson));
         const result = await def.execute(args, ctx);
         return JSON.stringify(result);
       } catch (err) {
@@ -232,6 +176,7 @@ export class RealtimeSession {
       this.toolCtx.bridge,
       this.toolCtx.config,
       this.toolCtx.automations,
+      this.toolCtx.voiceDevices,
     );
 
     // Strip inline reference instructions — the Realtime API outputs audio, not text with XML tags

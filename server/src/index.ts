@@ -38,11 +38,12 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
     const tools = createTools();
     const tool = tools[name];
     if (!tool) throw new Error(`Unknown tool: ${name}`);
-    return tool.execute(params, { bridge, config, automations: automationEngine });
+    const parsed = tool.parameters.parse(params);
+    return tool.execute(parsed, toolCtx);
   },
 });
 
-const { app, injectWebSocket } = createApp(bridge, config, automationEngine);
+const { app, injectWebSocket, toolCtx } = createApp(bridge, config, automationEngine);
 
 // Mount in-process MCP server at /mcp (for Cursor IDE remote MCP)
 app.route("/", createMcpRoute({ bridge, config, automations: automationEngine }));

@@ -9,7 +9,7 @@ import type { Automation, Trigger, Condition, Action } from "@minhome/server/aut
 
 // ── Defaults ──────────────────────────────────────────────
 
-const TRIGGER_TYPES = ["device_state", "device_event", "mqtt", "cron", "time", "interval"] as const;
+const TRIGGER_TYPES = ["device_state", "device_event", "mqtt", "cron", "time", "datetime", "interval"] as const;
 const CONDITION_TYPES = ["time_range", "day_of_week", "device_state", "and", "or", "xor"] as const;
 const ACTION_TYPES = ["device_set", "mqtt_publish", "delay", "conditional", "tool"] as const;
 
@@ -18,7 +18,7 @@ const TOOL_NAMES = [
   "rename_device", "rename_entity",
   "get_room_config", "set_room_dimensions", "set_room_lights",
   "update_room_furniture", "upsert_furniture_item", "remove_furniture_item",
-  "set_voice",
+  "set_voice", "announce",
 ] as const;
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
@@ -28,6 +28,7 @@ function defaultTrigger(type: string = "device_state"): Trigger {
     case "mqtt":         return { type: "mqtt", topic: "" };
     case "cron":         return { type: "cron", expression: "0 * * * *" };
     case "time":         return { type: "time", at: "08:00" };
+    case "datetime":     return { type: "datetime", at: new Date(Date.now() + 3600_000).toISOString().slice(0, 16) };
     case "interval":     return { type: "interval", every: 300 };
     default:             return { type: "device_state", device: "", entity: "main", property: "state" };
   }
@@ -235,8 +236,14 @@ function TriggerEditor({ trigger, onChange, onRemove, devices }: {
         )}
 
         {trigger.type === "time" && (
-          <Field label="At (HH:MM)">
-            <input className={fieldCls} type="time" value={trigger.at} onChange={(e) => onChange({ ...trigger, at: e.target.value })} />
+          <Field label="At (HH:MM:SS)">
+            <input className={fieldCls} type="time" step="1" value={trigger.at} onChange={(e) => onChange({ ...trigger, at: e.target.value })} />
+          </Field>
+        )}
+
+        {trigger.type === "datetime" && (
+          <Field label="Date & Time">
+            <input className={fieldCls} type="datetime-local" step="1" value={trigger.at} onChange={(e) => onChange({ ...trigger, at: e.target.value })} />
           </Field>
         )}
 

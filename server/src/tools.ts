@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import type { MqttBridge } from "./mqtt.js";
 import type { ConfigStore } from "./config/config.js";
 import type { AutomationEngine } from "./automations.js";
@@ -11,13 +12,29 @@ import {
   buildEntityResponses,
   resolveEntityPayload,
 } from "./config/config.js";
+import { generateTTS } from "./tts.js";
+import { SharedAudioSource } from "./audio-utils.js";
 
 // ── Context passed to every tool execute function ─────────
+
+export interface VoiceDeviceInfo {
+  name: string;
+  model?: string;
+  version?: string;
+}
 
 export interface ToolContext {
   bridge: MqttBridge;
   config: ConfigStore;
   automations: AutomationEngine;
+  /** Send a JSON message to the connected voice bridge. */
+  sendToBridge?: (msg: object) => void;
+  /** Registry of active audio streams for HTTP serving. */
+  audioStreams?: Map<string, ReadableStream<Uint8Array>>;
+  /** Registry of fan-out audio sources (announcements — replayable to multiple devices). */
+  audioSources?: Map<string, SharedAudioSource>;
+  /** Connected voice devices reported by the bridge (device_id → info). */
+  voiceDevices?: Map<string, VoiceDeviceInfo>;
 }
 
 // ── Tool definition type ──────────────────────────────────
@@ -153,6 +170,19 @@ export const toolSchemas = {
       "Available voices: alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar.",
     parameters: z.object({
       voice: VoiceSchema.describe("The voice to use for spoken responses"),
+    }),
+  },
+  announce: {
+    description:
+      "Send a spoken announcement to a voice device. " +
+      "The text will be converted to speech and played on the device. " +
+      "Use this to proactively inform the user, e.g. 'The front door was opened' or 'Timer is done'.",
+    parameters: z.object({
+      text: z.string().describe("The text to speak as an announcement"),
+      device_id: z
+        .string()
+        .optional()
+        .describe("Target device ID (omit to announce on all connected devices)"),
     }),
   },
 } as const satisfies Record<string, { description: string; parameters: z.ZodType }>;
@@ -292,6 +322,31 @@ export function createTools(): Record<string, ToolDef> {
       execute: async ({ voice }, { config }) => {
         config.setVoice(voice);
         return { ok: true, voice };
+      },
+    },
+
+    announce: {
+      ...toolSchemas.announce,
+      execute: async ({ text, device_id }, { config, sendToBridge, audioSources }) => {
+        if (!sendToBridge) throw new Error("Voice bridge not available");
+        if (!audioSources) throw new Error("Audio source registry not available");
+
+        // Generate TTS stream and wrap in SharedAudioSource for fan-out
+        const stream = await generateTTS(text, config);
+        const announceId = randomUUID();
+        const audioPath = `/audio/${announceId}`;
+        audioSources.set(announceId, new SharedAudioSource(stream));
+
+        // Send announce message to bridge (one device or all)
+        const isBroadcast = !device_id || device_id === "all";
+        if (!isBroadcast) {
+          sendToBridge({ type: "announce", device_id, audio_path: audioPath, announce_id: announceId });
+        } else {
+          // Broadcast: bridge will forward to all connected devices
+          sendToBridge({ type: "announce_all", audio_path: audioPath, announce_id: announceId });
+        }
+
+        return { ok: true, announce_id: announceId };
       },
     },
   };

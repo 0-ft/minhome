@@ -8,13 +8,12 @@
 - [ ] Server side chats
 - [x] MCP for updating room
   - [x] Furniture groups
-- [ ] Device loading
 - [ ] ZigBee pairing
 - [x] Room config MCP uses raw JSON
 - [x] Room config live updates
 - [x] Entities view
 - [ ] Wifi devices
-- [ ] Sensors
+- [x] Sensors
 - [ ] Types deduplication
 - [ ] Entity/device configurable icons
 - [x] 404 route
@@ -24,7 +23,8 @@
 - [ ] How are crons managed? Should prob be schedule/heartbeat-ish
 - [ ] Error if no zigbee
 - [ ] Config page: config state, zigbee interface connected & state, voice device+state
-- [ ] Auto find voice PE devices
-- [ ] Openai Realtime API
+- [x] Auto find voice PE devices
+- [x] Openai Realtime API
 - [ ] voice endpoint auth check
-- [ ] Automations to invoke the tools
+- [x] Automations to invoke the tools
+- [x] Sensors in room

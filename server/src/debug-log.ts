@@ -28,6 +28,9 @@ export type DebugLogType =
   | "mqtt_state_change"
   | "mqtt_message"
   | "automation_fired"
+  | "automation_created"
+  | "automation_updated"
+  | "automation_deleted"
   | "api_request"
   | "device_control"
   | "error";
@@ -127,7 +130,7 @@ class DebugLog extends EventEmitter {
       entries = entries.filter((e) => e.type === filter.type);
     }
     if (filter?.since) {
-      entries = entries.filter((e) => e.id > filter.since);
+      entries = entries.filter((e) => e.id > filter.since!);
     }
 
     // Return only the last MAX_RETURN entries

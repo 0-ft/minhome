@@ -9,8 +9,9 @@ import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { createChatRoute } from "./chat/index.js";
 import { authMiddleware, authRoutes } from "./auth.js";
-import { buildDeviceResponse, type ToolContext } from "./tools.js";
-import { createVoiceWSHandler, type AudioStreamRegistry } from "./voice.js";
+import { buildDeviceResponse, type ToolContext, type VoiceDeviceInfo } from "./tools.js";
+import { createVoiceWSHandler, type AudioStreamRegistry, type BridgeRef } from "./voice.js";
+import { SharedAudioSource } from "./audio-utils.js";
 import { debugLog, type DebugLogType } from "./debug-log.js";
 
 export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine) {
@@ -19,14 +20,31 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
 
   // Shared registry of active audio streams for voice response playback
   const audioStreams: AudioStreamRegistry = new Map();
-  const toolCtx: ToolContext = { bridge, config, automations };
+
+  // Fan-out audio sources — for announcements (one source → many device readers)
+  const audioSources: Map<string, SharedAudioSource> = new Map();
+
+  // Connected voice devices reported by the bridge
+  const voiceDevices: Map<string, VoiceDeviceInfo> = new Map();
+
+  // Bridge WebSocket ref — populated when bridge connects
+  const bridgeRef: { current: BridgeRef | null } = { current: null };
+  const sendToBridge = (msg: object) => {
+    if (!bridgeRef.current) {
+      console.warn("[voice] No bridge connected — dropping message:", (msg as any).type);
+      return;
+    }
+    bridgeRef.current.send(JSON.stringify(msg));
+  };
+
+  const toolCtx: ToolContext = { bridge, config, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
 
   // --- Auth (no-ops when AUTH_PASSWORD is unset) ---
   app.route("/", authRoutes());
   app.use("*", authMiddleware());
 
   // --- AI Chat ---
-  app.route("/", createChatRoute(bridge, config, automations));
+  app.route("/", createChatRoute(toolCtx));
 
   app
 
@@ -243,17 +261,32 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
 
     // --- Voice Bridge WebSocket ---
     .get("/ws/voice", upgradeWebSocket(
-      createVoiceWSHandler({ audioStreams, toolCtx })
+      createVoiceWSHandler({ audioStreams, toolCtx, bridgeRef })
     ))
 
     // --- Audio streaming for voice responses ---
     .get("/audio/:sessionId", (c) => {
       const sessionId = c.req.param("sessionId");
+
+      // Check shared audio sources first (announcements — fan-out to many readers)
+      const source = audioSources.get(sessionId);
+      if (source) {
+        console.log(`[audio] Creating fan-out reader for announcement ${sessionId}`);
+        return new Response(source.createReader(), {
+          headers: {
+            "Content-Type": "audio/wav",
+            "Transfer-Encoding": "chunked",
+            "Cache-Control": "no-cache, no-store",
+          },
+        });
+      }
+
+      // Fall back to streaming audio (realtime voice sessions — single consumer)
       const stream = audioStreams.get(sessionId);
       if (!stream) {
         return c.json({ error: "Audio stream not found" }, 404);
       }
-      console.log(`[audio] Device fetching audio for session ${sessionId}`);
+      console.log(`[audio] Device fetching audio stream for ${sessionId}`);
       return new Response(stream, {
         headers: {
           "Content-Type": "audio/wav",
@@ -305,7 +338,7 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
     debugLog.add("mqtt_message", `MQTT: ${d.topic}`, d);
   });
 
-  return { app, injectWebSocket };
+  return { app, injectWebSocket, toolCtx };
 }
 
 export type AppType = ReturnType<typeof createApp>["app"];

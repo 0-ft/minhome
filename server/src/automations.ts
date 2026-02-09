@@ -1,9 +1,10 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { z } from "zod";
 import { Cron } from "croner";
 import type { MqttBridge, DeviceState } from "./mqtt.js";
 import { extractEntitiesFromExposes, resolveCanonicalProperty, resolveEntityPayload } from "./config/devices.js";
 import { toolSchemas } from "./tools.js";
+import { debugLog } from "./debug-log.js";
 
 // --- Zod schemas ---
 
@@ -29,8 +30,13 @@ const TriggerCron = z.object({
 
 const TriggerTime = z.object({
   type: z.literal("time").describe("Trigger type: fires at a specific time of day"),
-  at: z.string().regex(/^\d{2}:\d{2}$/).describe("Time of day in HH:MM 24-hour format, e.g. '08:30', '22:00'"),
+  at: z.iso.time().describe("Time of day in HH:MM or HH:MM:SS 24-hour format, e.g. '08:30', '22:00', '06:15:30'"),
 }).describe("Trigger that fires once per day at a specific time");
+
+const TriggerDatetime = z.object({
+  type: z.literal("datetime").describe("Trigger type: fires at a specific date and time (one-shot)"),
+  at: z.iso.datetime({ local: true }).describe("ISO 8601 local datetime, e.g. '2026-02-09T08:00' or '2026-02-09T08:00:00'. No timezone offset — uses server local time (Europe/London)."),
+}).describe("Trigger that fires once at a specific date and time. Ideal for one-off scheduled events like 'turn on lights at 8am tomorrow'. Typically paired with max_runs:1.");
 
 const TriggerInterval = z.object({
   type: z.literal("interval").describe("Trigger type: fires at a recurring interval"),
@@ -50,13 +56,14 @@ export const TriggerSchema = z.discriminatedUnion("type", [
   TriggerMqtt,
   TriggerCron,
   TriggerTime,
+  TriggerDatetime,
   TriggerInterval,
-]).describe("A trigger that causes the automation to fire. Set 'type' to one of: 'device_state', 'device_event', 'mqtt', 'cron', 'time', 'interval'. Use 'device_event' for buttons/sensors, 'device_state' for controllable devices like lights/switches.");
+]).describe("A trigger that causes the automation to fire. Set 'type' to one of: 'device_state', 'device_event', 'mqtt', 'cron', 'time', 'datetime', 'interval'. Use 'device_event' for buttons/sensors, 'device_state' for controllable devices, 'datetime' for one-off scheduled events.");
 
 const ConditionTimeRange = z.object({
   type: z.literal("time_range").describe("Condition type: passes only during a time-of-day window"),
-  after: z.string().regex(/^\d{2}:\d{2}$/).describe("Start of the allowed time window in HH:MM 24-hour format"),
-  before: z.string().regex(/^\d{2}:\d{2}$/).describe("End of the allowed time window in HH:MM 24-hour format (supports midnight wrap-around)"),
+  after: z.iso.time().describe("Start of the allowed time window in HH:MM or HH:MM:SS 24-hour format"),
+  before: z.iso.time().describe("End of the allowed time window in HH:MM or HH:MM:SS 24-hour format (supports midnight wrap-around)"),
 }).describe("Condition that passes only if the current time is within the given range");
 
 const ConditionDayOfWeek = z.object({
@@ -238,6 +245,7 @@ export class AutomationEngine {
     this.save();
     this.reload();
     this.emitChange();
+    debugLog.add("automation_created", `Created automation '${automation.name}'`, { id: automation.id, name: automation.name, triggers: automation.triggers.length, actions: automation.actions.length });
     return automation;
   }
 
@@ -248,14 +256,17 @@ export class AutomationEngine {
     this.save();
     this.reload();
     this.emitChange();
+    debugLog.add("automation_updated", `Updated automation '${this.automations[idx].name}'`, { id, patch: Object.keys(patch) });
     return this.automations[idx];
   }
 
   remove(id: string): void {
+    const existing = this.automations.find(a => a.id === id);
     this.automations = this.automations.filter(a => a.id !== id);
     this.save();
     this.reload();
     this.emitChange();
+    debugLog.add("automation_deleted", `Deleted automation '${existing?.name ?? id}'`, { id });
   }
 
   destroy(): void {
@@ -265,10 +276,19 @@ export class AutomationEngine {
   // --- Internals ---
 
   private load(): void {
-    if (existsSync(this.filePath)) {
-      const raw = readFileSync(this.filePath, "utf-8");
-      const parsed = AutomationsFileSchema.parse(JSON.parse(raw));
-      this.automations = parsed.automations;
+    try {
+      if (existsSync(this.filePath) && statSync(this.filePath).isFile()) {
+        const raw = readFileSync(this.filePath, "utf-8");
+        const parsed = AutomationsFileSchema.parse(JSON.parse(raw));
+        this.automations = parsed.automations;
+      } else {
+        this.automations = [];
+        this.save(); // create the file so it exists for future writes
+      }
+    } catch (err) {
+      console.error(`[auto] Failed to load automations from ${this.filePath}, starting empty:`, err);
+      this.automations = [];
+      this.save();
     }
     this.setupScheduled();
   }
@@ -291,8 +311,19 @@ export class AutomationEngine {
           const job = new Cron(trigger.expression, () => this.fire(auto, "cron"));
           this.cronJobs.push(job);
         } else if (trigger.type === "time") {
-          const [h, m] = trigger.at.split(":").map(Number);
-          const job = new Cron(`${m} ${h} * * *`, () => this.fire(auto, `time:${trigger.at}`));
+          const parts = trigger.at.split(":").map(Number);
+          const [h, m] = parts;
+          const s = parts[2] ?? 0;
+          const job = new Cron(`${s} ${m} ${h} * * *`, () => this.fire(auto, `time:${trigger.at}`));
+          this.cronJobs.push(job);
+        } else if (trigger.type === "datetime") {
+          const d = new Date(trigger.at);
+          if (isNaN(d.getTime())) {
+            console.warn(`[auto] Invalid datetime '${trigger.at}' in automation '${auto.name}', skipping`);
+            continue;
+          }
+          // Croner supports scheduling at a specific Date
+          const job = new Cron(d, () => this.fire(auto, `datetime:${trigger.at}`));
           this.cronJobs.push(job);
         } else if (trigger.type === "interval") {
           const iv = setInterval(() => this.fire(auto, `interval:${trigger.every}s`), trigger.every * 1000);
@@ -380,11 +411,10 @@ export class AutomationEngine {
 
     switch (cond.type) {
       case "time_range": {
-        const current = now.getHours() * 60 + now.getMinutes();
-        const [ah, am] = cond.after.split(":").map(Number);
-        const [bh, bm] = cond.before.split(":").map(Number);
-        const after = ah * 60 + am;
-        const before = bh * 60 + bm;
+        const toSecs = (t: string) => { const p = t.split(":").map(Number); return p[0] * 3600 + p[1] * 60 + (p[2] ?? 0); };
+        const current = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+        const after = toSecs(cond.after);
+        const before = toSecs(cond.before);
         // Handle wrap-around midnight
         if (after <= before) return current >= after && current < before;
         return current >= after || current < before;

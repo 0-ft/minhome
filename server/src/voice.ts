@@ -20,9 +20,16 @@ import type { ToolContext } from "./tools.js";
 /** Registry of active audio streams for HTTP serving */
 export type AudioStreamRegistry = Map<string, ReadableStream<Uint8Array>>;
 
+/** Shared ref to the bridge WebSocket, populated on connect, cleared on disconnect. */
+export interface BridgeRef {
+  send: (data: string | ArrayBuffer) => void;
+}
+
 export interface VoiceWSOptions {
   audioStreams: AudioStreamRegistry;
   toolCtx: ToolContext;
+  /** Populated when bridge connects, set to null on disconnect. */
+  bridgeRef: { current: BridgeRef | null };
 }
 
 /**
@@ -42,6 +49,7 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
       onOpen(_evt: unknown, ws: { send: (data: string | ArrayBuffer) => void }) {
         console.log("[voice] Bridge connected");
         bridgeWs = ws;
+        opts.bridgeRef.current = ws;
       },
 
       onMessage(evt: { data: unknown }, _ws: unknown) {
@@ -154,6 +162,48 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
               break;
             }
 
+            case "devices_list": {
+              // Bridge sends this on (re)connect with all currently connected devices
+              const devices = Array.isArray(msg.devices) ? msg.devices : [];
+              if (opts.toolCtx.voiceDevices) {
+                opts.toolCtx.voiceDevices.clear();
+                for (const dev of devices) {
+                  const devId = String(dev.device_id ?? "");
+                  if (devId) {
+                    opts.toolCtx.voiceDevices.set(devId, {
+                      name: String(dev.name ?? devId),
+                      model: dev.model ? String(dev.model) : undefined,
+                      version: dev.version ? String(dev.version) : undefined,
+                    });
+                  }
+                }
+                console.log(`[voice] Received devices_list: ${devices.length} device(s)`);
+              }
+              break;
+            }
+
+            case "device_connected": {
+              const deviceId = String(msg.device_id ?? "");
+              if (deviceId && opts.toolCtx.voiceDevices) {
+                opts.toolCtx.voiceDevices.set(deviceId, {
+                  name: String(msg.name ?? deviceId),
+                  model: msg.model ? String(msg.model) : undefined,
+                  version: msg.version ? String(msg.version) : undefined,
+                });
+                console.log(`[voice] Device connected: ${deviceId} (${msg.name})`);
+              }
+              break;
+            }
+
+            case "device_disconnected": {
+              const deviceId = String(msg.device_id ?? "");
+              if (deviceId && opts.toolCtx.voiceDevices) {
+                opts.toolCtx.voiceDevices.delete(deviceId);
+                console.log(`[voice] Device disconnected: ${deviceId}`);
+              }
+              break;
+            }
+
             default:
               console.log("[voice] Unknown message type:", msg.type);
           }
@@ -169,6 +219,8 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
         sessions.clear();
         activeStreamingDevice = null;
         bridgeWs = null;
+        opts.bridgeRef.current = null;
+        opts.toolCtx.voiceDevices?.clear();
       },
 
       onError(evt: unknown) {

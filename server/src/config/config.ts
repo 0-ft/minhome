@@ -36,7 +36,7 @@ export class ConfigStore {
       const raw = readFileSync(filePath, "utf-8");
       this.data = ConfigSchema.parse(JSON.parse(raw));
     } else {
-      this.data = { devices: {} };
+      this.data = ConfigSchema.parse({ devices: {} });
       this.save();
     }
   }

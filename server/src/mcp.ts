@@ -19,7 +19,8 @@ export function createMcpRoute(ctx: ToolContext) {
     const paramShape = "shape" in def.parameters ? (def.parameters as { shape: Record<string, unknown> }).shape : {};
     mcpServer.tool(name, def.description, paramShape, async (params) => {
       try {
-        const result = await def.execute(params, ctx);
+        const parsed = def.parameters.parse(params);
+        const result = await def.execute(parsed, ctx);
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         return {
