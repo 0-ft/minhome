@@ -172,15 +172,99 @@ function findEntityForLight(device: DeviceData | undefined, entityId: string): E
   return device.entities?.find(e => e.key === entityId);
 }
 
-// ── Animated light orb ──────────────────────────────────
+// ── Drag overlay (2D ring UI around orb during drag) ────
+function DragOverlay({
+  brightness,
+  hue,
+  saturation,
+  hasColor,
+  hasBrightness,
+}: {
+  brightness: number;
+  hue: number;
+  saturation: number;
+  hasColor: boolean;
+  hasBrightness: boolean;
+}) {
+  const pct = Math.round((brightness / 254) * 100);
+  const R = 38;
+  const circumference = 2 * Math.PI * R;
+  const arcLength = (pct / 100) * circumference;
+
+  // Arc colour: use the current hue if colour-capable, otherwise a warm white
+  const arcColor = hasColor
+    ? `hsl(${hue}, ${Math.max(saturation, 40)}%, 55%)`
+    : `hsl(40, 60%, ${45 + pct * 0.25}%)`;
+
+  return (
+    <div style={{ pointerEvents: "none", userSelect: "none" }}>
+      <svg viewBox="0 0 100 100" width={100} height={100} style={{ display: "block" }}>
+        {/* Dark backdrop */}
+        <circle cx="50" cy="50" r="46" fill="rgba(16,14,12,0.8)" />
+        {/* Track ring */}
+        <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+        {/* Brightness arc — fills clockwise from 12 o'clock */}
+        {hasBrightness && (
+          <circle
+            cx="50" cy="50" r={R}
+            fill="none"
+            stroke={arcColor}
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeDasharray={`${arcLength} ${circumference}`}
+            transform="rotate(-90 50 50)"
+            style={{ filter: `drop-shadow(0 0 4px ${arcColor})` }}
+          />
+        )}
+        {/* Percentage text */}
+        <text
+          x="50" y={hasColor ? "48" : "52"}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize="14"
+          fontFamily="'Space Mono', monospace"
+          fill="rgba(255,255,255,0.85)"
+        >
+          {pct}%
+        </text>
+        {/* Colour swatch dot */}
+        {hasColor && (
+          <circle
+            cx="50" cy="62"
+            r="4.5"
+            fill={`hsl(${hue}, ${saturation}%, 50%)`}
+            stroke="rgba(255,255,255,0.15)"
+            strokeWidth="0.5"
+          />
+        )}
+        {/* Drag direction hints */}
+        <text
+          x="50" y="92"
+          textAnchor="middle"
+          fontSize="7"
+          fontFamily="'Space Mono', monospace"
+          fill="rgba(255,255,255,0.3)"
+        >
+          {hasBrightness ? "↕ bright" : ""}{hasBrightness && hasColor ? "  " : ""}{hasColor ? "↔ colour" : ""}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+// ── Animated light orb (click to toggle, drag to adjust) ─
 function LightOrb({
   light,
   device,
   onToggle,
+  onDragSet,
+  setOrbitEnabled,
 }: {
   light: RoomLightDef;
   device?: DeviceData;
   onToggle: (deviceId: string, stateProperty: string, isOn: boolean) => void;
+  onDragSet?: (deviceId: string, payload: Record<string, unknown>) => void;
+  setOrbitEnabled?: (enabled: boolean) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [showLabel, setShowLabel] = useReactState(false);
@@ -194,8 +278,9 @@ function LightOrb({
     return light.deviceId;
   }, [entity, device, light.deviceId]);
 
-  const { isOn, brightness, colorTemp, stateProperty } = useMemo(() => {
-    if (!entity) return { isOn: false, brightness: 0, colorTemp: 370, stateProperty: "state" };
+  // ── Server state ─────────────────────────────────────
+  const { isOn, brightness, colorTemp, stateProperty, colorHue, colorSaturation, colorMode } = useMemo(() => {
+    if (!entity) return { isOn: false, brightness: 0, colorTemp: 370, stateProperty: "state", colorHue: 0, colorSaturation: 100, colorMode: undefined as string | undefined };
 
     const { features, state } = entity;
     const on = state?.[features.stateProperty] === "ON";
@@ -210,19 +295,57 @@ function LightOrb({
         ? (state[features.colorTempProperty] as number)
         : 370;
 
-    return { isOn: on, brightness: br, colorTemp: ct, stateProperty: features.stateProperty };
+    const colorObj = features.colorProperty && state?.[features.colorProperty] as { hue?: number; saturation?: number } | undefined;
+    const hue = typeof colorObj?.hue === "number" ? colorObj.hue : 0;
+    const sat = typeof colorObj?.saturation === "number" ? colorObj.saturation : 100;
+    const colorModeProp = features.colorProperty ? features.colorProperty.replace("color", "color_mode") : undefined;
+    const cm = colorModeProp && typeof state?.[colorModeProp] === "string" ? state[colorModeProp] as string : undefined;
+
+    return { isOn: on, brightness: br, colorTemp: ct, stateProperty: features.stateProperty, colorHue: hue, colorSaturation: sat, colorMode: cm };
   }, [entity]);
 
-  const targetColor = useMemo(() => miredToColor(colorTemp), [colorTemp]);
-  const normalizedBr = brightness / 254;
-  const targetIntensity = isOn ? normalizedBr * 3 : 0;
-  const targetEmissive = isOn ? 0.6 + normalizedBr * 1.4 : 0;
-  const targetOpacity = isOn ? 0.92 : 0.55;
+  // ── Feature checks ───────────────────────────────────
+  const hasBrightness = !!entity?.features.brightnessProperty;
+  const hasColor = !!entity?.features.colorProperty;
+  const canDrag = (hasBrightness || hasColor) && !!onDragSet;
+
+  // ── Drag state ───────────────────────────────────────
+  const [dragState, setDragState] = useReactState<{
+    brightness: number;
+    hue: number;
+    saturation: number;
+  } | null>(null);
+
+  const dragRef = useRef({
+    startX: 0, startY: 0,
+    startBrightness: 0, startHue: 0, startSaturation: 0,
+    hasMoved: false, sentOn: false,
+  });
+  const latestDragRef = useRef<{ brightness: number; hue: number; saturation: number } | null>(null);
+  const commitTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // ── Effective values (prefer drag state for instant feedback) ─
+  const effectiveBrightness = dragState?.brightness ?? brightness;
+  const effectiveHue = dragState?.hue ?? colorHue;
+  const effectiveSat = dragState?.saturation ?? colorSaturation;
+  const effectiveIsOn = dragState ? true : isOn;
+
+  const targetColor = useMemo(() => {
+    if (hasColor && (colorMode === "hs" || colorMode === "xy" || dragState)) {
+      return new THREE.Color().setHSL(effectiveHue / 360, effectiveSat / 100, 0.5);
+    }
+    return miredToColor(colorTemp);
+  }, [colorTemp, colorMode, effectiveHue, effectiveSat, hasColor, dragState]);
+
+  const normalizedBr = effectiveBrightness / 254;
+  const targetIntensity = effectiveIsOn ? normalizedBr * 3 : 0;
+  const targetEmissive = effectiveIsOn ? 0.6 + normalizedBr * 1.4 : 0;
+  const targetOpacity = effectiveIsOn ? 0.92 : 0.55;
   const radius = light.type === "ceiling" ? 0.1 : 0.06;
 
-  // Smooth transition refs — lerp toward targets each frame (~150ms at 60fps)
+  // ── Smooth transition animation ──────────────────────
   const pointLightRef = useRef<THREE.PointLight>(null);
-  const curColor = useRef(isOn ? targetColor.clone() : new THREE.Color(LIGHT_OFF_COLOR));
+  const curColor = useRef(effectiveIsOn ? targetColor.clone() : new THREE.Color(LIGHT_OFF_COLOR));
   const curIntensity = useRef(targetIntensity);
   const curEmissive = useRef(targetEmissive);
   const curOpacity = useRef(targetOpacity);
@@ -232,14 +355,12 @@ function LightOrb({
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
 
-    // Lerp color, intensity, emissive, opacity toward targets
-    const tgtCol = isOn ? targetColor : new THREE.Color(LIGHT_OFF_COLOR);
+    const tgtCol = effectiveIsOn ? targetColor : new THREE.Color(LIGHT_OFF_COLOR);
     curColor.current.lerp(tgtCol, LERP);
     curIntensity.current = THREE.MathUtils.lerp(curIntensity.current, targetIntensity, LERP);
     curEmissive.current = THREE.MathUtils.lerp(curEmissive.current, targetEmissive, LERP);
     curOpacity.current = THREE.MathUtils.lerp(curOpacity.current, targetOpacity, LERP);
 
-    // Apply to orb material
     mat.color.copy(curColor.current);
     if (curEmissive.current > 0.01) {
       mat.emissive.copy(curColor.current);
@@ -251,35 +372,146 @@ function LightOrb({
     }
     mat.opacity = curOpacity.current;
 
-    // Apply to point light
     if (pointLightRef.current) {
       pointLightRef.current.color.copy(curColor.current);
       pointLightRef.current.intensity = curIntensity.current;
     }
 
-    // Hover scale
     const targetScale = hovered.current ? 1.35 : 1;
     meshRef.current.scale.setScalar(THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale, 0.15));
   });
 
+  // ── Pointer handling (drag + click) ──────────────────
+  // Stable refs for values needed inside window event listeners
+  const stableRef = useRef({ entity, stateProperty, isOn, brightness, colorHue, colorSaturation, hasBrightness, hasColor, onDragSet, onToggle, light });
+  stableRef.current = { entity, stateProperty, isOn, brightness, colorHue, colorSaturation, hasBrightness, hasColor, onDragSet, onToggle, light };
+
+  const handlePointerDown = useCallback((e: any) => {
+    e.stopPropagation();
+    const ne = e.nativeEvent as PointerEvent;
+    const s = stableRef.current;
+
+    dragRef.current = {
+      startX: ne.clientX, startY: ne.clientY,
+      startBrightness: s.brightness, startHue: s.colorHue, startSaturation: s.colorSaturation,
+      hasMoved: false, sentOn: false,
+    };
+
+    if (canDrag) setOrbitEnabled?.(false);
+
+    const onMove = (ev: PointerEvent) => {
+      if (!canDrag) return;
+      const dx = ev.clientX - dragRef.current.startX;
+      const dy = ev.clientY - dragRef.current.startY;
+
+      if (!dragRef.current.hasMoved && (Math.abs(dx) + Math.abs(dy)) > 5) {
+        dragRef.current.hasMoved = true;
+        document.body.style.cursor = "grabbing";
+      }
+      if (!dragRef.current.hasMoved) return;
+
+      const cur = stableRef.current;
+      const newBr = cur.hasBrightness
+        ? Math.max(1, Math.min(254, Math.round(dragRef.current.startBrightness - dy * 1.5)))
+        : dragRef.current.startBrightness;
+      const newHue = cur.hasColor
+        ? ((Math.round(dragRef.current.startHue + dx * 1.2) % 360) + 360) % 360
+        : dragRef.current.startHue;
+
+      const vals = { brightness: newBr, hue: newHue, saturation: dragRef.current.startSaturation };
+      latestDragRef.current = vals;
+      setDragState(vals);
+
+      // Debounced live update
+      clearTimeout(commitTimer.current);
+      commitTimer.current = setTimeout(() => {
+        const c = stableRef.current;
+        const payload: Record<string, unknown> = {};
+        if (!c.isOn && !dragRef.current.sentOn) {
+          payload[c.stateProperty] = "ON";
+          dragRef.current.sentOn = true;
+        }
+        if (c.hasBrightness && c.entity?.features.brightnessProperty) {
+          payload[c.entity.features.brightnessProperty] = newBr;
+        }
+        if (c.hasColor && c.entity?.features.colorProperty) {
+          payload[c.entity.features.colorProperty] = { hue: newHue, saturation: dragRef.current.startSaturation };
+        }
+        c.onDragSet?.(c.light.deviceId, payload);
+      }, 80);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setOrbitEnabled?.(true);
+      document.body.style.cursor = hovered.current ? "pointer" : "";
+
+      if (dragRef.current.hasMoved) {
+        // Final commit with latest values
+        clearTimeout(commitTimer.current);
+        const latest = latestDragRef.current;
+        const c = stableRef.current;
+        if (latest && c.onDragSet) {
+          const payload: Record<string, unknown> = {};
+          if (!c.isOn && !dragRef.current.sentOn) {
+            payload[c.stateProperty] = "ON";
+          }
+          if (c.hasBrightness && c.entity?.features.brightnessProperty) {
+            payload[c.entity.features.brightnessProperty] = latest.brightness;
+          }
+          if (c.hasColor && c.entity?.features.colorProperty) {
+            payload[c.entity.features.colorProperty] = { hue: latest.hue, saturation: latest.saturation };
+          }
+          c.onDragSet(c.light.deviceId, payload);
+        }
+        latestDragRef.current = null;
+        setDragState(null);
+      } else {
+        // No drag — treat as click toggle
+        const c = stableRef.current;
+        c.onToggle(c.light.deviceId, c.stateProperty, c.isOn);
+      }
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [canDrag, setOrbitEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup on unmount
+  useEffect(() => () => clearTimeout(commitTimer.current), []);
+
   return (
     <group position={light.position}>
-      {/* Visible orb — click to toggle */}
+      {/* Drag overlay — shown while adjusting */}
+      {dragState && (
+        <Html center style={{ pointerEvents: "none" }}>
+          <DragOverlay
+            brightness={dragState.brightness}
+            hue={dragState.hue}
+            saturation={dragState.saturation}
+            hasColor={hasColor}
+            hasBrightness={hasBrightness}
+          />
+        </Html>
+      )}
+
+      {/* Visible orb — pointer down starts drag detection */}
       <mesh
         ref={meshRef}
-        onClick={(e) => { e.stopPropagation(); onToggle(light.deviceId, stateProperty, isOn); }}
-        onPointerOver={(e) => { e.stopPropagation(); hovered.current = true; setShowLabel(true); document.body.style.cursor = "pointer"; }}
-        onPointerOut={() => { hovered.current = false; setShowLabel(false); document.body.style.cursor = ""; }}
+        onPointerDown={handlePointerDown}
+        onPointerOver={(e) => { e.stopPropagation(); hovered.current = true; if (!dragState) setShowLabel(true); document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { hovered.current = false; setShowLabel(false); if (!dragState) document.body.style.cursor = ""; }}
       >
         <sphereGeometry args={[radius, 16, 16]} />
         <meshStandardMaterial transparent />
       </mesh>
 
-      {/* Name label on hover */}
+      {/* Name label on hover (hidden during drag) */}
       <Html position={[0, radius + 0.15, 0]} center style={{ pointerEvents: "none" }}>
         <div
           className={`px-2 py-0.5 rounded bg-blood-500/90 text-sand-50 text-[10px] font-mono whitespace-nowrap shadow-lg transition-all duration-200 ${
-            showLabel ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
+            showLabel && !dragState ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
           }`}
         >
           {label}
@@ -493,17 +725,24 @@ export function Scene({
   roomConfig,
   deviceMap,
   onToggle,
+  onDragSet,
   orbitTarget,
   cameraRef,
 }: {
   roomConfig: RoomConfig;
   deviceMap: Map<string, DeviceData>;
   onToggle: (deviceId: string, stateProperty: string, isOn: boolean) => void;
+  onDragSet?: (deviceId: string, payload: Record<string, unknown>) => void;
   orbitTarget?: [number, number, number];
   cameraRef?: React.MutableRefObject<GetCameraState | null>;
 }) {
   const { dimensions, floor, furniture, lights, sensors, camera } = roomConfig;
   const controlsRef = useRef<any>(null);
+
+  // Disable orbit controls while a light orb is being dragged
+  const setOrbitEnabled = useCallback((enabled: boolean) => {
+    if (controlsRef.current) controlsRef.current.enabled = enabled;
+  }, []);
 
   // Wire up camera state getter — reads from OrbitControls + camera
   useEffect(() => {
@@ -538,6 +777,8 @@ export function Scene({
           light={light}
           device={deviceMap.get(light.deviceId)}
           onToggle={onToggle}
+          onDragSet={onDragSet}
+          setOrbitEnabled={setOrbitEnabled}
         />
       ))}
 
@@ -601,17 +842,24 @@ export function useRoomData() {
     [setDevice],
   );
 
+  const onDragSet = useCallback(
+    (deviceId: string, payload: Record<string, unknown>) =>
+      setDevice.mutate({ id: deviceId, payload }),
+    [setDevice],
+  );
+
   return {
     deviceMap,
     roomConfig,
     onToggle,
+    onDragSet,
     isLoading: devicesLoading || configLoading,
   };
 }
 
 // ── Exported view ───────────────────────────────────────
 export function RoomView() {
-  const { deviceMap, roomConfig, onToggle, isLoading } = useRoomData();
+  const { deviceMap, roomConfig, onToggle, onDragSet, isLoading } = useRoomData();
 
   if (isLoading) {
     return (
@@ -646,6 +894,7 @@ export function RoomView() {
           roomConfig={roomConfig}
           deviceMap={deviceMap}
           onToggle={onToggle}
+          onDragSet={onDragSet}
         />
       </Canvas>
     </div>

@@ -3,7 +3,7 @@ import { useDevices, useSetEntity, useRenameEntity, useRefreshStates } from "../
 import { Button } from "./ui/button.js";
 import { DebouncedSlider } from "./ui/slider.js";
 import { Input } from "./ui/input.js";
-import { Lightbulb, Plug, Power, Check, Thermometer, Sun, X, Radio } from "lucide-react";
+import { Lightbulb, Plug, Power, Check, Thermometer, Sun, X, Radio, Palette } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
 
 // ── Entities View ────────────────────────────────────────
@@ -73,6 +73,20 @@ export function EntitiesView() {
   );
 }
 
+// ── Colour helpers ───────────────────────────────────────
+
+/** Build a CSS hsl() string from hue (0-360) and saturation (0-100). */
+function hslCss(h: number, s: number, l = 50): string {
+  return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
+const HUE_GRADIENT =
+  "linear-gradient(to right, hsl(0,100%,50%), hsl(60,100%,50%), hsl(120,100%,50%), hsl(180,100%,50%), hsl(240,100%,50%), hsl(300,100%,50%), hsl(360,100%,50%))";
+
+function saturationGradient(hue: number): string {
+  return `linear-gradient(to right, hsl(${hue},0%,80%), hsl(${hue},100%,50%))`;
+}
+
 // ── Entity Card ──────────────────────────────────────────
 
 function EntityCard({ entity, device, onSet, onRename }: {
@@ -100,6 +114,13 @@ function EntityCard({ entity, device, onSet, onRename }: {
   const [brightness, setBrightness] = useState(serverBrightness);
   const [colorTemp, setColorTemp] = useState(serverColorTemp);
 
+  // Colour (hue / saturation) from the composite color state object
+  const colorObj = features.colorProperty && state?.[features.colorProperty] as { hue?: number; saturation?: number } | undefined;
+  const serverHue = typeof colorObj?.hue === "number" ? colorObj.hue : 0;
+  const serverSaturation = typeof colorObj?.saturation === "number" ? colorObj.saturation : 100;
+  const [hue, setHue] = useState(serverHue);
+  const [saturation, setSaturation] = useState(serverSaturation);
+
   const handleToggle = () => {
     if (isOn) {
       onSet({ state: "OFF" });
@@ -108,6 +129,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
         state: "ON",
         ...(features.brightnessProperty && { brightness }),
         ...(features.colorTempProperty && { color_temp: colorTemp }),
+        ...(features.colorProperty && { color: { hue, saturation } }),
       });
     }
   };
@@ -175,7 +197,14 @@ function EntityCard({ entity, device, onSet, onRename }: {
               <Power className="h-3 w-3" />
               <span className="font-mono text-[10px] uppercase">{isOn ? "on" : "off"}</span>
             </Button>
-              <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-sand-400"}`} />
+              {features.colorProperty && isOn ? (
+                <div
+                  className="h-3 w-3 rounded-full border border-sand-400/60 transition-colors"
+                  style={{ background: hslCss(hue, saturation) }}
+                />
+              ) : (
+                <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-sand-400"}`} />
+              )}
           </div>
         )}
       </div>
@@ -219,6 +248,35 @@ function EntityCard({ entity, device, onSet, onRename }: {
           onCommit={(val) => onSet({ color_temp: val })}
           label={<Thermometer className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-sand-500"}`} />}
         />
+      )}
+
+      {/* Colour sliders (hue + saturation) */}
+      {!isSensor && features.colorProperty && (
+        <>
+          <DebouncedSlider
+            min={0} max={360}
+            serverValue={serverHue}
+            value={hue}
+            onValueChange={setHue}
+            onCommit={(val) => onSet({ color: { hue: val, saturation } })}
+            label={<Palette className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-sand-500"}`} />}
+            trackBackground={HUE_GRADIENT}
+          />
+          <DebouncedSlider
+            min={0} max={100}
+            serverValue={serverSaturation}
+            value={saturation}
+            onValueChange={setSaturation}
+            onCommit={(val) => onSet({ color: { hue, saturation: val } })}
+            label={
+              <div
+                className="h-3.5 w-3.5 rounded-full border border-sand-400/40"
+                style={{ background: hslCss(hue, saturation) }}
+              />
+            }
+            trackBackground={saturationGradient(hue)}
+          />
+        </>
       )}
     </div>
   );

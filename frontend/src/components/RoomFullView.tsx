@@ -87,7 +87,7 @@ export function RoomFullView() {
   const navigate = useNavigate();
 
   // ── Room data ─────────────────────────────────────────
-  const { deviceMap, roomConfig, onToggle, isLoading: roomLoading } = useRoomData();
+  const { deviceMap, roomConfig, onToggle, onDragSet, isLoading: roomLoading } = useRoomData();
   const cameraRef = useRef<GetCameraState | null>(null);
   const saveCamera = useSaveRoomCamera();
   const [cameraSaved, setCameraSaved] = useState(false);
@@ -156,10 +156,12 @@ export function RoomFullView() {
           shadows={{ type: THREE.VSMShadowMap }}
           className="!absolute inset-0"
         >
+          <fog attach="fog" args={["#100e0c", 10, 15]} />
           <Scene
             roomConfig={roomConfig}
             deviceMap={deviceMap}
             onToggle={onToggle}
+            onDragSet={onDragSet}
             orbitTarget={[roomConfig.dimensions.width / 2 - 2, 0.5, roomConfig.dimensions.depth / 2]}
             cameraRef={cameraRef}
           />

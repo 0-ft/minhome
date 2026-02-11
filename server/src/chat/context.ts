@@ -64,7 +64,7 @@ You can send spoken announcements to these devices using the announce tool. Omit
 ` : ""}
 Guidelines:
 - Be concise and helpful.
-- When controlling devices, ALWAYS use control_entity with the entity key and canonical property names (state, brightness, color_temp). The server resolves actual MQTT property names automatically.
+- When controlling devices, ALWAYS use control_entity with the entity key and canonical property names (state, brightness, color_temp, color). The server resolves actual MQTT property names automatically. For colour-changing lights, set colour with: {"color":{"hue":N,"saturation":N}} (hue 0-360, saturation 0-100) or {"color":{"hex":"#RRGGBB"}}.
 - For single-entity devices, use entity key "main".
 - Only use control_device for device-level properties that don't belong to any entity (e.g. power_on_behavior).
 - Refer to devices by their friendly name, not their IEEE address.

@@ -27,6 +27,8 @@ export interface EntityFeatures {
   stateProperty: string;
   brightnessProperty?: string;
   colorTempProperty?: string;
+  /** MQTT property for the composite colour value (e.g. "color" or "color_l3"). */
+  colorProperty?: string;
 }
 
 export interface SensorProperty {
@@ -98,6 +100,7 @@ export function extractEntitiesFromExposes(exposes: unknown[]): ExtractedEntity[
       if (!stateFeature) continue;
       const brightnessFeature = e.features.find(f => f.name === "brightness" && f.type === "numeric");
       const colorTempFeature = e.features.find(f => f.name === "color_temp" && f.type === "numeric");
+      const colorFeature = e.features.find(f => (f.name === "color_xy" || f.name === "color_hs") && f.type === "composite");
       entities.push({
         key: e.endpoint ?? "main",
         type: e.type,
@@ -105,6 +108,7 @@ export function extractEntitiesFromExposes(exposes: unknown[]): ExtractedEntity[
           stateProperty: stateFeature.property,
           brightnessProperty: brightnessFeature?.property,
           colorTempProperty: colorTempFeature?.property,
+          colorProperty: colorFeature?.property,
         },
       });
       continue;
@@ -187,6 +191,7 @@ export function resolveCanonicalProperty(entity: ExtractedEntity, canonical: str
     case "state": return entity.features.stateProperty;
     case "brightness": return entity.features.brightnessProperty ?? canonical;
     case "color_temp": return entity.features.colorTempProperty ?? canonical;
+    case "color": return entity.features.colorProperty ?? canonical;
     default: return canonical;
   }
 }
@@ -202,10 +207,16 @@ export function partitionEntityState(
   const result = new Map<string, Record<string, unknown>>();
   for (const entity of entities) {
     const state: Record<string, unknown> = {};
+    // Derive color_mode property name from color property (e.g. "color" → "color_mode", "color_l3" → "color_mode_l3")
+    const colorModeProp = entity.features.colorProperty
+      ? entity.features.colorProperty.replace("color", "color_mode")
+      : undefined;
     const props = [
       entity.features.stateProperty,
       entity.features.brightnessProperty,
       entity.features.colorTempProperty,
+      entity.features.colorProperty,
+      colorModeProp,
       ...(entity.sensorProperties?.map(sp => sp.property) ?? []),
     ].filter((p): p is string => !!p);
     for (const prop of props) {

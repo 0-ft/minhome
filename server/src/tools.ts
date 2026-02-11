@@ -88,13 +88,14 @@ export const toolSchemas = {
   },
   control_entity: {
     description:
-      "Send a command to a specific entity on a device (e.g. turn on/off, set brightness, change color). " +
-      "Use canonical property names (state, brightness, color_temp) — the server resolves suffixed names automatically. " +
+      "Send a command to a specific entity on a device (e.g. turn on/off, set brightness, change colour). " +
+      "Use canonical property names (state, brightness, color_temp, color) — the server resolves suffixed names automatically. " +
+      "For colour-changing lights, set colour with: {\"color\":{\"hue\":N,\"saturation\":N}} (hue 0-360, sat 0-100) or {\"color\":{\"hex\":\"#RRGGBB\"}}. " +
       "For single-entity devices, use entity='main'.",
     parameters: z.object({
       id: z.string().describe("Device IEEE address"),
       entity: z.string().describe("Entity key, e.g. 'main' for single-entity devices, 'l1'/'l2'/'l3' for multi-entity"),
-      payload: z.record(z.string(), z.unknown()).describe('Command payload with canonical property names, e.g. {"state":"ON","brightness":200}'),
+      payload: z.record(z.string(), z.unknown()).describe('Command payload with canonical property names, e.g. {"state":"ON","brightness":200,"color":{"hue":120,"saturation":100}}'),
     }),
   },
   control_device: {

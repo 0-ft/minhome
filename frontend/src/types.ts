@@ -4,6 +4,8 @@ export interface EntityFeatures {
   stateProperty: string;
   brightnessProperty?: string;
   colorTempProperty?: string;
+  /** MQTT property for the composite colour value (e.g. "color" or "color_l3"). */
+  colorProperty?: string;
 }
 
 export interface SensorProperty {

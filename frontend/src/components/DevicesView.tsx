@@ -5,8 +5,21 @@ import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { DebouncedSlider } from "./ui/slider.js";
 import { Input } from "./ui/input.js";
-import { Lightbulb, Plug, Power, Check, Thermometer, Sun, ChevronRight, X, Radio } from "lucide-react";
+import { Lightbulb, Plug, Power, Check, Thermometer, Sun, ChevronRight, X, Radio, Palette } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
+
+// ── Colour helpers ───────────────────────────────────────
+
+function hslCss(h: number, s: number, l = 50): string {
+  return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
+const HUE_GRADIENT =
+  "linear-gradient(to right, hsl(0,100%,50%), hsl(60,100%,50%), hsl(120,100%,50%), hsl(180,100%,50%), hsl(240,100%,50%), hsl(300,100%,50%), hsl(360,100%,50%))";
+
+function saturationGradient(hue: number): string {
+  return `linear-gradient(to right, hsl(${hue},0%,80%), hsl(${hue},100%,50%))`;
+}
 
 // ── Devices View ────────────────────────────────────────
 
@@ -196,6 +209,13 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
   const [brightness, setBrightness] = useState(serverBrightness);
   const [colorTemp, setColorTemp] = useState(serverColorTemp);
 
+  // Colour (hue / saturation) — uses raw property name like other sliders in this view
+  const colorObj = features.colorProperty && state?.[features.colorProperty] as { hue?: number; saturation?: number } | undefined;
+  const serverHue = typeof colorObj?.hue === "number" ? colorObj.hue : 0;
+  const serverSaturation = typeof colorObj?.saturation === "number" ? colorObj.saturation : 100;
+  const [hue, setHue] = useState(serverHue);
+  const [saturation, setSaturation] = useState(serverSaturation);
+
   const handleToggle = () => {
     if (isOn) {
       onSet({ [features.stateProperty]: "OFF" });
@@ -205,6 +225,7 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
         [features.stateProperty]: "ON",
         ...(features.brightnessProperty && { [features.brightnessProperty]: brightness }),
         ...(features.colorTempProperty && { [features.colorTempProperty]: colorTemp }),
+        ...(features.colorProperty && { [features.colorProperty]: { hue, saturation } }),
       });
     }
   };
@@ -287,8 +308,15 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
           <span className="font-mono text-[10px] uppercase">{isOn ? "on" : "off"}</span>
         </Button>
 
-        {/* Status dot */}
-        <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-blood-300"}`} />
+        {/* Status dot / colour swatch */}
+        {features.colorProperty && isOn ? (
+          <div
+            className="h-3 w-3 rounded-full border border-sand-400/60 transition-colors"
+            style={{ background: hslCss(hue, saturation) }}
+          />
+        ) : (
+          <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-blood-300"}`} />
+        )}
       </div>
 
       {/* Sliders */}
@@ -312,6 +340,35 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
           onCommit={(val) => onSet({ [features.colorTempProperty!]: val })}
           label={<Thermometer className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
         />
+      )}
+
+      {/* Colour sliders (hue + saturation) */}
+      {features.colorProperty && (
+        <>
+          <DebouncedSlider
+            min={0} max={360}
+            serverValue={serverHue}
+            value={hue}
+            onValueChange={setHue}
+            onCommit={(val) => onSet({ [features.colorProperty!]: { hue: val, saturation } })}
+            label={<Palette className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
+            trackBackground={HUE_GRADIENT}
+          />
+          <DebouncedSlider
+            min={0} max={100}
+            serverValue={serverSaturation}
+            value={saturation}
+            onValueChange={setSaturation}
+            onCommit={(val) => onSet({ [features.colorProperty!]: { hue, saturation: val } })}
+            label={
+              <div
+                className="h-3.5 w-3.5 rounded-full border border-sand-400/40"
+                style={{ background: hslCss(hue, saturation) }}
+              />
+            }
+            trackBackground={saturationGradient(hue)}
+          />
+        </>
       )}
     </div>
   );

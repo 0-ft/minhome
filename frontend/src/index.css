@@ -124,6 +124,13 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"]:active::-webkit-slider-thumb {
   transform: scale(1.25);
 }
+/* Colour-track override — applies a custom gradient background via --track-bg */
+input[type="range"].color-track::-webkit-slider-runnable-track {
+  background: var(--track-bg);
+}
+input[type="range"].color-track::-moz-range-track {
+  background: var(--track-bg);
+}
 
 /* ── Chat markdown prose ──────────────────── */
 .prose-chat {

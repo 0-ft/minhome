@@ -12,10 +12,12 @@ interface SliderProps {
   onValueChange?: (val: number) => void;
   label?: React.ReactNode;
   className?: string;
+  /** Optional CSS background for the slider track (e.g. a gradient for hue/saturation). */
+  trackBackground?: string;
 }
 
 /** Debounced range slider — local state for smooth dragging, debounced commits */
-export function DebouncedSlider({ min, max, serverValue, onCommit, value, onValueChange, label, className }: SliderProps) {
+export function DebouncedSlider({ min, max, serverValue, onCommit, value, onValueChange, label, className, trackBackground }: SliderProps) {
   const controlled = value !== undefined;
   const [internalValue, setInternalValue] = useState(serverValue);
   const displayValue = controlled ? value : internalValue;
@@ -54,7 +56,8 @@ export function DebouncedSlider({ min, max, serverValue, onCommit, value, onValu
         onChange={handleChange}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="flex-1 cursor-pointer"
+        className={cn("flex-1 cursor-pointer", trackBackground && "color-track")}
+        style={trackBackground ? { "--track-bg": trackBackground } as React.CSSProperties : undefined}
       />
       <span className="text-[10px] font-mono tabular-nums w-7 text-right opacity-60">{displayValue}</span>
     </div>
