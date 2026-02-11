@@ -28,3 +28,7 @@
 - [ ] voice endpoint auth check
 - [x] Automations to invoke the tools
 - [x] Sensors in room
+- [ ] Log partial/scroll loading
+- [ ] Voice system prompt/voice in tool
+- [ ] Tool for triggering automation
+- [ ] Proper error display if no API connection

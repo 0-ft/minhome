@@ -15,13 +15,14 @@ import type { ConfigStore } from "./config/config.js";
 export async function generateTTS(
   text: string,
   config: ConfigStore,
+  opts?: { voice?: string; instructions?: string },
 ): Promise<ReadableStream<Uint8Array>> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY not set");
   }
 
-  const voice = config.getVoice();
+  const voice = opts?.voice ?? config.getVoice();
   const model = process.env.OPENAI_TTS_MODEL ?? "gpt-4o-mini-tts";
 
   console.log(`[tts] Generating speech: "${text.slice(0, 80)}${text.length > 80 ? "..." : ""}" (voice=${voice}, model=${model})`);
@@ -33,6 +34,7 @@ export async function generateTTS(
     voice,
     input: text,
     response_format: "wav",
+    ...(opts?.instructions ? { instructions: opts.instructions } : {}),
   });
 
   const rawBody = response.body;

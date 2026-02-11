@@ -7,8 +7,10 @@ services:
     working_dir: /app
     volumes:
       - .:/app
+      - ./data/server:/data
     environment:
       - NODE_OPTIONS=--max-old-space-size=256
+      - DATA_DIR=/data
 
   # Add frontend dev server (not in production compose)
   frontend:

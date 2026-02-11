@@ -12,7 +12,8 @@ import { existsSync } from "fs";
 
 const PORT = parseInt(process.env.PORT ?? "3111", 10);
 const MQTT_URL = process.env.MQTT_URL ?? "mqtt://localhost:1883";
-const DATA_DIR = process.env.DATA_DIR ?? resolve(import.meta.dirname, "../..");
+const DATA_DIR = process.env.DATA_DIR;
+if (!DATA_DIR) throw new Error("DATA_DIR environment variable is required");
 
 const configPath = resolve(DATA_DIR, "config.json");
 const automationsPath = resolve(DATA_DIR, "automations.json");

@@ -183,6 +183,11 @@ export const toolSchemas = {
         .string()
         .optional()
         .describe("Target device ID (omit to announce on all connected devices)"),
+      voice: VoiceSchema.optional().describe("Override the configured voice for this announcement. Only set if requested."),
+      instructions: z
+        .string()
+        .optional()
+        .describe("Voice instructions for the TTS model, e.g. 'speak in an excited german accent'"),
     }),
   },
 } as const satisfies Record<string, { description: string; parameters: z.ZodType }>;
@@ -327,12 +332,12 @@ export function createTools(): Record<string, ToolDef> {
 
     announce: {
       ...toolSchemas.announce,
-      execute: async ({ text, device_id }, { config, sendToBridge, audioSources }) => {
+      execute: async ({ text, device_id, voice, instructions }, { config, sendToBridge, audioSources }) => {
         if (!sendToBridge) throw new Error("Voice bridge not available");
         if (!audioSources) throw new Error("Audio source registry not available");
 
         // Generate TTS stream and wrap in SharedAudioSource for fan-out
-        const stream = await generateTTS(text, config);
+        const stream = await generateTTS(text, config, { voice, instructions });
         const announceId = randomUUID();
         const audioPath = `/audio/${announceId}`;
         audioSources.set(announceId, new SharedAudioSource(stream));

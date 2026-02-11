@@ -5,9 +5,9 @@ dist/
 __pycache__/
 mosquitto/data/
 mosquitto/log/
-z2m-data/
+data/z2m/
 .env
 .pnpm-store
 .vscode
-debug.jsonl
+data/server/debug.jsonl
 voice-recordings/

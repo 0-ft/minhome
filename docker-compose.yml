@@ -15,7 +15,7 @@ services:
     image: ghcr.io/koenkk/zigbee2mqtt
     restart: unless-stopped
     volumes:
-      - ./z2m-data:/app/data
+      - ./data/z2m:/app/data
       - /run/udev:/run/udev:ro
       - /dev:/dev
     device_cgroup_rules:
@@ -37,11 +37,10 @@ services:
     ports:
       - 3111:3111
     volumes:
-      - ./config.json:/app/config.json
-      - ./automations.json:/app/automations.json
+      - ./data/server:/data
     environment:
       - MQTT_URL=mqtt://mqtt:1883
-      - DATA_DIR=/app
+      - DATA_DIR=/data
       - AI_API_KEY=${AI_API_KEY:-}
       - AI_BASE_URL=${AI_BASE_URL:-}
       - AI_MODEL=${AI_MODEL:-}
