@@ -21,8 +21,6 @@ export const CalendarDisplayComponentConfigSchema = z.object({
   title: z.string().trim().min(1).optional(),
   max_events: z.number().int().positive().default(8),
   show_location: z.boolean().default(false),
-  border_width: z.number().positive().optional(),
-  padding: z.number().nonnegative().optional(),
 });
 
 export type CalendarDisplayComponentConfig = z.infer<typeof CalendarDisplayComponentConfigSchema>;
@@ -179,10 +177,6 @@ function formatGridEventText(
   return `${timePrefix}${event.summary}${locationSuffix}`;
 }
 
-function scaledFont(baseSize: number, factor: number, minimum: number): number {
-  return Math.max(minimum, Math.round(baseSize * factor));
-}
-
 function renderContinuationTriangle(direction: "left" | "right"): ReactElement {
   const points = direction === "left"
     ? "8.5,1 1.5,5 8.5,9"
@@ -198,16 +192,14 @@ function renderContinuationTriangle(direction: "left" | "right"): ReactElement {
 function renderAgenda(
   events: CalendarEvent[],
   config: CalendarDisplayComponentConfig,
-  width: number,
-  height: number,
 ): ReactElement {
   const day = new Date();
-  const baseSize = Math.min(width, height);
 
   const outerStyle: CSSProperties = {
-    width,
-    height,
     display: "flex",
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
     flexDirection: "column",
     gap: 6,
     overflow: "visible",
@@ -239,7 +231,7 @@ function renderAgenda(
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: scaledFont(baseSize, 0.032, 11),
+    fontSize: 12,
     fontWeight: 700,
     lineHeight: 1,
     color: EINK_FOREGROUND,
@@ -272,7 +264,7 @@ function renderAgenda(
 
   const eventArrowGlyphWrapStyle: CSSProperties = {
     display: "flex",
-    fontSize: scaledFont(baseSize, 0.032, 11),
+    fontSize: 12,
     lineHeight: 1,
   };
 
@@ -287,13 +279,13 @@ function renderAgenda(
   };
 
   const timeStyle: CSSProperties = {
-    fontSize: scaledFont(baseSize, 0.036, 12),
+    fontSize: 14,
     fontWeight: 700,
     lineHeight: 1.2,
   };
 
   const summaryStyle: CSSProperties = {
-    fontSize: scaledFont(baseSize, 0.042, 14),
+    fontSize: 16,
     fontWeight: 700,
     lineHeight: 1.2,
     whiteSpace: "normal",
@@ -301,7 +293,7 @@ function renderAgenda(
   };
 
   const locationStyle: CSSProperties = {
-    fontSize: scaledFont(baseSize, 0.034, 12),
+    fontSize: 13,
     fontWeight: 500,
     lineHeight: 1.2,
     whiteSpace: "normal",
@@ -355,20 +347,18 @@ function renderAgenda(
 function renderGrid(
   events: CalendarEvent[],
   config: CalendarDisplayComponentConfig,
-  width: number,
-  height: number,
 ): ReactElement {
   const now = new Date();
-  const baseSize = Math.min(width, height);
   const days = getDaySlots(config.view, now);
   const isMonth = config.view === "month";
   const rows = isMonth ? 6 : 1;
   const eventsPerCell = isMonth ? 2 : 3;
 
   const gridStyle: CSSProperties = {
-    width,
-    height,
     display: "flex",
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
     flexDirection: "column",
     gap: 4,
   };
@@ -395,7 +385,7 @@ function renderGrid(
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    fontSize: scaledFont(baseSize, isMonth ? 0.016 : 0.021, 10),
+    fontSize: isMonth ? 10 : 12,
     fontWeight: 700,
     paddingBottom: 2,
     minHeight: 14,
@@ -410,7 +400,7 @@ function renderGrid(
   };
 
   const eventStyle: CSSProperties = {
-    fontSize: scaledFont(baseSize, isMonth ? 0.014 : 0.019, 9),
+    fontSize: isMonth ? 9 : 11,
     lineHeight: 1.2,
     fontWeight: 500,
     padding: "2px 3px",
@@ -497,8 +487,6 @@ function renderGrid(
 export async function createCalendarDisplayElement(
   config: CalendarDisplayComponentConfig,
   calendarSourceProvider: CalendarSourceProvider,
-  width: number,
-  height: number,
 ): Promise<DisplayComponentResult> {
   try {
     const calendarSource = new CalendarSource(config.calendar_ids, calendarSourceProvider);
@@ -506,20 +494,15 @@ export async function createCalendarDisplayElement(
     const sourceEvents = await calendarSource.getEvents();
     const events = getViewEvents(sourceEvents, config.view, config.max_events, now);
 
-    const borderWidth = Math.max(1, Math.round(config.border_width ?? 2));
-    const padding = Math.max(0, Math.round(config.padding ?? 10));
-    const titleFontSize = Math.max(14, Math.round(Math.min(width, height) * 0.08));
+    const titleFontSize = 18;
 
     const wrapperStyle: CSSProperties = {
-      width,
-      height,
       display: "flex",
+      flex: 1,
+      minWidth: 0,
+      minHeight: 0,
       flexDirection: "column",
-      boxSizing: "border-box",
-      border: `${borderWidth}px solid ${EINK_FOREGROUND}`,
-      backgroundColor: EINK_BACKGROUND,
       color: EINK_FOREGROUND,
-      padding,
       fontFamily: "DejaVu Sans",
       gap: 6,
     };
@@ -533,7 +516,7 @@ export async function createCalendarDisplayElement(
     };
 
     const subtitleStyle: CSSProperties = {
-      fontSize: Math.max(10, Math.round(Math.min(width, height) * 0.03)),
+      fontSize: 12,
       fontWeight: 600,
       marginTop: -2,
       marginBottom: 2,
@@ -552,8 +535,8 @@ export async function createCalendarDisplayElement(
 
     const body =
       config.view === "day"
-        ? renderAgenda(events, config, width - (padding * 2), height - (padding * 2) - titleFontSize - 20)
-        : renderGrid(events, config, width - (padding * 2), height - (padding * 2) - titleFontSize - 20);
+        ? renderAgenda(events, config)
+        : renderGrid(events, config);
 
     return componentSuccess(
       <div style={wrapperStyle}>

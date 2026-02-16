@@ -3,20 +3,14 @@ import type { DisplayComponentError } from "./component-result.js";
 
 export function createErrorDisplayElement(
   error: DisplayComponentError,
-  width: number,
-  height: number,
 ): ReactElement {
-  const baseSize = Math.min(width, height);
-
   const wrapperStyle: CSSProperties = {
-    width,
-    height,
     display: "flex",
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
     flexDirection: "column",
     justifyContent: "center",
-    boxSizing: "border-box",
-    padding: Math.max(8, Math.round(Math.min(width, height) * 0.04)),
-    backgroundColor: "#fff",
     color: "#000",
     fontFamily: "DejaVu Sans",
     textAlign: "left",
@@ -24,19 +18,19 @@ export function createErrorDisplayElement(
   };
 
   const headingStyle: CSSProperties = {
-    fontSize: Math.max(14, Math.round(baseSize * 0.09)),
+    fontSize: 18,
     fontWeight: 700,
     lineHeight: 1.1,
   };
 
   const messageStyle: CSSProperties = {
-    fontSize: Math.max(12, Math.round(baseSize * 0.065)),
+    fontSize: 14,
     fontWeight: 500,
     lineHeight: 1.2,
   };
 
   const detailStyle: CSSProperties = {
-    fontSize: Math.max(10, Math.round(baseSize * 0.05)),
+    fontSize: 12,
     lineHeight: 1.2,
   };
 

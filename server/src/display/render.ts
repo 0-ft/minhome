@@ -57,8 +57,6 @@ export async function renderElementToPngBuffer(
 
 function renderResultToElement(
   result: DisplayComponentResult,
-  width: number,
-  height: number,
 ): ReactElement {
   if (result.ok) {
     return result.element;
@@ -68,33 +66,23 @@ function renderResultToElement(
     `[display/render] Component error (${result.error.component}): ${result.error.message}` +
     `${result.error.detail ? ` (${result.error.detail})` : ""}`,
   );
-  return createErrorDisplayElement(result.error, width, height);
+  return createErrorDisplayElement(result.error);
 }
 
 export async function createComponentElement(
   component: TileComponentConfig,
   calendarSourceProvider: CalendarSourceProvider,
   todoListProvider: TodoListProvider,
-  width: number,
-  height: number,
 ): Promise<ReactElement> {
   switch (component.kind) {
     case "string_display":
-      return renderResultToElement(
-        createStringDisplayElement(component, width, height),
-        width,
-        height,
-      );
+      return renderResultToElement(createStringDisplayElement(component));
     case "color_test":
-      return renderResultToElement(
-        createColorTestElement(component, width, height),
-        width,
-        height,
-      );
+      return renderResultToElement(createColorTestElement(component));
     case "calendar_display": {
       let result: DisplayComponentResult;
       try {
-        result = await createCalendarDisplayElement(component, calendarSourceProvider, width, height);
+        result = await createCalendarDisplayElement(component, calendarSourceProvider);
       } catch (error) {
         result = componentFailure(
           component.kind,
@@ -102,14 +90,10 @@ export async function createComponentElement(
           error instanceof Error ? error.message : String(error),
         );
       }
-      return renderResultToElement(result, width, height);
+      return renderResultToElement(result);
     }
     case "todo_display":
-      return renderResultToElement(
-        createTodoDisplayElement(component, todoListProvider, width, height),
-        width,
-        height,
-      );
+      return renderResultToElement(createTodoDisplayElement(component, todoListProvider));
     default: {
       const _exhaustive: never = component;
       throw new Error(`Unsupported tile component: ${String(_exhaustive)}`);

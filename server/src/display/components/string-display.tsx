@@ -6,33 +6,21 @@ export const StringDisplayComponentConfigSchema = z.object({
   kind: z.literal("string_display"),
   text: z.string(),
   font_size: z.number().positive().optional(),
-  padding: z.number().nonnegative().optional(),
-  border_width: z.number().positive().optional(),
 });
 
 export type StringDisplayComponentConfig = z.infer<typeof StringDisplayComponentConfigSchema>;
 
-export function createStringDisplayElement(
-  config: StringDisplayComponentConfig,
-  width: number,
-  height: number,
-): DisplayComponentResult {
-  const baseSize = Math.min(width, height);
-  const borderWidth = Math.max(1, Math.round(config.border_width ?? 2));
-  const padding = Math.max(0, Math.round(config.padding ?? 10));
-  const computedFontSize = Math.max(12, Math.round(config.font_size ?? baseSize * 0.2));
+export function createStringDisplayElement(config: StringDisplayComponentConfig): DisplayComponentResult {
+  const computedFontSize = Math.max(12, Math.round(config.font_size ?? 20));
 
   const style: CSSProperties = {
-    width,
-    height,
     display: "flex",
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
     alignItems: "center",
     justifyContent: "center",
-    boxSizing: "border-box",
-    border: `${borderWidth}px solid #000`,
-    backgroundColor: "#fff",
     color: "#000",
-    padding,
     textAlign: "center",
     fontFamily: "DejaVu Sans",
     fontSize: computedFontSize,

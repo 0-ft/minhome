@@ -9,8 +9,6 @@ export const TodoDisplayComponentConfigSchema = z.object({
   title: z.string().trim().min(1).optional(),
   max_items: z.number().int().positive().default(8),
   show_completed: z.boolean().default(false),
-  border_width: z.number().positive().optional(),
-  padding: z.number().nonnegative().optional(),
 });
 
 export type TodoDisplayComponentConfig = z.infer<typeof TodoDisplayComponentConfigSchema>;
@@ -49,8 +47,6 @@ function statusPrefix(list: TodoList, status: TodoList["items"][number]["status"
 export function createTodoDisplayElement(
   config: TodoDisplayComponentConfig,
   todoProvider: TodoListProvider,
-  width: number,
-  height: number,
 ): DisplayComponentResult {
   const list = todoProvider.getTodoList(config.list_id);
   if (!list) {
@@ -61,12 +57,9 @@ export function createTodoDisplayElement(
     );
   }
 
-  const borderWidth = Math.max(1, Math.round(config.border_width ?? 2));
-  const padding = Math.max(0, Math.round(config.padding ?? 10));
-  const baseSize = Math.min(width, height);
-  const titleFontSize = Math.max(14, Math.round(baseSize * 0.12));
-  const itemFontSize = Math.max(11, Math.round(baseSize * 0.075));
-  const rowGap = Math.max(2, Math.round(itemFontSize * 0.25));
+  const titleFontSize = 24;
+  const itemFontSize = 15;
+  const rowGap = 4;
 
   const sourceItems = config.show_completed
     ? list.items
@@ -74,15 +67,12 @@ export function createTodoDisplayElement(
   const items = sourceItems.slice(0, config.max_items);
 
   const containerStyle: CSSProperties = {
-    width,
-    height,
     display: "flex",
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
     flexDirection: "column",
-    boxSizing: "border-box",
-    border: `${borderWidth}px solid #000`,
-    backgroundColor: "#fff",
     color: "#000",
-    padding,
     fontFamily: "DejaVu Sans",
     overflow: "hidden",
   };

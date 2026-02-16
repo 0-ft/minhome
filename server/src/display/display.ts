@@ -6,11 +6,13 @@
  *   GET  /display/api/display – polling endpoint (image URL + refresh rate)
  *   POST /display/api/log     – device log ingestion
  *   GET  /display/image       – 800×480 PNG (configurable colour depth)
+ *   GET  /display/html        – debug HTML of pre-Satori render tree
  */
 
 import { Hono } from "hono";
 import sharp from "sharp";
 import { createElement, type ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { CalendarSourceProvider } from "../calendar/service.js";
 import type { ConfigStore, DisplayDeviceConfig, DisplaysConfig } from "../config/config.js";
 import type { TodoStore } from "../config/todos.js";
@@ -130,6 +132,21 @@ function regionToPixels(
   };
 }
 
+function insetRect(
+  rect: { left: number; top: number; width: number; height: number },
+  insetX: number,
+  insetY: number,
+): { left: number; top: number; width: number; height: number } {
+  const safeInsetX = Math.max(0, Math.min(Math.floor((rect.width - 1) / 2), insetX));
+  const safeInsetY = Math.max(0, Math.min(Math.floor((rect.height - 1) / 2), insetY));
+  return {
+    left: rect.left + safeInsetX,
+    top: rect.top + safeInsetY,
+    width: Math.max(1, rect.width - (safeInsetX * 2)),
+    height: Math.max(1, rect.height - (safeInsetY * 2)),
+  };
+}
+
 function defaultTiles(fallbackText: string): TileConfig[] {
   return [
     {
@@ -137,8 +154,6 @@ function defaultTiles(fallbackText: string): TileConfig[] {
       component: {
         kind: "string_display",
         text: fallbackText,
-        border_width: 3,
-        padding: 20,
       },
     },
   ];
@@ -161,26 +176,27 @@ function getPaletteColourCount(colorDepth: DisplayDeviceConfig["color_depth"]): 
   return 2;
 }
 
-async function generateImage(
+async function buildDisplayRootElement(
   device: DeviceMatch | undefined,
   calendarSourceProvider: CalendarSourceProvider,
   todoListProvider: TodoListProvider,
   orientation: DisplayDeviceConfig["orientation"],
-  colorDepth: DisplayDeviceConfig["color_depth"],
   dimensions: DisplayDimensions,
-): Promise<Buffer> {
+): Promise<{ rootElement: ReactElement; renderSize: { width: number; height: number } }> {
   const renderSize = getRenderDimensions(orientation, dimensions);
   const tiles = resolveTilesForImage(device);
+  const tilePadding = Math.max(0, Math.round(device?.display.tile_padding ?? 0));
+  const tileGutter = Math.max(0, Math.round(device?.display.tile_gutter ?? 0));
+  const halfGutter = Math.round(tileGutter / 2);
   const tileElements: ReactElement[] = [];
 
   for (const tile of tiles) {
-    const pixelRegion = regionToPixels(tile.region, renderSize.width, renderSize.height);
+    const regionPixels = regionToPixels(tile.region, renderSize.width, renderSize.height);
+    const pixelRegion = insetRect(regionPixels, halfGutter, halfGutter);
     const tileElement = await createComponentElement(
       tile.component,
       calendarSourceProvider,
       todoListProvider,
-      pixelRegion.width,
-      pixelRegion.height,
     );
 
     tileElements.push(
@@ -199,7 +215,23 @@ async function generateImage(
             overflow: "hidden",
           },
         },
-        tileElement,
+        createElement(
+          "div",
+          {
+            style: {
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              minWidth: 0,
+              minHeight: 0,
+              boxSizing: "border-box",
+              backgroundColor: "#ffffff",
+              padding: tilePadding,
+              overflow: "hidden",
+            },
+          },
+          tileElement,
+        ),
       ),
     );
   }
@@ -213,7 +245,7 @@ async function generateImage(
         display: "flex",
         flexDirection: "column",
         position: "relative",
-        backgroundColor: "#ffffff",
+        backgroundColor: "#808080",
         overflow: "hidden",
         fontFamily: "DejaVu Sans",
       },
@@ -221,6 +253,24 @@ async function generateImage(
     tileElements,
   );
 
+  return { rootElement, renderSize };
+}
+
+async function generateImage(
+  device: DeviceMatch | undefined,
+  calendarSourceProvider: CalendarSourceProvider,
+  todoListProvider: TodoListProvider,
+  orientation: DisplayDeviceConfig["orientation"],
+  colorDepth: DisplayDeviceConfig["color_depth"],
+  dimensions: DisplayDimensions,
+): Promise<Buffer> {
+  const { rootElement, renderSize } = await buildDisplayRootElement(
+    device,
+    calendarSourceProvider,
+    todoListProvider,
+    orientation,
+    dimensions,
+  );
   const rendered = await renderElementToPngBuffer(rootElement, renderSize.width, renderSize.height);
 
   let image = sharp(rendered)
@@ -438,6 +488,57 @@ export function createDisplayRoute(config: ConfigStore, todos: TodoStore) {
         "X-Display-Indexed": "true",
       },
     });
+  });
+
+  display.get("/display/html", async (c) => {
+    const displays = config.getDisplays();
+    const accessToken = c.req.header("Access-Token");
+    const authHeader = c.req.header("Authorization");
+    const token = getTokenFromRequest(accessToken, authHeader);
+    const queryMac = c.req.query("mac");
+    const headerMac = c.req.header("ID");
+    const dimensions = getDisplayDimensionsFromRequest(
+      c.req.query("width") ?? c.req.header("Width"),
+      c.req.query("height") ?? c.req.header("Height"),
+    );
+    if (!dimensions) {
+      return c.json({ status: 400, message: "Missing or invalid width/height values" }, 400);
+    }
+
+    const matchedDevice =
+      (queryMac && lookupDeviceByMac(displays, queryMac)) ||
+      (headerMac && lookupDeviceByMac(displays, headerMac)) ||
+      (token && lookupDeviceByToken(displays, token)) ||
+      undefined;
+    const orientation = matchedDevice?.display.orientation ?? DEFAULT_ORIENTATION;
+
+    const { rootElement, renderSize } = await buildDisplayRootElement(
+      matchedDevice,
+      calendarSourceProvider,
+      todoListProvider,
+      orientation,
+      dimensions,
+    );
+    const renderedMarkup = renderToStaticMarkup(rootElement);
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Display HTML Preview</title>
+  </head>
+  <body style="margin:0;padding:16px;background:#111;color:#eee;font-family:system-ui, sans-serif;">
+    <div style="margin-bottom:8px;font-size:12px;">
+      Render size: ${renderSize.width}x${renderSize.height} (orientation: ${orientation})
+    </div>
+    <div style="width:${renderSize.width}px;height:${renderSize.height}px;overflow:hidden;box-shadow:0 0 0 1px #444;">
+      ${renderedMarkup}
+    </div>
+  </body>
+</html>`;
+
+    return c.html(html);
   });
 
   return display;

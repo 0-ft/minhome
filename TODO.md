@@ -46,3 +46,5 @@ a - [x] Dev tunnel
 - [ ] Voice chat should be persistent
 - [ ] Emoji pickers everywhere
 - [x] Todo markdown mermaid
+- [ ] Check how much voice heartbeat hammers server
+- [ ] Voice bridge to support announcement queue

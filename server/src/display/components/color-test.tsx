@@ -5,8 +5,6 @@ import { componentSuccess, type DisplayComponentResult } from "./component-resul
 export const ColorTestComponentConfigSchema = z.object({
   kind: z.literal("color_test"),
   colors: z.number().int().min(2).max(32).default(4),
-  padding: z.number().nonnegative().optional(),
-  border_width: z.number().positive().optional(),
 });
 
 export type ColorTestComponentConfig = z.infer<typeof ColorTestComponentConfigSchema>;
@@ -17,23 +15,14 @@ function greyscaleHex(index: number, total: number): string {
   return `#${hex}${hex}${hex}`;
 }
 
-export function createColorTestElement(
-  config: ColorTestComponentConfig,
-  width: number,
-  height: number,
-): DisplayComponentResult {
+export function createColorTestElement(config: ColorTestComponentConfig): DisplayComponentResult {
   const colors = config.colors;
-  const borderWidth = Math.max(1, Math.round(config.border_width ?? 2));
-  const padding = Math.max(0, Math.round(config.padding ?? Math.min(width, height) * 0.04));
 
   const wrapperStyle: CSSProperties = {
-    width,
-    height,
-    boxSizing: "border-box",
-    border: `${borderWidth}px solid #000`,
-    backgroundColor: "#fff",
-    padding,
     display: "flex",
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
     gap: 0,
   };
 
