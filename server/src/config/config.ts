@@ -19,6 +19,11 @@ export type Voice = z.infer<typeof VoiceSchema>;
 export const DisplayConfigSchema = z.object({
   /** How often the device should refresh, in seconds. */
   refresh_rate: z.number().positive().default(300),
+  /** Provisioned TRMNL devices keyed by MAC address. */
+  devices: z.record(z.string(), z.object({
+    token: z.string().min(1),
+    friendly_id: z.string().min(1).optional(),
+  })).default({}),
 });
 
 export type DisplayConfig = z.infer<typeof DisplayConfigSchema>;

@@ -3,6 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { createApp } from "./app.js";
 import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config/config.js";
+import { TokenStore } from "./config/tokens.js";
 import { AutomationEngine } from "./automations.js";
 import { createTools } from "./tools.js";
 import { createMcpRoute } from "./mcp.js";
@@ -16,6 +17,7 @@ const DATA_DIR = process.env.DATA_DIR;
 if (!DATA_DIR) throw new Error("DATA_DIR environment variable is required");
 
 const configPath = resolve(DATA_DIR, "config.json");
+const tokensPath = resolve(DATA_DIR, "tokens.json");
 const automationsPath = resolve(DATA_DIR, "automations.json");
 const debugLogPath = resolve(DATA_DIR, "debug.jsonl");
 
@@ -25,6 +27,7 @@ console.log(`[server] Automations: ${automationsPath}`);
 
 // Load config first so we can read debugLogMaxSizeMB
 const config = new ConfigStore(configPath);
+const tokens = new TokenStore(tokensPath);
 
 // Initialise file-backed debug log before anything else uses it
 debugLog.init(debugLogPath, config.get().debugLogMaxSizeMB);
@@ -44,7 +47,7 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
   },
 });
 
-const { app, injectWebSocket, toolCtx } = createApp(bridge, config, automationEngine);
+const { app, injectWebSocket, toolCtx } = createApp(bridge, config, automationEngine, tokens);
 
 // Mount in-process MCP server at /mcp (for Cursor IDE remote MCP)
 app.route("/", createMcpRoute({ bridge, config, automations: automationEngine }));
@@ -56,8 +59,10 @@ bridge.on("devices", (devices: unknown) => {
   }
 });
 
-// Serve frontend static files in production
+// Serve frontend: static files in production, or proxy to Vite dev server
 const frontendDist = resolve(import.meta.dirname, "../../frontend/dist");
+const viteDevUrl = process.env.VITE_DEV_URL;
+
 if (existsSync(frontendDist)) {
   console.log(`[server] Serving frontend from ${frontendDist}`);
   app.use("/*", serveStatic({ root: frontendDist }));
@@ -65,6 +70,30 @@ if (existsSync(frontendDist)) {
   app.get("*", async (c, next) => {
     if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path.startsWith("/audio/") || c.req.path.startsWith("/display/") || c.req.path === "/mcp") return next();
     return serveStatic({ root: frontendDist, path: "index.html" })(c, next);
+  });
+} else if (viteDevUrl) {
+  console.log(`[server] Dev frontend proxy -> ${viteDevUrl}`);
+  app.all("*", async (c, next) => {
+    if (
+      c.req.path.startsWith("/api/") ||
+      c.req.path.startsWith("/ws") ||
+      c.req.path.startsWith("/audio/") ||
+      c.req.path.startsWith("/display/") ||
+      c.req.path === "/mcp"
+    ) {
+      return next();
+    }
+    try {
+      const reqUrl = new URL(c.req.url);
+      const target = new URL(reqUrl.pathname + reqUrl.search, viteDevUrl);
+      const resp = await fetch(target.toString());
+      return new Response(resp.body, {
+        status: resp.status,
+        headers: resp.headers,
+      });
+    } catch {
+      return next();
+    }
   });
 }
 

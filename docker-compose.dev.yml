@@ -3,7 +3,7 @@ services:
   server:
     image: node:22-slim
     build: !reset null
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @minhome/server dev"
+    command: sh -c "apt-get update && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core && rm -rf /var/lib/apt/lists/* && corepack enable && pnpm install && pnpm --filter @minhome/server dev"
     working_dir: /app
     volumes:
       - .:/app
@@ -11,6 +11,8 @@ services:
     environment:
       - NODE_OPTIONS=--max-old-space-size=256
       - DATA_DIR=/data
+      - VITE_DEV_URL=http://frontend:5173
+      - FONTCONFIG_PATH=/etc/fonts
 
   # Add frontend dev server (not in production compose)
   frontend:

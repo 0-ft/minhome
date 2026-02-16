@@ -22,7 +22,7 @@
 - [x] Configurable tunnel
 - [ ] How are crons managed? Should prob be schedule/heartbeat-ish
 - [ ] Error if no zigbee
-- [ ] Config page: config state, zigbee interface connected & state, voice device+state
+- [ ] Config page: config state, zigbee interface connected & state, voice device+state, AUTH TOKENS
 - [x] Auto find voice PE devices
 - [x] Openai Realtime API
 - [ ] voice endpoint auth check
@@ -35,5 +35,6 @@
 - [ ] Fix immediate automation timing
 - [ ] Multiple device sets per invocation
 - [ ] TRMNL server
-- [ ] Dev tunnel
+- [x] Dev tunnel
 - [ ] Display & voice PE auto flashing from device
+- [ ] ConfigStore and AutomationEngine and TokenStore should share a base class

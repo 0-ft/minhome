@@ -4,6 +4,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import type { TokenStore } from "./config/tokens.js";
 
 const COOKIE_NAME = "minhome_session";
 const TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days in seconds
@@ -54,7 +55,7 @@ function passwordMatches(input: string): boolean {
 
 // ── Middleware ────────────────────────────────────────────
 
-export function authMiddleware(): MiddlewareHandler {
+export function authMiddleware(tokens: TokenStore): MiddlewareHandler {
   return async (c, next) => {
     // Auth disabled — let everything through
     if (!authEnabled) return next();
@@ -65,7 +66,8 @@ export function authMiddleware(): MiddlewareHandler {
     if (
       path === "/api/auth/login" ||
       path === "/api/auth/check" ||
-      path === "/api/auth/logout"
+      path === "/api/auth/logout" ||
+      path === "/display/api/setup"
     ) {
       return next();
     }
@@ -74,6 +76,10 @@ export function authMiddleware(): MiddlewareHandler {
     if (!path.startsWith("/api/") && !path.startsWith("/display/") && path !== "/ws") {
       return next();
     }
+
+    // Check bearer token with scope (Authorization: Bearer or Access-Token)
+    const tokenMatch = tokens.match(c.req.header("Authorization"), c.req.header("Access-Token"), path);
+    if (tokenMatch) return next();
 
     // Check session cookie
     const cookieToken = getCookie(c, COOKIE_NAME);
