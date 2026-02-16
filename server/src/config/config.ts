@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { z } from "zod";
 import { DeviceConfigSchema, EntityConfigSchema, extractEntitiesFromExposes } from "./devices.js";
 import { RoomSchema, type FurnitureItem } from "./room.js";
+import { TileConfigSchema } from "../display/tiles.js";
 
 // Re-export sub-module types for consumers
 export { DeviceConfigSchema, EntityConfigSchema } from "./devices.js";
@@ -19,10 +20,13 @@ export type Voice = z.infer<typeof VoiceSchema>;
 export const DisplayConfigSchema = z.object({
   /** How often the device should refresh, in seconds. */
   refresh_rate: z.number().positive().default(300),
+  /** Display layout orientation. */
+  orientation: z.enum(["landscape", "portrait"]).default("landscape"),
   /** Provisioned TRMNL devices keyed by MAC address. */
   devices: z.record(z.string(), z.object({
     token: z.string().min(1),
     friendly_id: z.string().min(1).optional(),
+    tiles: z.array(TileConfigSchema).default([]),
   })).default({}),
 });
 

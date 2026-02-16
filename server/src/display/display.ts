@@ -11,35 +11,45 @@
 import { Hono } from "hono";
 import sharp from "sharp";
 import type { ConfigStore, DisplayConfig } from "../config/config.js";
-
-const WIDTH = 800;
-const HEIGHT = 480;
-
-const WORDS = [
-  "serendipity", "cascade", "ephemeral", "labyrinth", "solitude",
-  "nebula", "chrysalis", "vortex", "enigma", "silhouette",
-  "aurora", "zenith", "catalyst", "paradox", "reverie",
-  "mosaic", "fjord", "quartz", "zephyr", "obsidian",
-  "mirage", "velvet", "cipher", "prism", "ember",
-  "gossamer", "halcyon", "incognito", "juxtapose", "kaleidoscope",
-];
+import type { TileConfig } from "./tiles.js";
+import { renderComponentToPngBuffer } from "./render.js";
 
 function normalizeMac(mac: string): string {
   return mac.replace(/[^a-fA-F0-9]/g, "").toLowerCase();
 }
 
-function lookupDevice(displayConfig: DisplayConfig, mac: string): DisplayConfig["devices"][string] | undefined {
+type DisplayDevice = DisplayConfig["devices"][string];
+
+type DeviceMatch = {
+  mac: string;
+  device: DisplayDevice;
+};
+
+function lookupDeviceByMac(displayConfig: DisplayConfig, mac: string): DeviceMatch | undefined {
   const normalized = normalizeMac(mac);
   for (const [configuredMac, device] of Object.entries(displayConfig.devices)) {
     if (normalizeMac(configuredMac) === normalized) {
-      return device;
+      return { mac: configuredMac, device };
     }
   }
   return undefined;
 }
 
-function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function lookupDeviceByToken(displayConfig: DisplayConfig, token: string): DeviceMatch | undefined {
+  for (const [configuredMac, device] of Object.entries(displayConfig.devices)) {
+    if (device.token === token) {
+      return { mac: configuredMac, device };
+    }
+  }
+  return undefined;
+}
+
+function getTokenFromRequest(
+  accessToken: string | undefined,
+  authHeader: string | undefined,
+): string | undefined {
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+  return bearer ?? accessToken;
 }
 
 function getPublicOrigin(url: string, hostHeader: string | undefined, forwardedHost: string | undefined, forwardedProto: string | undefined): string {
@@ -55,23 +65,149 @@ function getPublicOrigin(url: string, hostHeader: string | undefined, forwardedH
   }
 }
 
-async function generateImage(): Promise<Buffer> {
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-  const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", month: "long", day: "numeric" });
-  const word = WORDS[Math.floor(Math.random() * WORDS.length)];
+type DisplayDimensions = {
+  width: number;
+  height: number;
+};
 
-  const svg = `<svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-  <rect width="${WIDTH}" height="${HEIGHT}" fill="white"/>
-  <text x="${WIDTH / 2}" y="150" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="120" font-weight="bold" fill="black">${escapeXml(timeStr)}</text>
-  <text x="${WIDTH / 2}" y="230" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="40" fill="black">${escapeXml(dateStr)}</text>
-  <line x1="200" y1="280" x2="600" y2="280" stroke="black" stroke-width="2"/>
-  <text x="${WIDTH / 2}" y="375" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="64" font-weight="bold" fill="black">${escapeXml(word)}</text>
-</svg>`;
+function parsePositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return undefined;
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return parsed;
+}
 
-  return sharp(Buffer.from(svg))
-    .png({ colours: 2 })
-    .toBuffer();
+function getDisplayDimensionsFromRequest(
+  widthValue: string | undefined,
+  heightValue: string | undefined,
+): DisplayDimensions | undefined {
+  const width = parsePositiveInt(widthValue);
+  const height = parsePositiveInt(heightValue);
+  if (!width || !height) return undefined;
+  return { width, height };
+}
+
+function appendDimensionsToImageUrl(imageUrl: string, dimensions: DisplayDimensions): string {
+  const url = new URL(imageUrl);
+  url.searchParams.set("width", String(dimensions.width));
+  url.searchParams.set("height", String(dimensions.height));
+  return url.toString();
+}
+
+function getRenderDimensions(
+  orientation: DisplayConfig["orientation"],
+  deviceDimensions: DisplayDimensions,
+): { width: number; height: number } {
+  if (orientation === "portrait") {
+    return { width: deviceDimensions.height, height: deviceDimensions.width };
+  }
+  return { width: deviceDimensions.width, height: deviceDimensions.height };
+}
+
+function regionToPixels(
+  region: TileConfig["region"],
+  width: number,
+  height: number,
+): { left: number; top: number; width: number; height: number } {
+  const left = Math.max(0, Math.min(width - 1, Math.round(region.x * width)));
+  const top = Math.max(0, Math.min(height - 1, Math.round(region.y * height)));
+  const right = Math.max(left + 1, Math.min(width, Math.round((region.x + region.w) * width)));
+  const bottom = Math.max(top + 1, Math.min(height, Math.round((region.y + region.h) * height)));
+
+  return {
+    left,
+    top,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+function defaultTiles(fallbackText: string): TileConfig[] {
+  return [
+    {
+      region: { x: 0, y: 0, w: 1, h: 1 },
+      component: {
+        kind: "string_display",
+        text: fallbackText,
+        border_width: 3,
+        padding: 20,
+      },
+    },
+  ];
+}
+
+function resolveTilesForImage(device: DeviceMatch | undefined): TileConfig[] {
+  if (!device) {
+    return defaultTiles("Display token not recognized");
+  }
+
+  if (device.device.tiles.length > 0) {
+    return device.device.tiles;
+  }
+
+  return defaultTiles("Configure display tiles");
+}
+
+async function renderTileWithFallback(
+  tile: TileConfig,
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  try {
+    return await renderComponentToPngBuffer(tile.component, width, height);
+  } catch (error) {
+    console.warn(`[display/image] Tile render failed (${tile.component.kind}): ${(error as Error).message}`);
+    return renderComponentToPngBuffer(
+      {
+        kind: "string_display",
+        text: "Tile render error",
+        border_width: 2,
+      },
+      width,
+      height,
+    );
+  }
+}
+
+async function generateImage(
+  device: DeviceMatch | undefined,
+  orientation: DisplayConfig["orientation"],
+  dimensions: DisplayDimensions,
+): Promise<Buffer> {
+  const renderSize = getRenderDimensions(orientation, dimensions);
+  const tiles = resolveTilesForImage(device);
+  const compositeInputs: sharp.OverlayOptions[] = [];
+
+  for (const tile of tiles) {
+    const pixelRegion = regionToPixels(tile.region, renderSize.width, renderSize.height);
+    const tilePng = await renderTileWithFallback(tile, pixelRegion.width, pixelRegion.height);
+    compositeInputs.push({
+      input: tilePng,
+      left: pixelRegion.left,
+      top: pixelRegion.top,
+    });
+  }
+
+  let image = sharp({
+    create: {
+      width: renderSize.width,
+      height: renderSize.height,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 },
+    },
+  })
+    .composite(compositeInputs)
+    .flatten({ background: "#ffffff" })
+    .grayscale()
+    .threshold(128);
+
+  if (orientation === "portrait") {
+    image = image.rotate(90);
+  }
+
+  return image.png({ colours: 2 }).toBuffer();
 }
 
 export function createDisplayRoute(config: ConfigStore) {
@@ -88,7 +224,8 @@ export function createDisplayRoute(config: ConfigStore) {
     console.log(`[display/setup] ID header mac=${mac}`);
     const cfg = config.getDisplay();
     console.log(`[display/setup] Config loaded refresh_rate=${cfg.refresh_rate} devices=${Object.keys(cfg.devices).length}`);
-    const device = lookupDevice(cfg, mac);
+    const matchedDevice = lookupDeviceByMac(cfg, mac);
+    const device = matchedDevice?.device;
     if (!device) {
       console.warn(`[display/setup] Device not configured mac=${mac}`);
       return c.json({ status: 404, message: `Device ${mac} is not configured` }, 404);
@@ -125,10 +262,23 @@ export function createDisplayRoute(config: ConfigStore) {
       c.req.header("X-Forwarded-Host"),
       c.req.header("X-Forwarded-Proto"),
     );
-    console.log(`[display/poll] Responding refresh_rate=${cfg.refresh_rate} image_url=${host}/display/image`);
+    const dimensions = getDisplayDimensionsFromRequest(
+      c.req.header("Width"),
+      c.req.header("Height"),
+    );
+    if (!dimensions) {
+      console.warn("[display/poll] Missing or invalid Width/Height headers");
+      return c.json({ status: 400, message: "Missing or invalid Width/Height headers" }, 400);
+    }
+    const rawImageUrl = `${host}/display/image`;
+    const imageUrl = appendDimensionsToImageUrl(rawImageUrl, dimensions);
+    console.log(
+      `[display/poll] Responding refresh_rate=${cfg.refresh_rate}` +
+      ` image_url=${imageUrl} width=${dimensions.width} height=${dimensions.height}`,
+    );
     return c.json({
       status: 0,
-      image_url: `${host}/display/image`,
+      image_url: imageUrl,
       filename: new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14),
       refresh_rate: cfg.refresh_rate,
       update_firmware: false,
@@ -155,9 +305,34 @@ export function createDisplayRoute(config: ConfigStore) {
 
   display.get("/display/image", async (c) => {
     console.log("[display/image] Render requested");
+    const cfg = config.getDisplay();
+    const accessToken = c.req.header("Access-Token");
+    const authHeader = c.req.header("Authorization");
+    const token = getTokenFromRequest(accessToken, authHeader);
+    const queryMac = c.req.query("mac");
+    const headerMac = c.req.header("ID");
+    const dimensions = getDisplayDimensionsFromRequest(
+      c.req.query("width") ?? c.req.header("Width"),
+      c.req.query("height") ?? c.req.header("Height"),
+    );
+    if (!dimensions) {
+      console.warn("[display/image] Missing or invalid width/height values");
+      return c.json({ status: 400, message: "Missing or invalid width/height values" }, 400);
+    }
+
+    const matchedDevice =
+      (queryMac && lookupDeviceByMac(cfg, queryMac)) ||
+      (headerMac && lookupDeviceByMac(cfg, headerMac)) ||
+      (token && lookupDeviceByToken(cfg, token)) ||
+      undefined;
+
     const start = Date.now();
-    const png = await generateImage();
-    console.log(`[display/image] Rendered ${png.length} bytes in ${Date.now() - start}ms`);
+    const png = await generateImage(matchedDevice, cfg.orientation, dimensions);
+    console.log(
+      `[display/image] Rendered ${png.length} bytes in ${Date.now() - start}ms` +
+      ` mac=${matchedDevice?.mac ?? "unknown"} orientation=${cfg.orientation}` +
+      ` width=${dimensions.width} height=${dimensions.height}`,
+    );
     return new Response(new Uint8Array(png), {
       headers: { "Content-Type": "image/png", "Cache-Control": "no-cache, no-store" },
     });
