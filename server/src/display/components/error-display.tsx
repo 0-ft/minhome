@@ -1,4 +1,4 @@
-import { createElement, type CSSProperties, type ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import type { DisplayComponentError } from "./component-result.js";
 
 export function createErrorDisplayElement(
@@ -6,6 +6,8 @@ export function createErrorDisplayElement(
   width: number,
   height: number,
 ): ReactElement {
+  const baseSize = Math.min(width, height);
+
   const wrapperStyle: CSSProperties = {
     width,
     height,
@@ -13,7 +15,6 @@ export function createErrorDisplayElement(
     flexDirection: "column",
     justifyContent: "center",
     boxSizing: "border-box",
-    border: "2px solid #000",
     padding: Math.max(8, Math.round(Math.min(width, height) * 0.04)),
     backgroundColor: "#fff",
     color: "#000",
@@ -23,31 +24,27 @@ export function createErrorDisplayElement(
   };
 
   const headingStyle: CSSProperties = {
-    fontSize: Math.max(14, Math.round(Math.min(width, height) * 0.09)),
+    fontSize: Math.max(14, Math.round(baseSize * 0.09)),
     fontWeight: 700,
     lineHeight: 1.1,
   };
 
   const messageStyle: CSSProperties = {
-    fontSize: Math.max(12, Math.round(Math.min(width, height) * 0.065)),
+    fontSize: Math.max(12, Math.round(baseSize * 0.065)),
     fontWeight: 500,
     lineHeight: 1.2,
   };
 
   const detailStyle: CSSProperties = {
-    fontSize: Math.max(10, Math.round(Math.min(width, height) * 0.05)),
+    fontSize: Math.max(10, Math.round(baseSize * 0.05)),
     lineHeight: 1.2,
   };
 
-  return createElement("div", { style: wrapperStyle }, [
-    createElement("div", { style: headingStyle, key: "heading" }, "Tile error"),
-    createElement(
-      "div",
-      { style: messageStyle, key: "message" },
-      `${error.component}: ${error.message}`,
-    ),
-    error.detail
-      ? createElement("div", { style: detailStyle, key: "detail" }, error.detail.slice(0, 120))
-      : null,
-  ]);
+  return (
+    <div style={wrapperStyle}>
+      <div style={headingStyle}>Tile error</div>
+      <div style={messageStyle}>{`${error.component}: ${error.message}`}</div>
+      {error.detail ? <div style={detailStyle}>{error.detail.slice(0, 120)}</div> : null}
+    </div>
+  );
 }

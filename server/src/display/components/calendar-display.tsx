@@ -1,4 +1,4 @@
-import { createElement, type CSSProperties } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import { z } from "zod";
 import {
   CalendarViewOptions,
@@ -25,13 +25,17 @@ export const CalendarDisplayComponentConfigSchema = z.object({
 export type CalendarDisplayComponentConfig = z.infer<typeof CalendarDisplayComponentConfigSchema>;
 
 const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const DAY_TITLE_FORMATTER = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric" });
 const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 const MONTH_DAY_FORMATTER = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 const DAY_NUMBER_FORMATTER = new Intl.DateTimeFormat(undefined, { day: "numeric" });
 const WEEKDAY_SHORT_FORMATTER = new Intl.DateTimeFormat(undefined, { weekday: "short" });
 
+const EINK_BACKGROUND = "#fff";
+const EINK_FOREGROUND = "#000";
+
 function getDefaultTitle(view: CalendarDisplayComponentConfig["view"]): string {
-  return view === "day" ? "Today" : view === "week" ? "This week" : "This month";
+  return view === "week" ? "This week" : "This month";
 }
 
 function startOfDay(date: Date): Date {
@@ -56,7 +60,6 @@ function startOfMonthGrid(date: Date): Date {
 }
 
 function endOfEventForDayMath(event: CalendarEvent): Date {
-  // Treat all-day end dates as exclusive by default so date-only ranges render correctly.
   if (event.allDay) {
     return new Date(event.end.getTime() - 1);
   }
@@ -94,21 +97,16 @@ function getDaySlots(view: CalendarDisplayComponentConfig["view"], now: Date): D
   return [];
 }
 
-function getEventBadges(
+function getEventContinuation(
   event: CalendarEvent,
   day: Date,
-): string[] {
-  const badges: string[] = [];
-  const multiDay = isMultiDayEvent(event);
-  if (event.allDay) badges.push("ALL DAY");
-  if (multiDay) badges.push("MULTI-DAY");
-
+): { continuesFromPrev: boolean; continuesToNext: boolean } {
   const dayStart = startOfDay(day);
   const nextDay = addDays(dayStart, 1);
-  if (multiDay && event.start < dayStart) badges.push("CONT");
-  if (multiDay && event.end > nextDay) badges.push("->");
-
-  return badges;
+  return {
+    continuesFromPrev: event.start < dayStart,
+    continuesToNext: event.end > nextDay,
+  };
 }
 
 function eventTimeLabelForAgenda(event: CalendarEvent, day: Date): string {
@@ -133,30 +131,27 @@ function eventTimeLabelForAgenda(event: CalendarEvent, day: Date): string {
 
 function formatGridEventText(
   event: CalendarEvent,
-  day: Date,
   showLocation: boolean,
 ): string {
-  const badges = getEventBadges(event, day);
   const timePrefix = event.allDay ? "" : `${TIME_FORMATTER.format(event.start)} `;
   const locationSuffix = showLocation && event.location ? ` (${event.location})` : "";
-  const badgePrefix = badges.length > 0 ? `[${badges.join(", ")}] ` : "";
-  return `${badgePrefix}${timePrefix}${event.summary}${locationSuffix}`;
+  return `${timePrefix}${event.summary}${locationSuffix}`;
 }
 
-function renderBadge(text: string): ReturnType<typeof createElement> {
-  const style: CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "1px solid #000",
-    padding: "1px 4px",
-    fontSize: 9,
-    fontWeight: 700,
-    lineHeight: 1,
-    minHeight: 14,
-    backgroundColor: "#fff",
-  };
-  return createElement("div", { key: `badge-${text}`, style }, text);
+function scaledFont(baseSize: number, factor: number, minimum: number): number {
+  return Math.max(minimum, Math.round(baseSize * factor));
+}
+
+function renderContinuationTriangle(direction: "left" | "right"): ReactElement {
+  const points = direction === "left"
+    ? "8.5,1 1.5,5 8.5,9"
+    : "1.5,1 8.5,5 1.5,9";
+
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" style={{ display: "block" }}>
+      <polygon points={points} fill={EINK_FOREGROUND} />
+    </svg>
+  );
 }
 
 function renderAgenda(
@@ -164,56 +159,101 @@ function renderAgenda(
   config: CalendarDisplayComponentConfig,
   width: number,
   height: number,
-): ReturnType<typeof createElement> {
+): ReactElement {
   const day = new Date();
+  const baseSize = Math.min(width, height);
+
   const outerStyle: CSSProperties = {
     width,
     height,
     display: "flex",
     flexDirection: "column",
     gap: 6,
-    overflow: "hidden",
+    overflow: "visible",
   };
 
   const eventListStyle: CSSProperties = {
     display: "flex",
     flexDirection: "column",
     gap: 6,
-    overflow: "hidden",
+    overflow: "visible",
   };
 
-  const eventCardStyle: CSSProperties = {
-    border: "1px solid #000",
-    padding: "6px 8px",
+  const eventRowShellStyle: CSSProperties = {
+    display: "flex",
+    alignItems: "stretch",
+    gap: 4,
+  };
+
+  const eventRowStyle: CSSProperties = {
+    borderLeft: "2px solid #000",
+    padding: "5px 0 5px 6px",
     display: "flex",
     flexDirection: "column",
     gap: 4,
-    backgroundColor: "#fff",
-  };
-
-  const metaRowStyle: CSSProperties = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 14,
-  };
-
-  const timeStyle: CSSProperties = {
-    fontSize: Math.max(10, Math.round(Math.min(width, height) * 0.03)),
-    fontWeight: 700,
-    lineHeight: 1.2,
     flex: 1,
   };
 
-  const badgesStyle: CSSProperties = {
+  const eventArrowStyle: CSSProperties = {
     display: "flex",
-    gap: 3,
-    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: scaledFont(baseSize, 0.03, 10),
+    fontWeight: 700,
+    lineHeight: 1,
+    color: EINK_FOREGROUND,
+  };
+
+  const eventArrowLeftStyle: CSSProperties = {
+    ...eventArrowStyle,
+    width: 6,
+    minWidth: 6,
+    marginLeft: -2,
+    justifyContent: "flex-start",
+    overflow: "visible",
+  };
+
+  const eventArrowRightStyle: CSSProperties = {
+    ...eventArrowStyle,
+    width: 10,
+    minWidth: 10,
+    justifyContent: "flex-end",
+  };
+
+  const eventArrowLeftSpacerStyle: CSSProperties = {
+    width: 6,
+    minWidth: 6,
+  };
+
+  const eventArrowRightSpacerStyle: CSSProperties = {
+    width: 10,
+    minWidth: 10,
+  };
+
+  const eventArrowGlyphWrapStyle: CSSProperties = {
+    display: "flex",
+    fontSize: scaledFont(baseSize, 0.03, 10),
+    lineHeight: 1,
+  };
+
+  const eventArrowGlyphLeftStyle: CSSProperties = {
+    ...eventArrowGlyphWrapStyle,
+    marginLeft: -4,
+  };
+
+  const eventArrowGlyphRightStyle: CSSProperties = {
+    ...eventArrowGlyphWrapStyle,
+    marginLeft: -2,
+  };
+
+  const timeStyle: CSSProperties = {
+    fontSize: scaledFont(baseSize, 0.034, 11),
+    fontWeight: 700,
+    lineHeight: 1.2,
   };
 
   const summaryStyle: CSSProperties = {
-    fontSize: Math.max(12, Math.round(Math.min(width, height) * 0.035)),
+    fontSize: scaledFont(baseSize, 0.04, 13),
     fontWeight: 700,
     lineHeight: 1.2,
     whiteSpace: "normal",
@@ -221,7 +261,7 @@ function renderAgenda(
   };
 
   const locationStyle: CSSProperties = {
-    fontSize: Math.max(10, Math.round(Math.min(width, height) * 0.028)),
+    fontSize: scaledFont(baseSize, 0.032, 11),
     fontWeight: 500,
     lineHeight: 1.2,
     whiteSpace: "normal",
@@ -229,32 +269,47 @@ function renderAgenda(
   };
 
   if (events.length === 0) {
-    return createElement(
-      "div",
-      { style: outerStyle },
-      createElement("div", { style: summaryStyle }, "No events for today"),
+    return (
+      <div style={outerStyle}>
+        <div style={summaryStyle}>No events for today</div>
+      </div>
     );
   }
 
-  const cards = events.map((event, idx) => {
-    const badges = getEventBadges(event, day);
-    return createElement("div", { key: `${event.start.toISOString()}-${idx}`, style: eventCardStyle }, [
-      createElement("div", { key: "meta", style: metaRowStyle }, [
-        createElement("div", { key: "time", style: timeStyle }, eventTimeLabelForAgenda(event, day)),
-        createElement(
-          "div",
-          { key: "badges", style: badgesStyle },
-          badges.map((badge) => renderBadge(badge)),
-        ),
-      ]),
-      createElement("div", { key: "summary", style: summaryStyle }, event.summary),
-      config.show_location && event.location
-        ? createElement("div", { key: "location", style: locationStyle }, event.location)
-        : null,
-    ]);
-  });
-
-  return createElement("div", { style: outerStyle }, createElement("div", { style: eventListStyle }, cards));
+  return (
+    <div style={outerStyle}>
+      <div style={eventListStyle}>
+        {events.map((event, idx) => {
+          const { continuesFromPrev, continuesToNext } = getEventContinuation(event, day);
+          return (
+            <div key={`${event.start.toISOString()}-${idx}`} style={eventRowShellStyle}>
+              {continuesFromPrev
+                ? (
+                    <div style={eventArrowLeftStyle}>
+                      <div style={eventArrowGlyphLeftStyle}>{renderContinuationTriangle("left")}</div>
+                    </div>
+                  )
+                : <div style={eventArrowLeftSpacerStyle} />}
+              <div style={eventRowStyle}>
+                <div style={timeStyle}>{eventTimeLabelForAgenda(event, day)}</div>
+                <div style={summaryStyle}>{event.summary}</div>
+                {config.show_location && event.location ? (
+                  <div style={locationStyle}>{event.location}</div>
+                ) : null}
+              </div>
+              {continuesToNext
+                ? (
+                    <div style={eventArrowRightStyle}>
+                      <div style={eventArrowGlyphRightStyle}>{renderContinuationTriangle("right")}</div>
+                    </div>
+                  )
+                : <div style={eventArrowRightSpacerStyle} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function renderGrid(
@@ -262,8 +317,9 @@ function renderGrid(
   config: CalendarDisplayComponentConfig,
   width: number,
   height: number,
-): ReturnType<typeof createElement> {
+): ReactElement {
   const now = new Date();
+  const baseSize = Math.min(width, height);
   const days = getDaySlots(config.view, now);
   const isMonth = config.view === "month";
   const rows = isMonth ? 6 : 1;
@@ -286,23 +342,21 @@ function renderGrid(
 
   const cellStyle: CSSProperties = {
     flex: 1,
-    border: "1px solid #000",
     padding: 4,
     display: "flex",
     flexDirection: "column",
     gap: 3,
     minWidth: 0,
     overflow: "hidden",
-    backgroundColor: "#fff",
+    backgroundColor: EINK_BACKGROUND,
   };
 
   const cellHeaderStyle: CSSProperties = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    fontSize: Math.max(9, Math.round(Math.min(width, height) * (isMonth ? 0.015 : 0.02))),
+    fontSize: scaledFont(baseSize, isMonth ? 0.015 : 0.02, 9),
     fontWeight: 700,
-    borderBottom: "1px solid #000",
     paddingBottom: 2,
     minHeight: 14,
   };
@@ -316,90 +370,87 @@ function renderGrid(
   };
 
   const eventStyle: CSSProperties = {
-    fontSize: Math.max(8, Math.round(Math.min(width, height) * (isMonth ? 0.013 : 0.018))),
+    fontSize: scaledFont(baseSize, isMonth ? 0.013 : 0.018, 8),
     lineHeight: 1.2,
     fontWeight: 500,
-    border: "1px solid #000",
     padding: "2px 3px",
     whiteSpace: "normal",
     wordBreak: "break-word",
     overflow: "hidden",
-    backgroundColor: "#fff",
+    backgroundColor: EINK_BACKGROUND,
   };
 
-  return createElement(
-    "div",
-    { style: gridStyle },
-    Array.from({ length: rows }, (_, rowIdx) => {
-      const rowDays = days.slice(rowIdx * 7, rowIdx * 7 + 7);
-      return createElement(
-        "div",
-        { key: `row-${rowIdx}`, style: rowStyle },
-        rowDays.map((day, dayIdx) => {
-          const dayEvents = events
-            .filter((event) => overlapsDay(event, day))
-            .sort((a, b) => a.start.getTime() - b.start.getTime());
-          const visible = dayEvents.slice(0, eventsPerCell);
-          const hiddenCount = Math.max(0, dayEvents.length - visible.length);
-          const outsideCurrentMonth = isMonth && day.getMonth() !== now.getMonth();
+  const rowItemsStyle: CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+  };
 
-          return createElement("div", { key: `day-${rowIdx}-${dayIdx}`, style: cellStyle }, [
-            createElement("div", { key: "header", style: cellHeaderStyle }, [
-              createElement(
-                "div",
-                { key: "weekday" },
-                WEEKDAY_SHORT_FORMATTER.format(day),
-              ),
-              createElement(
-                "div",
-                { key: "day-number" },
-                DAY_NUMBER_FORMATTER.format(day),
-              ),
-            ]),
-            createElement(
-              "div",
-              { key: "events", style: listStyle },
-              visible.length > 0
-                ? [
-                    ...visible.map((event, eventIdx) =>
-                      createElement(
-                        "div",
-                        { key: `event-${eventIdx}`, style: eventStyle },
-                        formatGridEventText(event, day, config.show_location),
-                      )),
-                    hiddenCount > 0
-                      ? createElement(
-                          "div",
-                          {
-                            key: "more",
-                            style: {
+  const dayLabelStyle: CSSProperties = {
+    display: "flex",
+  };
+
+  return (
+    <div style={gridStyle}>
+      {Array.from({ length: rows }, (_, rowIdx) => {
+        const rowDays = days.slice(rowIdx * 7, rowIdx * 7 + 7);
+        return (
+          <div key={`row-${rowIdx}`} style={rowStyle}>
+            {rowDays.map((day, dayIdx) => {
+              const dayEvents = events
+                .filter((event) => overlapsDay(event, day))
+                .sort((a, b) => a.start.getTime() - b.start.getTime());
+              const visible = dayEvents.slice(0, eventsPerCell);
+              const hiddenCount = Math.max(0, dayEvents.length - visible.length);
+              const outsideCurrentMonth = isMonth && day.getMonth() !== now.getMonth();
+
+              return (
+                <div key={`day-${rowIdx}-${dayIdx}`} style={cellStyle}>
+                  <div style={cellHeaderStyle}>
+                    <div style={dayLabelStyle}>{WEEKDAY_SHORT_FORMATTER.format(day)}</div>
+                    <div style={dayLabelStyle}>{DAY_NUMBER_FORMATTER.format(day)}</div>
+                  </div>
+                  <div style={listStyle}>
+                    {visible.length > 0 ? (
+                      <div style={rowItemsStyle}>
+                        {visible.map((event, eventIdx) => (
+                          <div key={`event-${eventIdx}`} style={eventStyle}>
+                            {formatGridEventText(event, config.show_location)}
+                          </div>
+                        ))}
+                        {hiddenCount > 0 ? (
+                          <div
+                            style={{
                               ...eventStyle,
                               border: "0",
                               padding: "0",
                               fontWeight: 700,
-                            },
-                          },
-                          `+${hiddenCount} more`,
-                        )
-                      : null,
-                  ]
-                : createElement(
-                    "div",
-                    {
-                      style: {
-                        ...eventStyle,
-                        border: "0",
-                        padding: "0",
-                        opacity: outsideCurrentMonth ? 0.35 : 0.55,
-                      },
-                    },
-                    outsideCurrentMonth ? "" : "No events",
-                  ),
-            ),
-          ]);
-        }),
-      );
-    }),
+                            }}
+                          >
+                            {`+${hiddenCount} more`}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          ...eventStyle,
+                          border: "0",
+                          padding: "0",
+                          opacity: outsideCurrentMonth ? 0.35 : 0.55,
+                        }}
+                      >
+                        {outsideCurrentMonth ? "" : "No events"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -425,9 +476,9 @@ export async function createCalendarDisplayElement(
       display: "flex",
       flexDirection: "column",
       boxSizing: "border-box",
-      border: `${borderWidth}px solid #000`,
-      backgroundColor: "#fff",
-      color: "#000",
+      border: `${borderWidth}px solid ${EINK_FOREGROUND}`,
+      backgroundColor: EINK_BACKGROUND,
+      color: EINK_FOREGROUND,
       padding,
       fontFamily: "DejaVu Sans",
       gap: 6,
@@ -437,7 +488,6 @@ export async function createCalendarDisplayElement(
       fontSize: titleFontSize,
       fontWeight: 700,
       lineHeight: 1.1,
-      borderBottom: "1px solid #000",
       paddingBottom: 4,
       marginBottom: 2,
     };
@@ -449,11 +499,14 @@ export async function createCalendarDisplayElement(
       marginBottom: 2,
     };
 
-    const title = config.title ?? getDefaultTitle(config.view);
     const now = new Date();
+    const title =
+      config.view === "day"
+        ? DAY_TITLE_FORMATTER.format(now)
+        : config.title ?? getDefaultTitle(config.view);
     const subtitle =
       config.view === "day"
-        ? MONTH_DAY_FORMATTER.format(now)
+        ? null
         : config.view === "week"
           ? `${DATE_FORMATTER.format(startOfWeek(now))} - ${DATE_FORMATTER.format(addDays(startOfWeek(now), 6))}`
           : `${now.toLocaleDateString(undefined, { month: "long", year: "numeric" })}`;
@@ -464,15 +517,13 @@ export async function createCalendarDisplayElement(
         : renderGrid(events, config, width - (padding * 2), height - (padding * 2) - titleFontSize - 20);
 
     return componentSuccess(
-      createElement("div", { style: wrapperStyle }, [
-        createElement("div", { key: "title", style: titleStyle }, title),
-        createElement("div", { key: "subtitle", style: subtitleStyle }, subtitle),
-        createElement(
-          "div",
-          { key: "body", style: { display: "flex", flex: 1, minHeight: 0 } },
-          body,
-        ),
-      ]),
+      <div style={wrapperStyle}>
+        <div style={titleStyle}>{title}</div>
+        {subtitle ? <div style={subtitleStyle}>{subtitle}</div> : null}
+        <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+          {body}
+        </div>
+      </div>,
     );
   } catch (error) {
     return componentFailure(

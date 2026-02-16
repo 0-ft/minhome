@@ -22,6 +22,8 @@ export const DisplayConfigSchema = z.object({
   refresh_rate: z.number().positive().default(300),
   /** Display layout orientation. */
   orientation: z.enum(["landscape", "portrait"]).default("landscape"),
+  /** PNG color depth in bits per pixel (1 -> 2 colours, 2 -> 4 colours). */
+  color_depth: z.number().int().min(1).max(2).default(1),
   /** Provisioned TRMNL devices keyed by MAC address. */
   devices: z.record(z.string(), z.object({
     token: z.string().min(1),

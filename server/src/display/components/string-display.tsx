@@ -1,4 +1,4 @@
-import { createElement, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { z } from "zod";
 import { componentSuccess, type DisplayComponentResult } from "./component-result.js";
 
@@ -17,12 +17,10 @@ export function createStringDisplayElement(
   width: number,
   height: number,
 ): DisplayComponentResult {
+  const baseSize = Math.min(width, height);
   const borderWidth = Math.max(1, Math.round(config.border_width ?? 2));
   const padding = Math.max(0, Math.round(config.padding ?? 10));
-  const computedFontSize = Math.max(
-    12,
-    Math.round(config.font_size ?? Math.min(width, height) * 0.2),
-  );
+  const computedFontSize = Math.max(12, Math.round(config.font_size ?? baseSize * 0.2));
 
   const style: CSSProperties = {
     width,
@@ -42,9 +40,9 @@ export function createStringDisplayElement(
     lineHeight: 1.2,
   };
 
-  return componentSuccess(createElement(
-    "div",
-    { style },
-    config.text,
-  ));
+  return componentSuccess(
+    <div style={style}>
+      {config.text}
+    </div>,
+  );
 }

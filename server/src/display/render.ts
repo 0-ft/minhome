@@ -4,6 +4,7 @@ import { Resvg } from "@resvg/resvg-js";
 import type { ReactElement } from "react";
 import type { TileComponentConfig } from "./tiles.js";
 import { createCalendarDisplayElement } from "./components/calendar-display.js";
+import { createColorTestElement } from "./components/color-test.js";
 import { type DisplayComponentResult, componentFailure } from "./components/component-result.js";
 import { createErrorDisplayElement } from "./components/error-display.js";
 import { createStringDisplayElement } from "./components/string-display.js";
@@ -81,6 +82,12 @@ export async function renderComponentToPngBuffer(
     case "string_display":
       return renderResultToPngBuffer(
         createStringDisplayElement(component, width, height),
+        width,
+        height,
+      );
+    case "color_test":
+      return renderResultToPngBuffer(
+        createColorTestElement(component, width, height),
         width,
         height,
       );

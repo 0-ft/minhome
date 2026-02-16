@@ -5,7 +5,7 @@
  *   GET  /display/api/setup   – device registration
  *   GET  /display/api/display – polling endpoint (image URL + refresh rate)
  *   POST /display/api/log     – device log ingestion
- *   GET  /display/image       – 800×480 1-bit PNG
+ *   GET  /display/image       – 800×480 PNG (configurable colour depth)
  */
 
 import { Hono } from "hono";
@@ -150,6 +150,11 @@ function resolveTilesForImage(device: DeviceMatch | undefined): TileConfig[] {
   return defaultTiles("Configure display tiles");
 }
 
+function getPaletteColourCount(colorDepth: DisplayConfig["color_depth"]): 2 | 4 {
+  if (colorDepth === 2) return 4;
+  return 2;
+}
+
 async function renderTileWithFallback(
   tile: TileConfig,
   width: number,
@@ -174,6 +179,7 @@ async function renderTileWithFallback(
 async function generateImage(
   device: DeviceMatch | undefined,
   orientation: DisplayConfig["orientation"],
+  colorDepth: DisplayConfig["color_depth"],
   dimensions: DisplayDimensions,
 ): Promise<Buffer> {
   const renderSize = getRenderDimensions(orientation, dimensions);
@@ -200,14 +206,15 @@ async function generateImage(
   })
     .composite(compositeInputs)
     .flatten({ background: "#ffffff" })
-    .grayscale()
-    .threshold(128);
+    .grayscale();
 
   if (orientation === "portrait") {
     image = image.rotate(90);
   }
 
-  return image.png({ colours: 2 }).toBuffer();
+  // Quantize after rendering so both 1-bit and 2-bit use the same pipeline.
+  const colours = getPaletteColourCount(colorDepth);
+  return image.png({ palette: true, colours, dither: 0 }).toBuffer();
 }
 
 export function createDisplayRoute(config: ConfigStore) {
@@ -327,14 +334,22 @@ export function createDisplayRoute(config: ConfigStore) {
       undefined;
 
     const start = Date.now();
-    const png = await generateImage(matchedDevice, cfg.orientation, dimensions);
+    const png = await generateImage(matchedDevice, cfg.orientation, cfg.color_depth, dimensions);
+    const paletteColours = getPaletteColourCount(cfg.color_depth);
     console.log(
       `[display/image] Rendered ${png.length} bytes in ${Date.now() - start}ms` +
       ` mac=${matchedDevice?.mac ?? "unknown"} orientation=${cfg.orientation}` +
-      ` width=${dimensions.width} height=${dimensions.height}`,
+      ` width=${dimensions.width} height=${dimensions.height}` +
+      ` color_depth=${cfg.color_depth} colours=${paletteColours}`,
     );
     return new Response(new Uint8Array(png), {
-      headers: { "Content-Type": "image/png", "Cache-Control": "no-cache, no-store" },
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-cache, no-store",
+        "X-Display-Color-Depth": String(cfg.color_depth),
+        "X-Display-Colours": String(paletteColours),
+        "X-Display-Indexed": "true",
+      },
     });
   });
 
