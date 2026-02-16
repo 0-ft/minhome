@@ -168,6 +168,9 @@ importers:
       hono:
         specifier: ^4.11.8
         version: 4.11.8
+      lucide-static:
+        specifier: ^0.564.0
+        version: 0.564.0
       mqtt:
         specifier: ^5.15.0
         version: 5.15.0
@@ -183,6 +186,9 @@ importers:
       react-dom:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.13)(react@19.2.4)
       satori:
         specifier: ^0.19.2
         version: 0.19.2
@@ -2192,6 +2198,9 @@ packages:
     resolution: {integrity: sha512-8dXPB2GI4dI8jV4MgUDGBeLdGk8ekfqVZ0BdLcrRzocGgG75ltNEmWS+gE7uokKF/0oSUuczNDT+g9hFJ23FkA==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  lucide-static@0.564.0:
+    resolution: {integrity: sha512-SfECSvMnoIPa8ZuH4Ubtjc1ZWSxLpPy9yhHt+0DR8vvMEFWxw0gjX2INCNkIXWllFsiJDO4d9iye6cXvIxMG0Q==}
 
   maath@0.10.8:
     resolution: {integrity: sha512-tRvbDF0Pgqz+9XUa4jjfgAQ8/aPKmQdWXilFu2tMy4GWj4NOsx99HlULO4IeREfbO3a0sA145DZYyvXPkybm0g==}
@@ -4948,6 +4957,8 @@ snapshots:
   lucide-react@0.563.0(react@19.2.4):
     dependencies:
       react: 19.2.4
+
+  lucide-static@0.564.0: {}
 
   maath@0.10.8(@types/three@0.182.0)(three@0.182.0):
     dependencies:

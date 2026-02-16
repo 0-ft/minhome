@@ -132,18 +132,22 @@ function regionToPixels(
   };
 }
 
-function insetRect(
+function applyTileGutter(
+  region: TileConfig["region"],
   rect: { left: number; top: number; width: number; height: number },
-  insetX: number,
-  insetY: number,
+  gutter: number,
 ): { left: number; top: number; width: number; height: number } {
-  const safeInsetX = Math.max(0, Math.min(Math.floor((rect.width - 1) / 2), insetX));
-  const safeInsetY = Math.max(0, Math.min(Math.floor((rect.height - 1) / 2), insetY));
+  const epsilon = 1e-6;
+  const touchesRightEdge = (region.x + region.w) >= (1 - epsilon);
+  const touchesBottomEdge = (region.y + region.h) >= (1 - epsilon);
+  const rightGutter = touchesRightEdge ? 0 : gutter;
+  const bottomGutter = touchesBottomEdge ? 0 : gutter;
+
   return {
-    left: rect.left + safeInsetX,
-    top: rect.top + safeInsetY,
-    width: Math.max(1, rect.width - (safeInsetX * 2)),
-    height: Math.max(1, rect.height - (safeInsetY * 2)),
+    left: rect.left,
+    top: rect.top,
+    width: Math.max(1, rect.width - rightGutter),
+    height: Math.max(1, rect.height - bottomGutter),
   };
 }
 
@@ -187,12 +191,11 @@ async function buildDisplayRootElement(
   const tiles = resolveTilesForImage(device);
   const tilePadding = Math.max(0, Math.round(device?.display.tile_padding ?? 0));
   const tileGutter = Math.max(0, Math.round(device?.display.tile_gutter ?? 0));
-  const halfGutter = Math.round(tileGutter / 2);
   const tileElements: ReactElement[] = [];
 
   for (const tile of tiles) {
     const regionPixels = regionToPixels(tile.region, renderSize.width, renderSize.height);
-    const pixelRegion = insetRect(regionPixels, halfGutter, halfGutter);
+    const pixelRegion = applyTileGutter(tile.region, regionPixels, tileGutter);
     const tileElement = await createComponentElement(
       tile.component,
       calendarSourceProvider,
@@ -245,7 +248,7 @@ async function buildDisplayRootElement(
         display: "flex",
         flexDirection: "column",
         position: "relative",
-        backgroundColor: "#808080",
+        backgroundColor: "#909090",
         overflow: "hidden",
         fontFamily: "DejaVu Sans",
       },

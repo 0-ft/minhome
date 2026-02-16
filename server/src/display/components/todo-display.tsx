@@ -1,4 +1,6 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactElement } from "react";
+import * as LucideStatic from "lucide-static";
+import ReactMarkdown from "react-markdown";
 import { z } from "zod";
 import type { TodoList } from "../../config/todos.js";
 import { componentFailure, componentSuccess, type DisplayComponentResult } from "./component-result.js";
@@ -8,7 +10,7 @@ export const TodoDisplayComponentConfigSchema = z.object({
   list_id: z.string().trim().min(1),
   title: z.string().trim().min(1).optional(),
   max_items: z.number().int().positive().default(8),
-  show_completed: z.boolean().default(false),
+  status_filter: z.array(z.string().trim().min(1)).optional(),
 });
 
 export type TodoDisplayComponentConfig = z.infer<typeof TodoDisplayComponentConfigSchema>;
@@ -17,31 +19,63 @@ export interface TodoListProvider {
   getTodoList(listId: string): TodoList | undefined;
 }
 
-function getCompletedStatuses(list: TodoList): Set<string> {
-  // Only treat statuses as "completed-like" when they are explicitly configured on the list.
-  const completed = new Set<string>();
-  for (const column of list.columns) {
-    const normalized = column.status.trim().toLowerCase();
-    if (normalized === "done" || normalized === "cancelled") {
-      completed.add(column.status);
-    }
+function getLucideIconSvgByName(name: string | undefined): string | null {
+  if (!name) return null;
+  const maybeSvg = (LucideStatic as Record<string, unknown>)[name];
+  if (typeof maybeSvg !== "string") return null;
+  return maybeSvg.replaceAll("currentColor", "#000");
+}
+
+function svgToDataUri(svg: string): string {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function renderInlineMarkdownTitle(title: string): ReactElement {
+  try {
+    return (
+      <ReactMarkdown
+        allowedElements={["p", "em", "strong", "code"]}
+        unwrapDisallowed
+        skipHtml
+        components={{
+          p: ({ children }) => <span style={{ whiteSpace: "pre" }}>{children}</span>,
+          em: ({ children }) => (
+            <span
+              style={{
+                transform: "skewX(-12deg)",
+                transformOrigin: "left center",
+                fontStyle: "normal",
+                fontWeight: 400,
+              }}
+            >
+              {children}
+            </span>
+          ),
+          strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
+          code: ({ children }) => (
+            <span
+              style={{
+                fontFamily: "DejaVu Sans Mono",
+                padding: 0,
+                fontSize: "1em",
+                lineHeight: "1.3",
+                verticalAlign: "baseline",
+                color: "inherit",
+                backgroundColor: "transparent",
+                whiteSpace: "pre",
+              }}
+            >
+              {children}
+            </span>
+          ),
+        }}
+      >
+        {title}
+      </ReactMarkdown>
+    );
+  } catch {
+    return <span>{title}</span>;
   }
-  return completed;
-}
-
-function isOutstandingStatus(list: TodoList, status: TodoList["items"][number]["status"]): boolean {
-  const completed = getCompletedStatuses(list);
-  if (completed.size === 0) return true;
-  return !completed.has(status);
-}
-
-function statusPrefix(list: TodoList, status: TodoList["items"][number]["status"]): string {
-  const normalized = status.trim().toLowerCase();
-  if (normalized === "done") return "[x]";
-  if (normalized === "cancelled") return "[-]";
-  if (normalized === "backlog") return "[ ]";
-  if (normalized === "todo") return "[>]";
-  return list.columns.some((column) => column.status === status) ? "[•]" : "[?]";
 }
 
 export function createTodoDisplayElement(
@@ -57,13 +91,15 @@ export function createTodoDisplayElement(
     );
   }
 
-  const titleFontSize = 24;
-  const itemFontSize = 15;
+  const titleFontSize = 18;
+  const itemFontSize = 22;
   const rowGap = 4;
 
-  const sourceItems = config.show_completed
-    ? list.items
-    : list.items.filter((item) => isOutstandingStatus(list, item.status));
+  const statusFilter = new Set(config.status_filter ?? []);
+  const statusIconByStatus = new Map(list.columns.map((column) => [column.status, column.icon]));
+  const sourceItems = statusFilter.size > 0
+    ? list.items.filter((item) => statusFilter.has(item.status))
+    : list.items;
   const items = sourceItems.slice(0, config.max_items);
 
   const containerStyle: CSSProperties = {
@@ -97,19 +133,25 @@ export function createTodoDisplayElement(
 
   const rowStyle: CSSProperties = {
     display: "flex",
-    alignItems: "baseline",
-    gap: Math.max(4, Math.round(itemFontSize * 0.4)),
+    alignItems: "center",
+    gap: 6,
     fontSize: itemFontSize,
     lineHeight: 1.3,
     overflow: "hidden",
   };
 
-  const rowPrefixStyle: CSSProperties = {
+  const rowIconWrapStyle: CSSProperties = {
     flex: "0 0 auto",
-    fontFamily: "DejaVu Sans Mono, monospace",
+    width: itemFontSize,
+    height: itemFontSize,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   };
 
   const rowTitleStyle: CSSProperties = {
+    display: "block",
+    flex: 1,
     minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -121,12 +163,25 @@ export function createTodoDisplayElement(
       <div style={titleStyle}>{config.title ?? list.name}</div>
       <div style={listStyle}>
         {items.length > 0 ? (
-          items.map((item) => (
-            <div key={item.id} style={rowStyle}>
-              <span style={rowPrefixStyle}>{statusPrefix(list, item.status)}</span>
-              <span style={rowTitleStyle}>{item.title}</span>
-            </div>
-          ))
+          items.map((item) => {
+            const iconSvg = getLucideIconSvgByName(statusIconByStatus.get(item.status));
+            const iconSrc = iconSvg ? svgToDataUri(iconSvg) : null;
+            return (
+              <div key={item.id} style={rowStyle}>
+                <span style={rowIconWrapStyle}>
+                  {iconSrc ? (
+                    <img
+                      src={iconSrc}
+                      width={itemFontSize}
+                      height={itemFontSize}
+                      style={{ display: "block" }}
+                    />
+                  ) : null}
+                </span>
+                <span style={rowTitleStyle}>{renderInlineMarkdownTitle(item.title)}</span>
+              </div>
+            );
+          })
         ) : (
           <div style={rowStyle}>No items</div>
         )}

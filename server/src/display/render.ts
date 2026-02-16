@@ -12,24 +12,87 @@ import { createStringDisplayElement } from "./components/string-display.js";
 import { createTodoDisplayElement, type TodoListProvider } from "./components/todo-display.js";
 
 const FONT_NAME = "DejaVu Sans";
-const FONT_CANDIDATES = [
-  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-  "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+const FONT_MONO_NAME = "DejaVu Sans Mono";
+type FontFaceSpec = {
+  name?: string;
+  weight: 400 | 700;
+  style: "normal" | "italic";
+  candidates: string[];
+  required?: boolean;
+};
+
+const FONT_FACE_SPECS: FontFaceSpec[] = [
+  {
+    weight: 400,
+    style: "normal",
+    required: true,
+    candidates: [
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    ],
+  },
+  {
+    weight: 700,
+    style: "normal",
+    candidates: [
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+      "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+    ],
+  },
+  {
+    weight: 400,
+    style: "italic",
+    candidates: [
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
+      "/usr/share/fonts/dejavu/DejaVuSans-Oblique.ttf",
+    ],
+  },
+  {
+    name: FONT_MONO_NAME,
+    weight: 400,
+    style: "normal",
+    candidates: [
+      "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+      "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
+    ],
+  },
 ];
 
-let cachedFontData: Buffer | null = null;
+let cachedFontFaces: Array<{
+  name: string;
+  data: Buffer;
+  weight: 400 | 700;
+  style: "normal" | "italic";
+}> | null = null;
 
-function getFontData(): Buffer {
-  if (cachedFontData) return cachedFontData;
+function getFontFaces() {
+  if (cachedFontFaces) return cachedFontFaces;
 
-  for (const candidate of FONT_CANDIDATES) {
-    if (existsSync(candidate)) {
-      cachedFontData = readFileSync(candidate);
-      return cachedFontData;
+  const faces: Array<{
+    name: string;
+    data: Buffer;
+    weight: 400 | 700;
+    style: "normal" | "italic";
+  }> = [];
+
+  for (const spec of FONT_FACE_SPECS) {
+    const candidate = spec.candidates.find((path) => existsSync(path));
+    if (!candidate) {
+      if (spec.required) {
+        throw new Error(`Unable to find required display font. Tried: ${spec.candidates.join(", ")}`);
+      }
+      continue;
     }
+    faces.push({
+      name: spec.name ?? FONT_NAME,
+      data: readFileSync(candidate),
+      weight: spec.weight,
+      style: spec.style,
+    });
   }
 
-  throw new Error(`Unable to find a display font. Tried: ${FONT_CANDIDATES.join(", ")}`);
+  cachedFontFaces = faces;
+  return cachedFontFaces;
 }
 
 export async function renderElementToPngBuffer(
@@ -40,14 +103,7 @@ export async function renderElementToPngBuffer(
   const svg = await satori(element, {
     width,
     height,
-    fonts: [
-      {
-        name: FONT_NAME,
-        data: getFontData(),
-        weight: 400,
-        style: "normal",
-      },
-    ],
+    fonts: getFontFaces(),
   });
 
   const resvg = new Resvg(svg);
