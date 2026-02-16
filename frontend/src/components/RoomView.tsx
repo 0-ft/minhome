@@ -204,7 +204,7 @@ function DragOverlay({
         {/* Track ring */}
         <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
         {/* Brightness arc — fills clockwise from 12 o'clock */}
-        {hasBrightness && (
+        {hasBrightness && pct > 0 && (
           <circle
             cx="50" cy="50" r={R}
             fill="none"
@@ -218,7 +218,7 @@ function DragOverlay({
         )}
         {/* Percentage text */}
         <text
-          x="50" y={hasColor ? "48" : "52"}
+          x="50" y="52"
           textAnchor="middle"
           dominantBaseline="central"
           fontSize="14"
@@ -227,16 +227,6 @@ function DragOverlay({
         >
           {pct}%
         </text>
-        {/* Colour swatch dot */}
-        {hasColor && (
-          <circle
-            cx="50" cy="62"
-            r="4.5"
-            fill={`hsl(${hue}, ${saturation}%, 50%)`}
-            stroke="rgba(255,255,255,0.15)"
-            strokeWidth="0.5"
-          />
-        )}
         {/* Drag direction hints */}
         <text
           x="50" y="92"
@@ -338,7 +328,7 @@ function LightOrb({
   }, [colorTemp, colorMode, effectiveHue, effectiveSat, hasColor, dragState]);
 
   const normalizedBr = effectiveBrightness / 254;
-  const targetIntensity = effectiveIsOn ? normalizedBr * 3 : 0;
+  const targetIntensity = effectiveIsOn ? normalizedBr * 4 : 0;
   const targetEmissive = effectiveIsOn ? 0.6 + normalizedBr * 1.4 : 0;
   const targetOpacity = effectiveIsOn ? 0.92 : 0.55;
   const radius = light.type === "ceiling" ? 0.1 : 0.06;
@@ -522,8 +512,8 @@ function LightOrb({
       <pointLight
         ref={pointLightRef}
         intensity={0}
-        distance={light.type === "ceiling" ? 8 : 3.5}
-        decay={2}
+        distance={light.type === "ceiling" ? 14 : 7}
+        decay={1.5}
         castShadow
         shadow-mapSize-width={512}
         shadow-mapSize-height={512}

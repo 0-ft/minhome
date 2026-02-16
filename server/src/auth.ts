@@ -70,8 +70,8 @@ export function authMiddleware(): MiddlewareHandler {
       return next();
     }
 
-    // Only protect API routes and WebSocket
-    if (!path.startsWith("/api/") && path !== "/ws") {
+    // Only protect API routes, WebSocket, and display endpoints
+    if (!path.startsWith("/api/") && !path.startsWith("/display/") && path !== "/ws") {
       return next();
     }
 

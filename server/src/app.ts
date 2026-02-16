@@ -9,6 +9,7 @@ import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { createChatRoute } from "./chat/index.js";
 import { authMiddleware, authRoutes } from "./auth.js";
+import { createDisplayRoute } from "./display.js";
 import { buildDeviceResponse, type ToolContext, type VoiceDeviceInfo } from "./tools.js";
 import { createVoiceWSHandler, type AudioStreamRegistry, type BridgeRef } from "./voice.js";
 import { SharedAudioSource } from "./audio-utils.js";
@@ -42,6 +43,9 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
   // --- Auth (no-ops when AUTH_PASSWORD is unset) ---
   app.route("/", authRoutes());
   app.use("*", authMiddleware());
+
+  // --- TRMNL e-ink display ---
+  app.route("/", createDisplayRoute(config));
 
   // --- AI Chat ---
   app.route("/", createChatRoute(toolCtx));

@@ -29,6 +29,11 @@
 - [x] Automations to invoke the tools
 - [x] Sensors in room
 - [ ] Log partial/scroll loading
-- [ ] Voice system prompt/voice in tool
+- [x] Voice system prompt/voice in tool
 - [ ] Tool for triggering automation
 - [ ] Proper error display if no API connection
+- [ ] Fix immediate automation timing
+- [ ] Multiple device sets per invocation
+- [ ] TRMNL server
+- [ ] Dev tunnel
+- [ ] Display & voice PE auto flashing from device

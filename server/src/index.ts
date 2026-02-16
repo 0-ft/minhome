@@ -63,7 +63,7 @@ if (existsSync(frontendDist)) {
   app.use("/*", serveStatic({ root: frontendDist }));
   // SPA fallback: serve index.html for non-API, non-WS, non-MCP routes
   app.get("*", async (c, next) => {
-    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path.startsWith("/audio/") || c.req.path === "/mcp") return next();
+    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path.startsWith("/audio/") || c.req.path.startsWith("/display/") || c.req.path === "/mcp") return next();
     return serveStatic({ root: frontendDist, path: "index.html" })(c, next);
   });
 }

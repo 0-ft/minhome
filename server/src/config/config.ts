@@ -16,10 +16,18 @@ export const VoiceOptions = ["alloy", "ash", "ballad", "coral", "echo", "sage", 
 export const VoiceSchema = z.enum(VoiceOptions);
 export type Voice = z.infer<typeof VoiceSchema>;
 
+export const DisplayConfigSchema = z.object({
+  /** How often the device should refresh, in seconds. */
+  refresh_rate: z.number().positive().default(300),
+});
+
+export type DisplayConfig = z.infer<typeof DisplayConfigSchema>;
+
 const ConfigSchema = z.object({
   devices: z.record(z.string(), DeviceConfigSchema).default({}),
   room: RoomSchema.optional(),
   voice: VoiceSchema.optional(),
+  display: DisplayConfigSchema.optional(),
   /** Maximum debug log file size in MB before old entries are dropped. Default 10. */
   debugLogMaxSizeMB: z.number().positive().default(10),
 });
@@ -78,6 +86,17 @@ export class ConfigStore {
   setVoice(voice: Voice): void {
     this.reload();
     this.data.voice = voice;
+    this.save();
+  }
+
+  getDisplay(): DisplayConfig {
+    this.reload();
+    return this.data.display ?? DisplayConfigSchema.parse({});
+  }
+
+  setDisplay(display: DisplayConfig): void {
+    this.reload();
+    this.data.display = display;
     this.save();
   }
 
