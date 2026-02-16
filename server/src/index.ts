@@ -3,6 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { createApp } from "./app.js";
 import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config/config.js";
+import { TodoStore } from "./config/todos.js";
 import { TokenStore } from "./config/tokens.js";
 import { AutomationEngine } from "./automations.js";
 import { createTools } from "./tools.js";
@@ -17,6 +18,7 @@ const DATA_DIR = process.env.DATA_DIR;
 if (!DATA_DIR) throw new Error("DATA_DIR environment variable is required");
 
 const configPath = resolve(DATA_DIR, "config.json");
+const todosPath = resolve(DATA_DIR, "todos.json");
 const tokensPath = resolve(DATA_DIR, "tokens.json");
 const automationsPath = resolve(DATA_DIR, "automations.json");
 const debugLogPath = resolve(DATA_DIR, "debug.jsonl");
@@ -27,6 +29,7 @@ console.log(`[server] Automations: ${automationsPath}`);
 
 // Load config first so we can read debugLogMaxSizeMB
 const config = new ConfigStore(configPath);
+const todos = new TodoStore(todosPath);
 const tokens = new TokenStore(tokensPath);
 
 // Initialise file-backed debug log before anything else uses it
@@ -47,10 +50,10 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
   },
 });
 
-const { app, injectWebSocket, toolCtx } = createApp(bridge, config, automationEngine, tokens);
+const { app, injectWebSocket, toolCtx } = createApp(bridge, config, todos, automationEngine, tokens);
 
 // Mount in-process MCP server at /mcp (for Cursor IDE remote MCP)
-app.route("/", createMcpRoute({ bridge, config, automations: automationEngine }));
+app.route("/", createMcpRoute(toolCtx));
 
 // Auto-populate entity configs when Z2M device list arrives
 bridge.on("devices", (devices: unknown) => {

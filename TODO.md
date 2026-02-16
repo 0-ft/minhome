@@ -35,8 +35,14 @@
 - [ ] Fix immediate automation timing
 - [ ] Multiple device sets per invocation
 - [x] TRMNL server
-- [x] Dev tunnel
+a - [x] Dev tunnel
 - [ ] Display & voice PE auto flashing from device
-- [ ] ConfigStore and AutomationEngine and TokenStore should share a base class
+- [ ] ConfigStore and AutomationEngine and TokenStore and TodoStore should share a base class
 - [ ] Automation edits auto-save
-- [ ] Centralise calendar support, allowing access from models
+- [x] Centralise calendar support, allowing access from models
+- [x] Todo lists
+- [ ] System prompt to use XML structuring
+- [ ] Global data access to avoid passing bits around
+- [ ] Voice chat should be persistent
+- [ ] Emoji pickers everywhere
+- [x] Todo markdown mermaid

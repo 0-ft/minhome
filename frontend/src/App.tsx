@@ -6,13 +6,14 @@ import { EntitiesView } from "./components/EntitiesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { RoomView } from "./components/RoomView.js";
 import { RoomFullView } from "./components/RoomFullView.js";
+import { TodosView } from "./components/TodosView.js";
 import { DebugView } from "./components/DebugView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { LoginPage } from "./components/LoginPage.js";
 import { MessageSquare, LogOut } from "lucide-react";
 import { Logo } from "./components/Logo.js";
 
-const TABS = ["entities", "devices", "automations", "room"] as const;
+const TABS = ["entities", "devices", "automations", "room", "todos"] as const;
 type Tab = (typeof TABS)[number];
 
 const MIN_CHAT_WIDTH = 300;
@@ -50,7 +51,7 @@ function AuthenticatedApp({ showLogout }: { showLogout: boolean }) {
 function MainLayout({ showLogout }: { showLogout: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const tab = (TABS.find((t) => location.pathname === `/${t}`) ?? "entities") as Tab;
+  const tab = (TABS.find((t) => location.pathname === `/${t}` || location.pathname.startsWith(`/${t}/`)) ?? "entities") as Tab;
   const logout = useLogout();
   const [chatOpen, setChatOpen] = useState(
     () => window.matchMedia("(min-width: 768px)").matches,
@@ -152,6 +153,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
             <Route path="devices" element={<div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div>} />
             <Route path="automations" element={<div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div>} />
             <Route path="room" element={<div className="h-full p-4"><RoomView /></div>} />
+            <Route path="todos/*" element={<div className="max-w-6xl mx-auto px-6 py-8"><TodosView /></div>} />
             <Route path="*" element={<Navigate to="/404" replace />} />
           </Routes>
         </main>

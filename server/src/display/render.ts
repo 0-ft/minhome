@@ -9,6 +9,7 @@ import { createColorTestElement } from "./components/color-test.js";
 import { type DisplayComponentResult, componentFailure } from "./components/component-result.js";
 import { createErrorDisplayElement } from "./components/error-display.js";
 import { createStringDisplayElement } from "./components/string-display.js";
+import { createTodoDisplayElement, type TodoListProvider } from "./components/todo-display.js";
 
 const FONT_NAME = "DejaVu Sans";
 const FONT_CANDIDATES = [
@@ -73,6 +74,7 @@ function renderResultToElement(
 export async function createComponentElement(
   component: TileComponentConfig,
   calendarSourceProvider: CalendarSourceProvider,
+  todoListProvider: TodoListProvider,
   width: number,
   height: number,
 ): Promise<ReactElement> {
@@ -102,6 +104,12 @@ export async function createComponentElement(
       }
       return renderResultToElement(result, width, height);
     }
+    case "todo_display":
+      return renderResultToElement(
+        createTodoDisplayElement(component, todoListProvider, width, height),
+        width,
+        height,
+      );
     default: {
       const _exhaustive: never = component;
       throw new Error(`Unsupported tile component: ${String(_exhaustive)}`);

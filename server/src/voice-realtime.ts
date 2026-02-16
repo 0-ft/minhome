@@ -175,6 +175,7 @@ export class RealtimeSession {
     const system = buildSystemPrompt(
       this.toolCtx.bridge,
       this.toolCtx.config,
+      this.toolCtx.todos,
       this.toolCtx.automations,
       this.toolCtx.voiceDevices,
     );

@@ -1,5 +1,6 @@
 import type { MqttBridge } from "../mqtt.js";
 import type { ConfigStore } from "../config/config.js";
+import type { TodoStore } from "../config/todos.js";
 import type { AutomationEngine } from "../automations.js";
 import type { VoiceDeviceInfo } from "../tools.js";
 import { extractEntitiesFromExposes, buildEntityResponses } from "../config/devices.js";
@@ -7,6 +8,7 @@ import { extractEntitiesFromExposes, buildEntityResponses } from "../config/devi
 export function buildSystemPrompt(
   bridge: MqttBridge,
   config: ConfigStore,
+  todos: TodoStore,
   automations: AutomationEngine,
   voiceDevices?: Map<string, VoiceDeviceInfo>,
 ): string {
@@ -42,6 +44,16 @@ export function buildSystemPrompt(
     name: a.name,
     enabled: a.enabled,
   }));
+  const promptTodoLists = todos.getPromptLists().map((list) => ({
+    id: list.id,
+    name: list.name,
+    items: list.items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      body: item.body,
+      status: item.status,
+    })),
+  }));
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/London" });
@@ -57,6 +69,10 @@ ${JSON.stringify(devices, null, 2)}
 
 Current automations:
 ${JSON.stringify(allAutomations, null, 2)}
+${promptTodoLists.length > 0 ? `
+Current todo lists (outstanding items only):
+${JSON.stringify(promptTodoLists, null, 2)}
+` : ""}
 ${voiceDevices && voiceDevices.size > 0 ? `
 Connected voice devices:
 ${JSON.stringify([...voiceDevices.entries()].map(([id, info]) => ({ id, name: info.name, model: info.model })), null, 2)}

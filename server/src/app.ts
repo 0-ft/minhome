@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { MqttBridge } from "./mqtt.js";
 import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, resolveEntityPayload } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
+import { TodoStatusSchema, type TodoStore } from "./config/todos.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
@@ -16,7 +17,13 @@ import { createVoiceWSHandler, type AudioStreamRegistry, type BridgeRef } from "
 import { SharedAudioSource } from "./audio-utils.js";
 import { debugLog, type DebugLogType } from "./debug-log.js";
 
-export function createApp(bridge: MqttBridge, config: ConfigStore, automations: AutomationEngine, tokens: TokenStore) {
+export function createApp(
+  bridge: MqttBridge,
+  config: ConfigStore,
+  todos: TodoStore,
+  automations: AutomationEngine,
+  tokens: TokenStore,
+) {
   const app = new Hono();
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
@@ -39,14 +46,14 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
     bridgeRef.current.send(JSON.stringify(msg));
   };
 
-  const toolCtx: ToolContext = { bridge, config, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
+  const toolCtx: ToolContext = { bridge, config, todos, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
 
   // --- Auth (no-ops when AUTH_PASSWORD is unset) ---
   app.route("/", authRoutes());
   app.use("*", authMiddleware(tokens));
 
   // --- TRMNL e-ink display ---
-  app.route("/", createDisplayRoute(config));
+  app.route("/", createDisplayRoute(config, todos));
 
   // --- AI Chat ---
   app.route("/", createChatRoute(toolCtx));
@@ -121,6 +128,161 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
     // --- Config ---
     .get("/api/config", (c) => {
       return c.json(config.get());
+    })
+
+    // --- Todos ---
+    .get("/api/todos", (c) => {
+      return c.json(todos.getAllLists());
+    })
+
+    .post("/api/todos/lists",
+      zValidator("json", z.object({
+        id: z.string().trim().min(1),
+        name: z.string().trim().min(1),
+        include_in_system_prompt: z.boolean().optional(),
+        view: z.enum(["list", "kanban"]).optional(),
+        columns: z.array(z.object({
+          status: z.string().trim().min(1),
+          collapsed: z.boolean().optional(),
+          icon: z.string().optional(),
+        })).min(1).optional(),
+      })),
+      (c) => {
+        const body = c.req.valid("json");
+        try {
+          const list = todos.createList({
+            id: body.id,
+            name: body.name,
+            includeInSystemPrompt: body.include_in_system_prompt,
+            view: body.view,
+            columns: body.columns?.map((column) => ({
+              status: column.status,
+              collapsed: column.collapsed ?? false,
+              icon: column.icon,
+            })),
+          });
+          return c.json(list, 201);
+        } catch (e: unknown) {
+          const message = (e as Error).message;
+          const code = message.includes("already exists") ? 409 : 400;
+          return c.json({ error: message }, code);
+        }
+      },
+    )
+
+    .get("/api/todos/:listId", (c) => {
+      const listId = c.req.param("listId");
+      const list = todos.getList(listId);
+      if (!list) return c.json({ error: "Todo list not found" }, 404);
+      return c.json(list);
+    })
+
+    .patch("/api/todos/:listId",
+      zValidator("json", z.object({
+        name: z.string().trim().min(1).optional(),
+        include_in_system_prompt: z.boolean().optional(),
+        view: z.enum(["list", "kanban"]).optional(),
+        columns: z.array(z.object({
+          status: z.string().trim().min(1),
+          collapsed: z.boolean().optional(),
+          icon: z.string().optional(),
+        })).min(1).optional(),
+      })),
+      (c) => {
+        const listId = c.req.param("listId");
+        const body = c.req.valid("json");
+        try {
+          const list = todos.updateList(listId, {
+            name: body.name,
+            includeInSystemPrompt: body.include_in_system_prompt,
+            view: body.view,
+            columns: body.columns?.map((column) => ({
+              status: column.status,
+              collapsed: column.collapsed ?? false,
+              icon: column.icon,
+            })),
+          });
+          return c.json({ ok: true, list });
+        } catch (e: unknown) {
+          const message = (e as Error).message;
+          const code = message.includes("not found") ? 404 : 400;
+          return c.json({ error: message }, code);
+        }
+      },
+    )
+
+    .delete("/api/todos/:listId", (c) => {
+      const listId = c.req.param("listId");
+      const removed = todos.deleteList(listId);
+      if (!removed) return c.json({ error: "Todo list not found" }, 404);
+      return c.json({ ok: true });
+    })
+
+    .put("/api/todos/:listId/items/:itemId",
+      zValidator("json", z.object({
+        title: z.string().optional(),
+        body: z.string().optional(),
+        status: TodoStatusSchema.optional(),
+        list_name: z.string().optional(),
+        include_in_system_prompt: z.boolean().optional(),
+      })),
+      (c) => {
+        const listId = c.req.param("listId");
+        const itemId = Number.parseInt(c.req.param("itemId"), 10);
+        if (!Number.isInteger(itemId) || itemId < 1) {
+          return c.json({ error: "Invalid todo item ID" }, 400);
+        }
+        const body = c.req.valid("json");
+        try {
+          const item = todos.upsertItem(
+            listId,
+            {
+              id: itemId,
+              title: body.title,
+              body: body.body,
+              status: body.status,
+            },
+            {
+              name: body.list_name,
+              includeInSystemPrompt: body.include_in_system_prompt,
+            },
+          );
+          return c.json({ ok: true, item });
+        } catch (e: unknown) {
+          return c.json({ error: (e as Error).message }, 400);
+        }
+      },
+    )
+
+    .patch("/api/todos/:listId/items/:itemId/status",
+      zValidator("json", z.object({ status: TodoStatusSchema })),
+      (c) => {
+        const listId = c.req.param("listId");
+        const itemId = Number.parseInt(c.req.param("itemId"), 10);
+        if (!Number.isInteger(itemId) || itemId < 1) {
+          return c.json({ error: "Invalid todo item ID" }, 400);
+        }
+        const { status } = c.req.valid("json");
+        try {
+          const item = todos.setItemStatus(listId, itemId, status);
+          return c.json({ ok: true, item });
+        } catch (e: unknown) {
+          const message = (e as Error).message;
+          const code = message.includes("not found") ? 404 : 400;
+          return c.json({ error: message }, code);
+        }
+      },
+    )
+
+    .delete("/api/todos/:listId/items/:itemId", (c) => {
+      const listId = c.req.param("listId");
+      const itemId = Number.parseInt(c.req.param("itemId"), 10);
+      if (!Number.isInteger(itemId) || itemId < 1) {
+        return c.json({ error: "Invalid todo item ID" }, 400);
+      }
+      const removed = todos.deleteItem(listId, itemId);
+      if (!removed) return c.json({ error: "Todo item not found" }, 404);
+      return c.json({ ok: true });
     })
 
     .get("/api/config/room", (c) => {
@@ -243,11 +405,13 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
           const onDevices = (data: unknown) => ws.send(JSON.stringify({ type: "devices", data }));
           const onConfigChange = () => ws.send(JSON.stringify({ type: "config_change" }));
           const onAutomationsChange = () => ws.send(JSON.stringify({ type: "automations_change" }));
+          const onTodosChange = () => ws.send(JSON.stringify({ type: "todos_change" }));
 
           bridge.on("state_change", onStateChange);
           bridge.on("devices", onDevices);
           bridge.on("config_change", onConfigChange);
           automations.onChanged(onAutomationsChange);
+          todos.onChanged(onTodosChange);
 
           // Store cleanup refs on the ws object
           (ws as unknown as Record<string, unknown>).__cleanup = () => {
@@ -255,6 +419,7 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
             bridge.off("devices", onDevices);
             bridge.off("config_change", onConfigChange);
             automations.offChanged(onAutomationsChange);
+            todos.offChanged(onTodosChange);
           };
         },
         onClose(_evt, ws) {

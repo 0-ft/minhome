@@ -1,8 +1,8 @@
 import { marked } from "marked";
 import { memo, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
-import rehypeRaw from "rehype-raw";
+import { MarkdownHooks } from "react-markdown";
 import { DeviceBadge, EntityBadge, AutomationBadge } from "./DeviceBadge.js";
+import { markdownRehypePlugins } from "./markdownPlugins.js";
 
 function parseMarkdownIntoBlocks(markdown: string): string[] {
   const tokens = marked.lexer(markdown);
@@ -18,12 +18,13 @@ const markdownComponents = {
 const MemoizedMarkdownBlock = memo(
   ({ content }: { content: string }) => {
     return (
-      <ReactMarkdown
-        rehypePlugins={[rehypeRaw]}
+      <MarkdownHooks
+        rehypePlugins={markdownRehypePlugins}
         components={markdownComponents}
+        fallback={<pre className="whitespace-pre-wrap">{content}</pre>}
       >
         {content}
-      </ReactMarkdown>
+      </MarkdownHooks>
     );
   },
   (prevProps, nextProps) => prevProps.content === nextProps.content,

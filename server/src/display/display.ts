@@ -13,9 +13,11 @@ import sharp from "sharp";
 import { createElement, type ReactElement } from "react";
 import type { CalendarSourceProvider } from "../calendar/service.js";
 import type { ConfigStore, DisplayDeviceConfig, DisplaysConfig } from "../config/config.js";
+import type { TodoStore } from "../config/todos.js";
 import { debugLog } from "../debug-log.js";
 import type { TileConfig } from "./tiles.js";
 import { createComponentElement, renderElementToPngBuffer } from "./render.js";
+import type { TodoListProvider } from "./components/todo-display.js";
 
 function normalizeMac(mac: string): string {
   return mac.replace(/[^a-fA-F0-9]/g, "").toLowerCase();
@@ -162,6 +164,7 @@ function getPaletteColourCount(colorDepth: DisplayDeviceConfig["color_depth"]): 
 async function generateImage(
   device: DeviceMatch | undefined,
   calendarSourceProvider: CalendarSourceProvider,
+  todoListProvider: TodoListProvider,
   orientation: DisplayDeviceConfig["orientation"],
   colorDepth: DisplayDeviceConfig["color_depth"],
   dimensions: DisplayDimensions,
@@ -175,6 +178,7 @@ async function generateImage(
     const tileElement = await createComponentElement(
       tile.component,
       calendarSourceProvider,
+      todoListProvider,
       pixelRegion.width,
       pixelRegion.height,
     );
@@ -232,11 +236,14 @@ async function generateImage(
   return image.png({ palette: true, colours, dither: 0 }).toBuffer();
 }
 
-export function createDisplayRoute(config: ConfigStore) {
+export function createDisplayRoute(config: ConfigStore, todos: TodoStore) {
   const display = new Hono();
   const calendarSourceProvider: CalendarSourceProvider = {
     getCalendarSource: (calendarId) => config.getCalendarSource(calendarId),
     getCalendars: () => config.getCalendars(),
+  };
+  const todoListProvider: TodoListProvider = {
+    getTodoList: (listId) => todos.getList(listId),
   };
 
   display.get("/display/api/setup", (c) => {
@@ -400,6 +407,7 @@ export function createDisplayRoute(config: ConfigStore) {
     const png = await generateImage(
       matchedDevice,
       calendarSourceProvider,
+      todoListProvider,
       orientation,
       colorDepth,
       dimensions,

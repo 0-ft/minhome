@@ -204,6 +204,197 @@ export function useDeleteAutomation() {
   });
 }
 
+// --- Todos ---
+
+export type TodoStatus = string;
+
+export interface TodoItem {
+  id: number;
+  title: string;
+  body: string;
+  status: TodoStatus;
+}
+
+export interface TodoColumn {
+  status: TodoStatus;
+  collapsed: boolean;
+  icon?: string;
+}
+
+export interface TodoList {
+  id: string;
+  name: string;
+  includeInSystemPrompt: boolean;
+  view: "list" | "kanban";
+  columns: TodoColumn[];
+  items: TodoItem[];
+}
+
+export function useTodoLists() {
+  return useQuery({
+    queryKey: ["todos"],
+    queryFn: async () => {
+      const res = await fetch("/api/todos");
+      if (!res.ok) throw new Error("Failed to fetch todo lists");
+      return res.json() as Promise<TodoList[]>;
+    },
+  });
+}
+
+export function useTodoList(listId: string | null) {
+  return useQuery({
+    queryKey: ["todos", listId],
+    enabled: Boolean(listId),
+    queryFn: async () => {
+      const res = await fetch(`/api/todos/${encodeURIComponent(listId!)}`);
+      if (!res.ok) throw new Error("Failed to fetch todo list");
+      return res.json() as Promise<TodoList>;
+    },
+  });
+}
+
+export function useCreateTodoList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { id: string; name: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: TodoColumn[] }) => {
+      const res = await fetch("/api/todos/lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to create todo list");
+      return data as TodoList;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["todos"] });
+    },
+  });
+}
+
+export function useUpdateTodoList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      listId,
+      patch,
+    }: {
+      listId: string;
+      patch: { name?: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: TodoColumn[] };
+    }) => {
+      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to update todo list");
+      return data as { ok: true; list: TodoList };
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["todos"] });
+      qc.invalidateQueries({ queryKey: ["todos", vars.listId] });
+    },
+  });
+}
+
+export function useDeleteTodoList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (listId: string) => {
+      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to delete todo list");
+      return data as { ok: true };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["todos"] });
+    },
+  });
+}
+
+export function useUpsertTodoItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      listId,
+      itemId,
+      patch,
+    }: {
+      listId: string;
+      itemId: number;
+      patch: {
+        title?: string;
+        body?: string;
+        status?: TodoStatus;
+        list_name?: string;
+        include_in_system_prompt?: boolean;
+      };
+    }) => {
+      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to upsert todo item");
+      return data as { ok: true; item: TodoItem };
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["todos"] });
+      qc.invalidateQueries({ queryKey: ["todos", vars.listId] });
+    },
+  });
+}
+
+export function useSetTodoItemStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      listId,
+      itemId,
+      status,
+    }: {
+      listId: string;
+      itemId: number;
+      status: TodoStatus;
+    }) => {
+      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to set todo status");
+      return data as { ok: true; item: TodoItem };
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["todos"] });
+      qc.invalidateQueries({ queryKey: ["todos", vars.listId] });
+    },
+  });
+}
+
+export function useDeleteTodoItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ listId, itemId }: { listId: string; itemId: number }) => {
+      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to delete todo item");
+      return data as { ok: true };
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["todos"] });
+      qc.invalidateQueries({ queryKey: ["todos", vars.listId] });
+    },
+  });
+}
+
 // --- Debug logs ---
 
 export interface DebugLogEntry {
@@ -334,6 +525,9 @@ export function useRealtimeUpdates() {
         }
         if (msg.type === "automations_change") {
           qc.invalidateQueries({ queryKey: ["automations"] });
+        }
+        if (msg.type === "todos_change") {
+          qc.invalidateQueries({ queryKey: ["todos"] });
         }
       } catch { /* ignore */ }
     };
