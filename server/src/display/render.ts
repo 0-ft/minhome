@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "fs";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
 import type { ReactElement } from "react";
+import type { CalendarSourceProvider } from "../calendar/service.js";
 import type { TileComponentConfig } from "./tiles.js";
 import { createCalendarDisplayElement } from "./components/calendar-display.js";
 import { createColorTestElement } from "./components/color-test.js";
@@ -75,6 +76,7 @@ async function renderResultToPngBuffer(
 
 export async function renderComponentToPngBuffer(
   component: TileComponentConfig,
+  calendarSourceProvider: CalendarSourceProvider,
   width: number,
   height: number,
 ): Promise<Buffer> {
@@ -94,7 +96,7 @@ export async function renderComponentToPngBuffer(
     case "calendar_display": {
       let result: DisplayComponentResult;
       try {
-        result = await createCalendarDisplayElement(component, width, height);
+        result = await createCalendarDisplayElement(component, calendarSourceProvider, width, height);
       } catch (error) {
         result = componentFailure(
           component.kind,

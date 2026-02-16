@@ -1,20 +1,23 @@
 import type { CSSProperties, ReactElement } from "react";
 import { z } from "zod";
 import {
-  CalendarViewOptions,
-  getCalendarEventsForView,
+  CalendarSource,
   type CalendarEvent,
-} from "./calendar-events.js";
+  type CalendarSourceProvider,
+} from "../../calendar/service.js";
 import {
   componentFailure,
   componentSuccess,
   type DisplayComponentResult,
 } from "./component-result.js";
 
+const CalendarDisplayViewOptions = ["day", "week", "month"] as const;
+type CalendarDisplayView = (typeof CalendarDisplayViewOptions)[number];
+
 export const CalendarDisplayComponentConfigSchema = z.object({
   kind: z.literal("calendar_display"),
-  source_url: z.string().url(),
-  view: z.enum(CalendarViewOptions).default("week"),
+  calendar_ids: z.array(z.string().trim().min(1)).min(1),
+  view: z.enum(CalendarDisplayViewOptions).default("week"),
   title: z.string().trim().min(1).optional(),
   max_events: z.number().int().positive().default(8),
   show_location: z.boolean().default(false),
@@ -57,6 +60,44 @@ function startOfWeek(date: Date): Date {
 function startOfMonthGrid(date: Date): Date {
   const monthStart = new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
   return startOfWeek(monthStart);
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
+}
+
+function getBoundsForView(view: CalendarDisplayView, now: Date): { start: Date; end: Date } {
+  if (view === "day") {
+    const start = startOfDay(now);
+    const end = addDays(start, 1);
+    return { start, end };
+  }
+
+  if (view === "week") {
+    const start = startOfWeek(now);
+    const end = addDays(start, 7);
+    return { start, end };
+  }
+
+  const start = startOfMonth(now);
+  const end = new Date(start.getFullYear(), start.getMonth() + 1, 1, 0, 0, 0, 0);
+  return { start, end };
+}
+
+function overlapsWindow(event: CalendarEvent, start: Date, end: Date): boolean {
+  return event.start < end && event.end >= start;
+}
+
+function getViewEvents(
+  events: CalendarEvent[],
+  view: CalendarDisplayView,
+  maxEvents: number,
+  now: Date,
+): CalendarEvent[] {
+  const { start, end } = getBoundsForView(view, now);
+  return events
+    .filter((event) => overlapsWindow(event, start, end))
+    .slice(0, Math.max(1, maxEvents));
 }
 
 function endOfEventForDayMath(event: CalendarEvent): Date {
@@ -455,15 +496,15 @@ function renderGrid(
 
 export async function createCalendarDisplayElement(
   config: CalendarDisplayComponentConfig,
+  calendarSourceProvider: CalendarSourceProvider,
   width: number,
   height: number,
 ): Promise<DisplayComponentResult> {
   try {
-    const events = await getCalendarEventsForView({
-      sourceUrl: config.source_url,
-      view: config.view,
-      maxEvents: config.max_events,
-    });
+    const calendarSource = new CalendarSource(config.calendar_ids, calendarSourceProvider);
+    const now = new Date();
+    const sourceEvents = await calendarSource.getEvents();
+    const events = getViewEvents(sourceEvents, config.view, config.max_events, now);
 
     const borderWidth = Math.max(1, Math.round(config.border_width ?? 2));
     const padding = Math.max(0, Math.round(config.padding ?? 10));
@@ -498,7 +539,6 @@ export async function createCalendarDisplayElement(
       marginBottom: 2,
     };
 
-    const now = new Date();
     const title =
       config.view === "day"
         ? DAY_TITLE_FORMATTER.format(now)

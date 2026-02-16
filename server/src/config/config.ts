@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { z } from "zod";
 import { DeviceConfigSchema, EntityConfigSchema, extractEntitiesFromExposes } from "./devices.js";
 import { RoomSchema, type FurnitureItem } from "./room.js";
+import type { CalendarSourceConfig } from "../calendar/service.js";
 import { TileConfigSchema } from "../display/tiles.js";
 
 // Re-export sub-module types for consumers
@@ -16,6 +17,13 @@ export type { RoomConfig, RoomDimensions, FurniturePrimitive, FurnitureGroup, Fu
 export const VoiceOptions = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"] as const;
 export const VoiceSchema = z.enum(VoiceOptions);
 export type Voice = z.infer<typeof VoiceSchema>;
+
+export const CalendarSourceSchema = z.object({
+  source_url: z.string().url(),
+});
+
+export const CalendarsConfigSchema = z.record(z.string(), CalendarSourceSchema).default({});
+export type CalendarsConfig = z.infer<typeof CalendarsConfigSchema>;
 
 export const DisplayConfigSchema = z.object({
   /** How often the device should refresh, in seconds. */
@@ -38,6 +46,7 @@ const ConfigSchema = z.object({
   devices: z.record(z.string(), DeviceConfigSchema).default({}),
   room: RoomSchema.optional(),
   voice: VoiceSchema.optional(),
+  calendars: CalendarsConfigSchema.optional(),
   display: DisplayConfigSchema.optional(),
   /** Maximum debug log file size in MB before old entries are dropped. Default 10. */
   debugLogMaxSizeMB: z.number().positive().default(10),
@@ -109,6 +118,16 @@ export class ConfigStore {
     this.reload();
     this.data.display = display;
     this.save();
+  }
+
+  getCalendars(): CalendarsConfig {
+    this.reload();
+    return this.data.calendars ?? CalendarsConfigSchema.parse({});
+  }
+
+  getCalendarSource(calendarId: string): CalendarSourceConfig | undefined {
+    this.reload();
+    return this.data.calendars?.[calendarId];
   }
 
   getRoom(): Config["room"] | undefined {

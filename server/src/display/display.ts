@@ -10,6 +10,7 @@
 
 import { Hono } from "hono";
 import sharp from "sharp";
+import type { CalendarSourceProvider } from "../calendar/service.js";
 import type { ConfigStore, DisplayConfig } from "../config/config.js";
 import { debugLog } from "../debug-log.js";
 import type { TileConfig } from "./tiles.js";
@@ -158,11 +159,12 @@ function getPaletteColourCount(colorDepth: DisplayConfig["color_depth"]): 2 | 4 
 
 async function renderTileWithFallback(
   tile: TileConfig,
+  calendarSourceProvider: CalendarSourceProvider,
   width: number,
   height: number,
 ): Promise<Buffer> {
   try {
-    return await renderComponentToPngBuffer(tile.component, width, height);
+    return await renderComponentToPngBuffer(tile.component, calendarSourceProvider, width, height);
   } catch (error) {
     console.warn(`[display/image] Tile render failed (${tile.component.kind}): ${(error as Error).message}`);
     return renderComponentToPngBuffer(
@@ -171,6 +173,7 @@ async function renderTileWithFallback(
         text: "Tile render error",
         border_width: 2,
       },
+      calendarSourceProvider,
       width,
       height,
     );
@@ -179,6 +182,7 @@ async function renderTileWithFallback(
 
 async function generateImage(
   device: DeviceMatch | undefined,
+  calendarSourceProvider: CalendarSourceProvider,
   orientation: DisplayConfig["orientation"],
   colorDepth: DisplayConfig["color_depth"],
   dimensions: DisplayDimensions,
@@ -189,7 +193,7 @@ async function generateImage(
 
   for (const tile of tiles) {
     const pixelRegion = regionToPixels(tile.region, renderSize.width, renderSize.height);
-    const tilePng = await renderTileWithFallback(tile, pixelRegion.width, pixelRegion.height);
+    const tilePng = await renderTileWithFallback(tile, calendarSourceProvider, pixelRegion.width, pixelRegion.height);
     compositeInputs.push({
       input: tilePng,
       left: pixelRegion.left,
@@ -220,6 +224,10 @@ async function generateImage(
 
 export function createDisplayRoute(config: ConfigStore) {
   const display = new Hono();
+  const calendarSourceProvider: CalendarSourceProvider = {
+    getCalendarSource: (calendarId) => config.getCalendarSource(calendarId),
+    getCalendars: () => config.getCalendars(),
+  };
 
   display.get("/display/api/setup", (c) => {
     console.log("[display/setup] Request received");
@@ -368,7 +376,13 @@ export function createDisplayRoute(config: ConfigStore) {
       undefined;
 
     const start = Date.now();
-    const png = await generateImage(matchedDevice, cfg.orientation, cfg.color_depth, dimensions);
+    const png = await generateImage(
+      matchedDevice,
+      calendarSourceProvider,
+      cfg.orientation,
+      cfg.color_depth,
+      dimensions,
+    );
     const paletteColours = getPaletteColourCount(cfg.color_depth);
     console.log(
       `[display/image] Rendered ${png.length} bytes in ${Date.now() - start}ms` +
