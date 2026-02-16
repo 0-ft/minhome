@@ -38,3 +38,5 @@
 - [x] Dev tunnel
 - [ ] Display & voice PE auto flashing from device
 - [ ] ConfigStore and AutomationEngine and TokenStore should share a base class
+- [ ] Automation edits auto-save
+- [ ] Centralise calendar support, allowing access from models

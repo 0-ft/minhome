@@ -11,6 +11,7 @@
 import { Hono } from "hono";
 import sharp from "sharp";
 import type { ConfigStore, DisplayConfig } from "../config/config.js";
+import { debugLog } from "../debug-log.js";
 import type { TileConfig } from "./tiles.js";
 import { renderComponentToPngBuffer } from "./render.js";
 
@@ -225,6 +226,9 @@ export function createDisplayRoute(config: ConfigStore) {
     const mac = c.req.header("ID");
     if (!mac) {
       console.warn("[display/setup] Missing ID header");
+      debugLog.add("display_setup", "Display setup rejected (missing ID header)", {
+        host: c.req.header("Host"),
+      });
       return c.json({ status: 400, message: "Missing device ID header" }, 400);
     }
 
@@ -235,6 +239,9 @@ export function createDisplayRoute(config: ConfigStore) {
     const device = matchedDevice?.device;
     if (!device) {
       console.warn(`[display/setup] Device not configured mac=${mac}`);
+      debugLog.add("display_setup", "Display setup rejected (device not configured)", {
+        mac,
+      });
       return c.json({ status: 404, message: `Device ${mac} is not configured` }, 404);
     }
 
@@ -248,6 +255,12 @@ export function createDisplayRoute(config: ConfigStore) {
     );
     const friendlyId = device.friendly_id ?? fallbackFriendlyId;
     console.log(`[display/setup] Provisioning mac=${normalizedMac} friendly_id=${friendlyId} origin=${host}`);
+    debugLog.add("display_setup", `Display setup accepted (${friendlyId})`, {
+      mac: normalizedMac,
+      friendly_id: friendlyId,
+      device_config_mac: matchedDevice?.mac,
+      origin: host,
+    });
 
     return c.json({
       status: 200,
@@ -275,6 +288,10 @@ export function createDisplayRoute(config: ConfigStore) {
     );
     if (!dimensions) {
       console.warn("[display/poll] Missing or invalid Width/Height headers");
+      debugLog.add("display_poll", "Display poll rejected (invalid dimensions)", {
+        width_header: c.req.header("Width"),
+        height_header: c.req.header("Height"),
+      });
       return c.json({ status: 400, message: "Missing or invalid Width/Height headers" }, 400);
     }
     const rawImageUrl = `${host}/display/image`;
@@ -283,6 +300,14 @@ export function createDisplayRoute(config: ConfigStore) {
       `[display/poll] Responding refresh_rate=${cfg.refresh_rate}` +
       ` image_url=${imageUrl} width=${dimensions.width} height=${dimensions.height}`,
     );
+    debugLog.add("display_poll", "Display poll responded", {
+      width: dimensions.width,
+      height: dimensions.height,
+      refresh_rate: cfg.refresh_rate,
+      image_url: imageUrl,
+      has_access_token: Boolean(accessToken),
+      has_bearer_token: Boolean(authHeader?.startsWith("Bearer ")),
+    });
     return c.json({
       status: 0,
       image_url: imageUrl,
@@ -304,8 +329,13 @@ export function createDisplayRoute(config: ConfigStore) {
       for (const log of logs) {
         console.log(`[display log] ${(log as Record<string, unknown>).message ?? ""}`);
       }
+      debugLog.add("display_log", `Display posted ${logs.length} log entr${logs.length === 1 ? "y" : "ies"}`, {
+        count: logs.length,
+        first_message: (logs[0] as Record<string, unknown> | undefined)?.message ?? null,
+      });
     } else {
       console.log("[display/log] No logs array provided");
+      debugLog.add("display_log", "Display log endpoint called without logs array");
     }
     return c.body(null, 204);
   });
@@ -324,6 +354,10 @@ export function createDisplayRoute(config: ConfigStore) {
     );
     if (!dimensions) {
       console.warn("[display/image] Missing or invalid width/height values");
+      debugLog.add("display_image", "Display image rejected (invalid dimensions)", {
+        width: c.req.query("width") ?? c.req.header("Width"),
+        height: c.req.query("height") ?? c.req.header("Height"),
+      });
       return c.json({ status: 400, message: "Missing or invalid width/height values" }, 400);
     }
 
@@ -342,6 +376,16 @@ export function createDisplayRoute(config: ConfigStore) {
       ` width=${dimensions.width} height=${dimensions.height}` +
       ` color_depth=${cfg.color_depth} colours=${paletteColours}`,
     );
+    debugLog.add("display_image", "Display image rendered", {
+      mac: matchedDevice?.mac ?? "unknown",
+      orientation: cfg.orientation,
+      width: dimensions.width,
+      height: dimensions.height,
+      color_depth: cfg.color_depth,
+      colours: paletteColours,
+      bytes: png.length,
+      elapsed_ms: Date.now() - start,
+    });
     return new Response(new Uint8Array(png), {
       headers: {
         "Content-Type": "image/png",

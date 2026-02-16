@@ -33,6 +33,10 @@ export type DebugLogType =
   | "automation_deleted"
   | "api_request"
   | "device_control"
+  | "display_setup"
+  | "display_poll"
+  | "display_log"
+  | "display_image"
   | "error";
 
 export interface DebugLogEntry {

@@ -12,6 +12,7 @@ import {
   Radio,
   Zap,
   AlertCircle,
+  Monitor,
   Filter,
 } from "lucide-react";
 import { useDebugLogs, useDebugLogStream, useClearDebugLogs, type DebugLogEntry } from "../api.js";
@@ -47,6 +48,10 @@ const TYPE_META: Record<string, TypeMeta> = {
   automation_deleted:  { label: "Automation Deleted", color: "bg-red-100",     textColor: "text-red-700",     icon: Zap,           group: "automation" },
   api_request:         { label: "API Request",        color: "bg-sand-200",    textColor: "text-sand-700",    icon: Zap,           group: "api" },
   device_control:      { label: "Device Control",     color: "bg-teal-100",    textColor: "text-teal-700",    icon: Radio,         group: "mqtt" },
+  display_setup:      { label: "Display Setup",      color: "bg-indigo-100",  textColor: "text-indigo-700",  icon: Monitor,       group: "display" },
+  display_poll:       { label: "Display Poll",       color: "bg-indigo-50",   textColor: "text-indigo-600",  icon: Monitor,       group: "display" },
+  display_log:        { label: "Display Log",        color: "bg-sky-100",     textColor: "text-sky-700",     icon: Monitor,       group: "display" },
+  display_image:      { label: "Display Image",      color: "bg-sky-50",      textColor: "text-sky-600",     icon: Monitor,       group: "display" },
   error:               { label: "Error",              color: "bg-red-100",     textColor: "text-red-700",     icon: AlertCircle,   group: "error" },
 };
 
@@ -56,6 +61,7 @@ const GROUPS = [
   { id: "voice",      label: "Voice" },
   { id: "mqtt",       label: "MQTT" },
   { id: "automation", label: "Automations" },
+  { id: "display",    label: "Display" },
 ];
 
 function getMeta(type: string): TypeMeta {

@@ -59,19 +59,11 @@ bridge.on("devices", (devices: unknown) => {
   }
 });
 
-// Serve frontend: static files in production, or proxy to Vite dev server
+// Serve frontend: proxy to Vite dev server in dev, otherwise serve static build
 const frontendDist = resolve(import.meta.dirname, "../../frontend/dist");
 const viteDevUrl = process.env.VITE_DEV_URL;
 
-if (existsSync(frontendDist)) {
-  console.log(`[server] Serving frontend from ${frontendDist}`);
-  app.use("/*", serveStatic({ root: frontendDist }));
-  // SPA fallback: serve index.html for non-API, non-WS, non-MCP routes
-  app.get("*", async (c, next) => {
-    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path.startsWith("/audio/") || c.req.path.startsWith("/display/") || c.req.path === "/mcp") return next();
-    return serveStatic({ root: frontendDist, path: "index.html" })(c, next);
-  });
-} else if (viteDevUrl) {
+if (viteDevUrl) {
   console.log(`[server] Dev frontend proxy -> ${viteDevUrl}`);
   app.all("*", async (c, next) => {
     if (
@@ -85,8 +77,17 @@ if (existsSync(frontendDist)) {
     }
     try {
       const reqUrl = new URL(c.req.url);
-      const target = new URL(reqUrl.pathname + reqUrl.search, viteDevUrl);
-      const resp = await fetch(target.toString());
+      const isSpaNavigation =
+        c.req.method === "GET" &&
+        !reqUrl.pathname.includes(".") &&
+        (c.req.header("accept")?.includes("text/html") ?? false);
+      const proxyPath = isSpaNavigation ? "/index.html" : reqUrl.pathname + reqUrl.search;
+      const target = new URL(proxyPath, viteDevUrl);
+      const resp = await fetch(target.toString(), {
+        method: c.req.method,
+        headers: c.req.raw.headers,
+        body: c.req.method === "GET" || c.req.method === "HEAD" ? undefined : c.req.raw.body,
+      });
       return new Response(resp.body, {
         status: resp.status,
         headers: resp.headers,
@@ -94,6 +95,14 @@ if (existsSync(frontendDist)) {
     } catch {
       return next();
     }
+  });
+} else if (existsSync(frontendDist)) {
+  console.log(`[server] Serving frontend from ${frontendDist}`);
+  app.use("/*", serveStatic({ root: frontendDist }));
+  // SPA fallback: serve index.html for non-API, non-WS, non-MCP routes
+  app.get("*", async (c, next) => {
+    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path.startsWith("/audio/") || c.req.path.startsWith("/display/") || c.req.path === "/mcp") return next();
+    return serveStatic({ root: frontendDist, path: "index.html" })(c, next);
   });
 }
 
