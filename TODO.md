@@ -34,7 +34,7 @@
 - [ ] Proper error display if no API connection
 - [ ] Fix immediate automation timing
 - [ ] Multiple device sets per invocation
-- [ ] TRMNL server
+- [x] TRMNL server
 - [x] Dev tunnel
 - [ ] Display & voice PE auto flashing from device
 - [ ] ConfigStore and AutomationEngine and TokenStore should share a base class

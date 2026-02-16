@@ -208,7 +208,6 @@ function renderAgenda(
     ...eventArrowStyle,
     width: 6,
     minWidth: 6,
-    marginLeft: -2,
     justifyContent: "flex-start",
     overflow: "visible",
   };
@@ -238,7 +237,7 @@ function renderAgenda(
 
   const eventArrowGlyphLeftStyle: CSSProperties = {
     ...eventArrowGlyphWrapStyle,
-    marginLeft: -4,
+    transform: "translateX(-4px)",
   };
 
   const eventArrowGlyphRightStyle: CSSProperties = {
