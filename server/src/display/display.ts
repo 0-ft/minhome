@@ -220,8 +220,8 @@ async function generateImage(
   const rendered = await renderElementToPngBuffer(rootElement, renderSize.width, renderSize.height);
 
   let image = sharp(rendered)
-    .flatten({ background: "#ffffff" })
-    .grayscale();
+    .grayscale()
+    .removeAlpha();
 
   if (orientation === "portrait") {
     image = image.rotate(90);
