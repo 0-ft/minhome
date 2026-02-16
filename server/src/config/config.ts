@@ -25,29 +25,30 @@ export const CalendarSourceSchema = z.object({
 export const CalendarsConfigSchema = z.record(z.string(), CalendarSourceSchema).default({});
 export type CalendarsConfig = z.infer<typeof CalendarsConfigSchema>;
 
-export const DisplayConfigSchema = z.object({
+export const DisplayDeviceSchema = z.object({
+  /** Device MAC address used for lookup/matching. */
+  mac: z.string().min(1),
+  token: z.string().min(1),
+  friendly_id: z.string().min(1).optional(),
   /** How often the device should refresh, in seconds. */
-  refresh_rate: z.number().positive().default(300),
+  refresh_rate: z.number().positive(),
   /** Display layout orientation. */
-  orientation: z.enum(["landscape", "portrait"]).default("landscape"),
+  orientation: z.enum(["landscape", "portrait"]),
   /** PNG color depth in bits per pixel (1 -> 2 colours, 2 -> 4 colours). */
-  color_depth: z.number().int().min(1).max(2).default(1),
-  /** Provisioned TRMNL devices keyed by MAC address. */
-  devices: z.record(z.string(), z.object({
-    token: z.string().min(1),
-    friendly_id: z.string().min(1).optional(),
-    tiles: z.array(TileConfigSchema).default([]),
-  })).default({}),
+  color_depth: z.number().int().min(1).max(2),
+  tiles: z.array(TileConfigSchema),
 });
 
-export type DisplayConfig = z.infer<typeof DisplayConfigSchema>;
+export type DisplayDeviceConfig = z.infer<typeof DisplayDeviceSchema>;
+export const DisplaysConfigSchema = z.array(DisplayDeviceSchema).default([]);
+export type DisplaysConfig = z.infer<typeof DisplaysConfigSchema>;
 
 const ConfigSchema = z.object({
   devices: z.record(z.string(), DeviceConfigSchema).default({}),
   room: RoomSchema.optional(),
   voice: VoiceSchema.optional(),
   calendars: CalendarsConfigSchema.optional(),
-  display: DisplayConfigSchema.optional(),
+  displays: DisplaysConfigSchema.optional(),
   /** Maximum debug log file size in MB before old entries are dropped. Default 10. */
   debugLogMaxSizeMB: z.number().positive().default(10),
 });
@@ -109,14 +110,14 @@ export class ConfigStore {
     this.save();
   }
 
-  getDisplay(): DisplayConfig {
+  getDisplays(): DisplaysConfig {
     this.reload();
-    return this.data.display ?? DisplayConfigSchema.parse({});
+    return this.data.displays ?? DisplaysConfigSchema.parse([]);
   }
 
-  setDisplay(display: DisplayConfig): void {
+  setDisplays(displays: DisplaysConfig): void {
     this.reload();
-    this.data.display = display;
+    this.data.displays = displays;
     this.save();
   }
 

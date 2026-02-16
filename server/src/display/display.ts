@@ -10,37 +10,35 @@
 
 import { Hono } from "hono";
 import sharp from "sharp";
+import { createElement, type ReactElement } from "react";
 import type { CalendarSourceProvider } from "../calendar/service.js";
-import type { ConfigStore, DisplayConfig } from "../config/config.js";
+import type { ConfigStore, DisplayDeviceConfig, DisplaysConfig } from "../config/config.js";
 import { debugLog } from "../debug-log.js";
 import type { TileConfig } from "./tiles.js";
-import { renderComponentToPngBuffer } from "./render.js";
+import { createComponentElement, renderElementToPngBuffer } from "./render.js";
 
 function normalizeMac(mac: string): string {
   return mac.replace(/[^a-fA-F0-9]/g, "").toLowerCase();
 }
 
-type DisplayDevice = DisplayConfig["devices"][string];
-
 type DeviceMatch = {
-  mac: string;
-  device: DisplayDevice;
+  display: DisplayDeviceConfig;
 };
 
-function lookupDeviceByMac(displayConfig: DisplayConfig, mac: string): DeviceMatch | undefined {
+function lookupDeviceByMac(displaysConfig: DisplaysConfig, mac: string): DeviceMatch | undefined {
   const normalized = normalizeMac(mac);
-  for (const [configuredMac, device] of Object.entries(displayConfig.devices)) {
-    if (normalizeMac(configuredMac) === normalized) {
-      return { mac: configuredMac, device };
+  for (const display of displaysConfig) {
+    if (normalizeMac(display.mac) === normalized) {
+      return { display };
     }
   }
   return undefined;
 }
 
-function lookupDeviceByToken(displayConfig: DisplayConfig, token: string): DeviceMatch | undefined {
-  for (const [configuredMac, device] of Object.entries(displayConfig.devices)) {
-    if (device.token === token) {
-      return { mac: configuredMac, device };
+function lookupDeviceByToken(displaysConfig: DisplaysConfig, token: string): DeviceMatch | undefined {
+  for (const display of displaysConfig) {
+    if (display.token === token) {
+      return { display };
     }
   }
   return undefined;
@@ -72,6 +70,10 @@ type DisplayDimensions = {
   height: number;
 };
 
+const DEFAULT_REFRESH_RATE = 300;
+const DEFAULT_ORIENTATION: DisplayDeviceConfig["orientation"] = "landscape";
+const DEFAULT_COLOR_DEPTH: DisplayDeviceConfig["color_depth"] = 1;
+
 function parsePositiveInt(value: string | undefined): number | undefined {
   if (!value) return undefined;
   const trimmed = value.trim();
@@ -99,7 +101,7 @@ function appendDimensionsToImageUrl(imageUrl: string, dimensions: DisplayDimensi
 }
 
 function getRenderDimensions(
-  orientation: DisplayConfig["orientation"],
+  orientation: DisplayDeviceConfig["orientation"],
   deviceDimensions: DisplayDimensions,
 ): { width: number; height: number } {
   if (orientation === "portrait") {
@@ -145,71 +147,79 @@ function resolveTilesForImage(device: DeviceMatch | undefined): TileConfig[] {
     return defaultTiles("Display token not recognized");
   }
 
-  if (device.device.tiles.length > 0) {
-    return device.device.tiles;
+  if (device.display.tiles.length > 0) {
+    return device.display.tiles;
   }
 
   return defaultTiles("Configure display tiles");
 }
 
-function getPaletteColourCount(colorDepth: DisplayConfig["color_depth"]): 2 | 4 {
+function getPaletteColourCount(colorDepth: DisplayDeviceConfig["color_depth"]): 2 | 4 {
   if (colorDepth === 2) return 4;
   return 2;
-}
-
-async function renderTileWithFallback(
-  tile: TileConfig,
-  calendarSourceProvider: CalendarSourceProvider,
-  width: number,
-  height: number,
-): Promise<Buffer> {
-  try {
-    return await renderComponentToPngBuffer(tile.component, calendarSourceProvider, width, height);
-  } catch (error) {
-    console.warn(`[display/image] Tile render failed (${tile.component.kind}): ${(error as Error).message}`);
-    return renderComponentToPngBuffer(
-      {
-        kind: "string_display",
-        text: "Tile render error",
-        border_width: 2,
-      },
-      calendarSourceProvider,
-      width,
-      height,
-    );
-  }
 }
 
 async function generateImage(
   device: DeviceMatch | undefined,
   calendarSourceProvider: CalendarSourceProvider,
-  orientation: DisplayConfig["orientation"],
-  colorDepth: DisplayConfig["color_depth"],
+  orientation: DisplayDeviceConfig["orientation"],
+  colorDepth: DisplayDeviceConfig["color_depth"],
   dimensions: DisplayDimensions,
 ): Promise<Buffer> {
   const renderSize = getRenderDimensions(orientation, dimensions);
   const tiles = resolveTilesForImage(device);
-  const compositeInputs: sharp.OverlayOptions[] = [];
+  const tileElements: ReactElement[] = [];
 
   for (const tile of tiles) {
     const pixelRegion = regionToPixels(tile.region, renderSize.width, renderSize.height);
-    const tilePng = await renderTileWithFallback(tile, calendarSourceProvider, pixelRegion.width, pixelRegion.height);
-    compositeInputs.push({
-      input: tilePng,
-      left: pixelRegion.left,
-      top: pixelRegion.top,
-    });
+    const tileElement = await createComponentElement(
+      tile.component,
+      calendarSourceProvider,
+      pixelRegion.width,
+      pixelRegion.height,
+    );
+
+    tileElements.push(
+      createElement(
+        "div",
+        {
+          key: `${pixelRegion.left}:${pixelRegion.top}:${pixelRegion.width}:${pixelRegion.height}`,
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            position: "absolute",
+            left: pixelRegion.left,
+            top: pixelRegion.top,
+            width: pixelRegion.width,
+            height: pixelRegion.height,
+            overflow: "hidden",
+          },
+        },
+        tileElement,
+      ),
+    );
   }
 
-  let image = sharp({
-    create: {
-      width: renderSize.width,
-      height: renderSize.height,
-      channels: 3,
-      background: { r: 255, g: 255, b: 255 },
+  const rootElement = createElement(
+    "div",
+    {
+      style: {
+        width: renderSize.width,
+        height: renderSize.height,
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        backgroundColor: "#ffffff",
+        overflow: "hidden",
+        fontFamily: "DejaVu Sans",
+      },
     },
-  })
-    .composite(compositeInputs)
+    tileElements,
+  );
+
+  const rendered = await renderElementToPngBuffer(rootElement, renderSize.width, renderSize.height);
+
+  let image = sharp(rendered)
     .flatten({ background: "#ffffff" })
     .grayscale();
 
@@ -241,11 +251,11 @@ export function createDisplayRoute(config: ConfigStore) {
     }
 
     console.log(`[display/setup] ID header mac=${mac}`);
-    const cfg = config.getDisplay();
-    console.log(`[display/setup] Config loaded refresh_rate=${cfg.refresh_rate} devices=${Object.keys(cfg.devices).length}`);
-    const matchedDevice = lookupDeviceByMac(cfg, mac);
-    const device = matchedDevice?.device;
-    if (!device) {
+    const displays = config.getDisplays();
+    console.log(`[display/setup] Config loaded devices=${displays.length}`);
+    const matchedDevice = lookupDeviceByMac(displays, mac);
+    const displayDevice = matchedDevice?.display;
+    if (!displayDevice) {
       console.warn(`[display/setup] Device not configured mac=${mac}`);
       debugLog.add("display_setup", "Display setup rejected (device not configured)", {
         mac,
@@ -261,18 +271,18 @@ export function createDisplayRoute(config: ConfigStore) {
       c.req.header("X-Forwarded-Host"),
       c.req.header("X-Forwarded-Proto"),
     );
-    const friendlyId = device.friendly_id ?? fallbackFriendlyId;
+    const friendlyId = displayDevice.friendly_id ?? fallbackFriendlyId;
     console.log(`[display/setup] Provisioning mac=${normalizedMac} friendly_id=${friendlyId} origin=${host}`);
     debugLog.add("display_setup", `Display setup accepted (${friendlyId})`, {
       mac: normalizedMac,
       friendly_id: friendlyId,
-      device_config_mac: matchedDevice?.mac,
+      device_config_mac: matchedDevice?.display.mac,
       origin: host,
     });
 
     return c.json({
       status: 200,
-      api_key: device.token,
+      api_key: displayDevice.token,
       friendly_id: friendlyId,
       image_url: `${host}/display/image`,
       message: "Welcome to minhome TRMNL",
@@ -282,8 +292,17 @@ export function createDisplayRoute(config: ConfigStore) {
   display.get("/display/api/display", (c) => {
     const accessToken = c.req.header("Access-Token");
     const authHeader = c.req.header("Authorization");
+    const token = getTokenFromRequest(accessToken, authHeader);
+    const headerMac = c.req.header("ID");
+    const queryMac = c.req.query("mac");
     console.log(`[display/poll] Request received access_token=${accessToken ? "yes" : "no"} bearer=${authHeader?.startsWith("Bearer ") ? "yes" : "no"}`);
-    const cfg = config.getDisplay();
+    const displays = config.getDisplays();
+    const matchedDevice =
+      (queryMac && lookupDeviceByMac(displays, queryMac)) ||
+      (headerMac && lookupDeviceByMac(displays, headerMac)) ||
+      (token && lookupDeviceByToken(displays, token)) ||
+      undefined;
+    const refreshRate = matchedDevice?.display.refresh_rate ?? DEFAULT_REFRESH_RATE;
     const host = getPublicOrigin(
       c.req.url,
       c.req.header("Host"),
@@ -305,13 +324,13 @@ export function createDisplayRoute(config: ConfigStore) {
     const rawImageUrl = `${host}/display/image`;
     const imageUrl = appendDimensionsToImageUrl(rawImageUrl, dimensions);
     console.log(
-      `[display/poll] Responding refresh_rate=${cfg.refresh_rate}` +
+      `[display/poll] Responding refresh_rate=${refreshRate}` +
       ` image_url=${imageUrl} width=${dimensions.width} height=${dimensions.height}`,
     );
     debugLog.add("display_poll", "Display poll responded", {
       width: dimensions.width,
       height: dimensions.height,
-      refresh_rate: cfg.refresh_rate,
+      refresh_rate: refreshRate,
       image_url: imageUrl,
       has_access_token: Boolean(accessToken),
       has_bearer_token: Boolean(authHeader?.startsWith("Bearer ")),
@@ -320,7 +339,7 @@ export function createDisplayRoute(config: ConfigStore) {
       status: 0,
       image_url: imageUrl,
       filename: new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14),
-      refresh_rate: cfg.refresh_rate,
+      refresh_rate: refreshRate,
       update_firmware: false,
       reset_firmware: false,
       firmware_url: "",
@@ -350,7 +369,7 @@ export function createDisplayRoute(config: ConfigStore) {
 
   display.get("/display/image", async (c) => {
     console.log("[display/image] Render requested");
-    const cfg = config.getDisplay();
+    const displays = config.getDisplays();
     const accessToken = c.req.header("Access-Token");
     const authHeader = c.req.header("Authorization");
     const token = getTokenFromRequest(accessToken, authHeader);
@@ -370,32 +389,34 @@ export function createDisplayRoute(config: ConfigStore) {
     }
 
     const matchedDevice =
-      (queryMac && lookupDeviceByMac(cfg, queryMac)) ||
-      (headerMac && lookupDeviceByMac(cfg, headerMac)) ||
-      (token && lookupDeviceByToken(cfg, token)) ||
+      (queryMac && lookupDeviceByMac(displays, queryMac)) ||
+      (headerMac && lookupDeviceByMac(displays, headerMac)) ||
+      (token && lookupDeviceByToken(displays, token)) ||
       undefined;
+    const orientation = matchedDevice?.display.orientation ?? DEFAULT_ORIENTATION;
+    const colorDepth = matchedDevice?.display.color_depth ?? DEFAULT_COLOR_DEPTH;
 
     const start = Date.now();
     const png = await generateImage(
       matchedDevice,
       calendarSourceProvider,
-      cfg.orientation,
-      cfg.color_depth,
+      orientation,
+      colorDepth,
       dimensions,
     );
-    const paletteColours = getPaletteColourCount(cfg.color_depth);
+    const paletteColours = getPaletteColourCount(colorDepth);
     console.log(
       `[display/image] Rendered ${png.length} bytes in ${Date.now() - start}ms` +
-      ` mac=${matchedDevice?.mac ?? "unknown"} orientation=${cfg.orientation}` +
+      ` mac=${matchedDevice?.display.mac ?? "unknown"} orientation=${orientation}` +
       ` width=${dimensions.width} height=${dimensions.height}` +
-      ` color_depth=${cfg.color_depth} colours=${paletteColours}`,
+      ` color_depth=${colorDepth} colours=${paletteColours}`,
     );
     debugLog.add("display_image", "Display image rendered", {
-      mac: matchedDevice?.mac ?? "unknown",
-      orientation: cfg.orientation,
+      mac: matchedDevice?.display.mac ?? "unknown",
+      orientation,
       width: dimensions.width,
       height: dimensions.height,
-      color_depth: cfg.color_depth,
+      color_depth: colorDepth,
       colours: paletteColours,
       bytes: png.length,
       elapsed_ms: Date.now() - start,
@@ -404,7 +425,7 @@ export function createDisplayRoute(config: ConfigStore) {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "no-cache, no-store",
-        "X-Display-Color-Depth": String(cfg.color_depth),
+        "X-Display-Color-Depth": String(colorDepth),
         "X-Display-Colours": String(paletteColours),
         "X-Display-Indexed": "true",
       },

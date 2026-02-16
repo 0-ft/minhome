@@ -31,7 +31,7 @@ function getFontData(): Buffer {
   throw new Error(`Unable to find a display font. Tried: ${FONT_CANDIDATES.join(", ")}`);
 }
 
-async function renderElementToPngBuffer(
+export async function renderElementToPngBuffer(
   element: ReactElement,
   width: number,
   height: number,
@@ -54,41 +54,37 @@ async function renderElementToPngBuffer(
   return Buffer.from(pngData);
 }
 
-async function renderResultToPngBuffer(
+function renderResultToElement(
   result: DisplayComponentResult,
   width: number,
   height: number,
-): Promise<Buffer> {
+): ReactElement {
   if (result.ok) {
-    return renderElementToPngBuffer(result.element, width, height);
+    return result.element;
   }
 
   console.warn(
     `[display/render] Component error (${result.error.component}): ${result.error.message}` +
     `${result.error.detail ? ` (${result.error.detail})` : ""}`,
   );
-  return renderElementToPngBuffer(
-    createErrorDisplayElement(result.error, width, height),
-    width,
-    height,
-  );
+  return createErrorDisplayElement(result.error, width, height);
 }
 
-export async function renderComponentToPngBuffer(
+export async function createComponentElement(
   component: TileComponentConfig,
   calendarSourceProvider: CalendarSourceProvider,
   width: number,
   height: number,
-): Promise<Buffer> {
+): Promise<ReactElement> {
   switch (component.kind) {
     case "string_display":
-      return renderResultToPngBuffer(
+      return renderResultToElement(
         createStringDisplayElement(component, width, height),
         width,
         height,
       );
     case "color_test":
-      return renderResultToPngBuffer(
+      return renderResultToElement(
         createColorTestElement(component, width, height),
         width,
         height,
@@ -104,7 +100,7 @@ export async function renderComponentToPngBuffer(
           error instanceof Error ? error.message : String(error),
         );
       }
-      return renderResultToPngBuffer(result, width, height);
+      return renderResultToElement(result, width, height);
     }
     default: {
       const _exhaustive: never = component;

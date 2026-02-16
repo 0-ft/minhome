@@ -239,7 +239,7 @@ function renderAgenda(
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: scaledFont(baseSize, 0.03, 10),
+    fontSize: scaledFont(baseSize, 0.032, 11),
     fontWeight: 700,
     lineHeight: 1,
     color: EINK_FOREGROUND,
@@ -272,7 +272,7 @@ function renderAgenda(
 
   const eventArrowGlyphWrapStyle: CSSProperties = {
     display: "flex",
-    fontSize: scaledFont(baseSize, 0.03, 10),
+    fontSize: scaledFont(baseSize, 0.032, 11),
     lineHeight: 1,
   };
 
@@ -287,13 +287,13 @@ function renderAgenda(
   };
 
   const timeStyle: CSSProperties = {
-    fontSize: scaledFont(baseSize, 0.034, 11),
+    fontSize: scaledFont(baseSize, 0.036, 12),
     fontWeight: 700,
     lineHeight: 1.2,
   };
 
   const summaryStyle: CSSProperties = {
-    fontSize: scaledFont(baseSize, 0.04, 13),
+    fontSize: scaledFont(baseSize, 0.042, 14),
     fontWeight: 700,
     lineHeight: 1.2,
     whiteSpace: "normal",
@@ -301,7 +301,7 @@ function renderAgenda(
   };
 
   const locationStyle: CSSProperties = {
-    fontSize: scaledFont(baseSize, 0.032, 11),
+    fontSize: scaledFont(baseSize, 0.034, 12),
     fontWeight: 500,
     lineHeight: 1.2,
     whiteSpace: "normal",
@@ -395,7 +395,7 @@ function renderGrid(
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    fontSize: scaledFont(baseSize, isMonth ? 0.015 : 0.02, 9),
+    fontSize: scaledFont(baseSize, isMonth ? 0.016 : 0.021, 10),
     fontWeight: 700,
     paddingBottom: 2,
     minHeight: 14,
@@ -410,7 +410,7 @@ function renderGrid(
   };
 
   const eventStyle: CSSProperties = {
-    fontSize: scaledFont(baseSize, isMonth ? 0.013 : 0.018, 8),
+    fontSize: scaledFont(baseSize, isMonth ? 0.014 : 0.019, 9),
     lineHeight: 1.2,
     fontWeight: 500,
     padding: "2px 3px",
