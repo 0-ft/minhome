@@ -47,9 +47,17 @@ export interface DebugLogEntry {
   data?: unknown;
 }
 
+export interface DebugLogPage {
+  entries: DebugLogEntry[];
+  nextBefore: number | null;
+  hasMore: boolean;
+}
+
 // ── JSONL-backed log ─────────────────────────────────────
 
 const MAX_RETURN = 2000;
+const DEFAULT_PAGE_LIMIT = 200;
+const MAX_PAGE_LIMIT = 500;
 const DEFAULT_MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 class DebugLog extends EventEmitter {
@@ -143,6 +151,46 @@ class DebugLog extends EventEmitter {
     }
 
     return entries;
+  }
+
+  /**
+   * Read a reverse-chronological page of entries (newest first).
+   * Use `before` as an exclusive cursor to fetch older entries.
+   */
+  getPage(filter?: { type?: DebugLogType; before?: number; limit?: number }): DebugLogPage {
+    if (!this.filePath || !existsSync(this.filePath)) {
+      return { entries: [], nextBefore: null, hasMore: false };
+    }
+
+    const raw = readFileSync(this.filePath, "utf-8");
+    const lines = raw.trimEnd().split("\n").filter(Boolean);
+
+    let entries: DebugLogEntry[] = [];
+    for (const line of lines) {
+      try {
+        entries.push(JSON.parse(line));
+      } catch {
+        // Skip corrupted lines
+      }
+    }
+
+    if (filter?.type) {
+      entries = entries.filter((e) => e.type === filter.type);
+    }
+    const before = filter?.before;
+    if (before != null) {
+      entries = entries.filter((e) => e.id < before);
+    }
+
+    const newestFirst = [...entries].reverse();
+    const safeLimit = Math.min(Math.max(filter?.limit ?? DEFAULT_PAGE_LIMIT, 1), MAX_PAGE_LIMIT);
+    const pageEntries = newestFirst.slice(0, safeLimit);
+    const hasMore = newestFirst.length > pageEntries.length;
+    const nextBefore = hasMore && pageEntries.length > 0
+      ? pageEntries[pageEntries.length - 1].id
+      : null;
+
+    return { entries: pageEntries, nextBefore, hasMore };
   }
 
   /** Truncate the log file and reset the counter. */

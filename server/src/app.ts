@@ -304,8 +304,16 @@ export function createApp(bridge: MqttBridge, config: ConfigStore, automations: 
     // --- Debug log ---
     .get("/api/debug/logs", (c) => {
       const type = c.req.query("type") as DebugLogType | undefined;
-      const since = c.req.query("since") ? Number(c.req.query("since")) : undefined;
-      return c.json(debugLog.getAll({ type, since }));
+      const beforeRaw = c.req.query("before");
+      const limitRaw = c.req.query("limit");
+      const before = beforeRaw != null ? Number(beforeRaw) : undefined;
+      const limit = limitRaw != null ? Number(limitRaw) : undefined;
+
+      if ((beforeRaw != null && !Number.isFinite(before)) || (limitRaw != null && !Number.isFinite(limit))) {
+        return c.json({ error: "Invalid pagination parameters" }, 400);
+      }
+
+      return c.json(debugLog.getPage({ type, before, limit }));
     })
 
     .delete("/api/debug/logs", (c) => {

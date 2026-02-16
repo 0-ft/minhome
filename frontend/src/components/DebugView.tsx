@@ -15,7 +15,7 @@ import {
   Monitor,
   Filter,
 } from "lucide-react";
-import { useDebugLogs, useDebugLogStream, useClearDebugLogs, type DebugLogEntry } from "../api.js";
+import { useDebugLogsInfinite, useDebugLogStream, useClearDebugLogs, type DebugLogEntry } from "../api.js";
 
 // ── Type metadata ──────────────────────────────────────
 
@@ -155,11 +155,17 @@ function LogRow({ entry, isExpanded, onToggle }: {
 // ── Main view ──────────────────────────────────────────
 
 export function DebugView() {
-  const { data: initialLogs, isLoading } = useDebugLogs();
+  const {
+    data: pagedLogsData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useDebugLogsInfinite();
   const clearLogs = useClearDebugLogs();
 
-  // Local state for streaming logs (stored in chronological order internally)
-  const [logs, setLogs] = useState<DebugLogEntry[]>([]);
+  // Live logs from WebSocket (newest first)
+  const [liveLogs, setLiveLogs] = useState<DebugLogEntry[]>([]);
   const [paused, setPaused] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -167,43 +173,53 @@ export function DebugView() {
 
   const listRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
-
-  // Initialize from REST when loaded
-  useEffect(() => {
-    if (initialLogs) {
-      setLogs(initialLogs);
+  const pagedLogs = useMemo(
+    () => (pagedLogsData?.pages ?? []).flatMap((page) => page.entries),
+    [pagedLogsData],
+  );
+  const logs = useMemo(() => {
+    const seen = new Set<number>();
+    const merged: DebugLogEntry[] = [];
+    for (const entry of [...liveLogs, ...pagedLogs]) {
+      if (seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      merged.push(entry);
     }
-  }, [initialLogs]);
+    return merged;
+  }, [liveLogs, pagedLogs]);
 
-  // Stream new entries via WebSocket — append to end (newest last internally)
+  // Stream new entries via WebSocket — prepend (newest first)
   useDebugLogStream(
     useCallback(
       (entry: DebugLogEntry) => {
         if (paused) return;
-        setLogs((prev) => {
-          // Avoid duplicates
-          if (prev.length > 0 && prev[prev.length - 1].id >= entry.id) return prev;
-          const next = [...prev, entry];
-          // Trim to 2000 client-side (drop oldest)
-          return next.length > 2000 ? next.slice(-2000) : next;
+        setLiveLogs((prev) => {
+          if (prev.some((e) => e.id === entry.id)) return prev;
+          return [entry, ...prev];
         });
       },
       [paused],
     ),
   );
 
-  // Auto-scroll to top when new entries arrive (since display is reverse chronological)
+  // Auto-scroll to top when new live entries arrive.
   useEffect(() => {
     if (autoScrollRef.current && listRef.current) {
       listRef.current.scrollTop = 0;
     }
-  }, [logs]);
+  }, [liveLogs]);
 
-  // Detect manual scroll — auto-scroll is active when user is at the top
+  // Detect manual scroll and load older pages near the bottom.
   const handleScroll = useCallback(() => {
     if (!listRef.current) return;
-    autoScrollRef.current = listRef.current.scrollTop < 40;
-  }, []);
+    const el = listRef.current;
+    autoScrollRef.current = el.scrollTop < 40;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 240 && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const scrollToTop = useCallback(() => {
     if (listRef.current) {
@@ -222,12 +238,15 @@ export function DebugView() {
   }, []);
 
   const handleClear = useCallback(() => {
-    clearLogs.mutate();
-    setLogs([]);
-    setExpandedIds(new Set());
+    clearLogs.mutate(undefined, {
+      onSuccess: () => {
+        setLiveLogs([]);
+        setExpandedIds(new Set());
+      },
+    });
   }, [clearLogs]);
 
-  // Filter then reverse for display (newest first)
+  // Filter in-place (already newest first).
   const filteredLogs = useMemo(() => {
     let result = logs;
 
@@ -245,8 +264,7 @@ export function DebugView() {
       );
     }
 
-    // Reverse: newest first
-    return [...result].reverse();
+    return result;
   }, [logs, activeGroup, searchQuery]);
 
   if (isLoading) {
@@ -362,6 +380,16 @@ export function DebugView() {
               onToggle={() => toggleExpanded(entry.id)}
             />
           ))
+        )}
+        {isFetchingNextPage && (
+          <div className="py-3 text-center text-xs text-sand-500 font-mono border-t border-sand-200">
+            Loading older entries...
+          </div>
+        )}
+        {hasNextPage === false && filteredLogs.length > 0 && (
+          <div className="py-3 text-center text-xs text-sand-400 font-mono border-t border-sand-200">
+            Start of log history
+          </div>
         )}
       </div>
     </div>

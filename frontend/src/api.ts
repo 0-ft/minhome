@@ -1,5 +1,5 @@
 import { hc } from "hono/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import type { AppType } from "@minhome/server/app";
 import { useEffect, useRef, useCallback } from "react";
 
@@ -214,13 +214,28 @@ export interface DebugLogEntry {
   data?: unknown;
 }
 
-export function useDebugLogs() {
-  return useQuery({
+export interface DebugLogPage {
+  entries: DebugLogEntry[];
+  nextBefore: number | null;
+  hasMore: boolean;
+}
+
+const DEBUG_LOG_PAGE_SIZE = 200;
+
+export function useDebugLogsInfinite() {
+  return useInfiniteQuery({
     queryKey: ["debug-logs"],
-    queryFn: async () => {
-      const res = await fetch("/api/debug/logs");
-      return res.json() as Promise<DebugLogEntry[]>;
+    initialPageParam: undefined as number | undefined,
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams();
+      params.set("limit", String(DEBUG_LOG_PAGE_SIZE));
+      if (pageParam != null) {
+        params.set("before", String(pageParam));
+      }
+      const res = await fetch(`/api/debug/logs?${params.toString()}`);
+      return res.json() as Promise<DebugLogPage>;
     },
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? (lastPage.nextBefore ?? undefined) : undefined),
     refetchInterval: false, // we use WS for real-time updates
   });
 }
@@ -232,7 +247,7 @@ export function useClearDebugLogs() {
       await fetch("/api/debug/logs", { method: "DELETE" });
     },
     onSuccess: () => {
-      qc.setQueryData(["debug-logs"], []);
+      qc.invalidateQueries({ queryKey: ["debug-logs"] });
     },
   });
 }
