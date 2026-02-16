@@ -63,24 +63,35 @@ bridge.on("devices", (devices: unknown) => {
 const frontendDist = resolve(import.meta.dirname, "../../frontend/dist");
 const viteDevUrl = process.env.VITE_DEV_URL;
 
+function shouldBypassFrontend(path: string): boolean {
+  return (
+    path.startsWith("/api/") ||
+    path.startsWith("/ws") ||
+    path.startsWith("/audio/") ||
+    path.startsWith("/display/") ||
+    path === "/mcp"
+  );
+}
+
+function isSpaNavigationRequest(request: Request): boolean {
+  const reqUrl = new URL(request.url);
+  return (
+    request.method === "GET" &&
+    !reqUrl.pathname.includes(".") &&
+    (request.headers.get("accept")?.includes("text/html") ?? false)
+  );
+}
+
 if (viteDevUrl) {
   console.log(`[server] Dev frontend proxy -> ${viteDevUrl}`);
+  // Frontend handling is mounted last so API/WS/display routes keep precedence.
   app.all("*", async (c, next) => {
-    if (
-      c.req.path.startsWith("/api/") ||
-      c.req.path.startsWith("/ws") ||
-      c.req.path.startsWith("/audio/") ||
-      c.req.path.startsWith("/display/") ||
-      c.req.path === "/mcp"
-    ) {
+    if (shouldBypassFrontend(c.req.path)) {
       return next();
     }
     try {
       const reqUrl = new URL(c.req.url);
-      const isSpaNavigation =
-        c.req.method === "GET" &&
-        !reqUrl.pathname.includes(".") &&
-        (c.req.header("accept")?.includes("text/html") ?? false);
+      const isSpaNavigation = isSpaNavigationRequest(c.req.raw);
       const proxyPath = isSpaNavigation ? "/index.html" : reqUrl.pathname + reqUrl.search;
       const target = new URL(proxyPath, viteDevUrl);
       const resp = await fetch(target.toString(), {
@@ -98,11 +109,19 @@ if (viteDevUrl) {
   });
 } else if (existsSync(frontendDist)) {
   console.log(`[server] Serving frontend from ${frontendDist}`);
-  app.use("/*", serveStatic({ root: frontendDist }));
-  // SPA fallback: serve index.html for non-API, non-WS, non-MCP routes
+  const serveFrontendStatic = serveStatic({ root: frontendDist });
+  const serveFrontendIndex = serveStatic({ root: frontendDist, path: "index.html" });
+
+  // Frontend handling is mounted last so API/WS/display routes keep precedence.
+  app.use("*", async (c, next) => {
+    if (shouldBypassFrontend(c.req.path)) return next();
+    return serveFrontendStatic(c, next);
+  });
+
+  // SPA fallback: index for non-backend paths that were not static assets.
   app.get("*", async (c, next) => {
-    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/ws") || c.req.path.startsWith("/audio/") || c.req.path.startsWith("/display/") || c.req.path === "/mcp") return next();
-    return serveStatic({ root: frontendDist, path: "index.html" })(c, next);
+    if (shouldBypassFrontend(c.req.path)) return next();
+    return serveFrontendIndex(c, next);
   });
 }
 

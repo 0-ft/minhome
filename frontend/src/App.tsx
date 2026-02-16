@@ -148,10 +148,10 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
 
         <main className="flex-1 overflow-y-auto">
           <Routes>
-            <Route path="/entities" element={<div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div>} />
-            <Route path="/devices" element={<div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div>} />
-            <Route path="/automations" element={<div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div>} />
-            <Route path="/room" element={<div className="h-full p-4"><RoomView /></div>} />
+            <Route path="entities" element={<div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div>} />
+            <Route path="devices" element={<div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div>} />
+            <Route path="automations" element={<div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div>} />
+            <Route path="room" element={<div className="h-full p-4"><RoomView /></div>} />
             <Route path="*" element={<Navigate to="/404" replace />} />
           </Routes>
         </main>
