@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from "ai";
+import { streamText, convertToModelMessages, stepCountIs, type UIMessage, validateUIMessages, createIdGenerator } from "ai";
 import { buildSystemPrompt } from "./context.js";
 import { createTools, type ToolContext } from "../tools.js";
 import { createAutomationTools } from "../automation-tools.js";
@@ -10,7 +10,7 @@ import { debugLog } from "../debug-log.js";
 
 export function createChatRoute(ctx: ToolContext) {
   const chat = new Hono();
-  const { bridge, config, todos, automations, voiceDevices } = ctx;
+  const { bridge, config, chats, todos, automations, voiceDevices } = ctx;
 
   chat.get("/api/chat/info", (c) => {
     return c.json({
@@ -21,18 +21,58 @@ export function createChatRoute(ctx: ToolContext) {
 
   chat.get("/api/chat/debug", (c) => {
     const system = buildSystemPrompt(bridge, config, todos, automations, voiceDevices);
-    const defs = { ...createTools(), ...createAutomationTools() };
-
-    const toolDefs = Object.fromEntries(
-      Object.entries(defs).map(([name, def]) => [name, { description: def.description }]),
-    );
+    const tools = buildAiTools(ctx);
 
     return c.json({
       systemPromptChars: system.length,
-      toolCount: Object.keys(toolDefs).length,
-      tools: toolDefs,
+      toolCount: Object.keys(tools).length,
+      tools: tools,
       systemPrompt: system,
     });
+  });
+
+  chat.get("/api/chats", (c) => {
+    return c.json(chats.list());
+  });
+
+  chat.get("/api/chats/:id", (c) => {
+    const id = c.req.param("id");
+    const chatEntry = chats.get(id);
+    if (!chatEntry) return c.json({ error: "Chat not found" }, 404);
+    return c.json(chatEntry);
+  });
+
+  chat.post("/api/chats", async (c) => {
+    const body = await c.req.json<{
+      id?: string;
+      title?: string;
+      source?: "text" | "voice";
+      messages?: UIMessage[];
+    }>().catch(() => undefined);
+
+    const created = chats.create({
+      id: body?.id,
+      title: body?.title,
+      source: body?.source ?? "text",
+      messages: body?.messages ?? [],
+    });
+    return c.json(created, 201);
+  });
+
+  chat.patch("/api/chats/:id", async (c) => {
+    const id = c.req.param("id");
+    const existing = chats.get(id);
+    if (!existing) return c.json({ error: "Chat not found" }, 404);
+    const body = await c.req.json<{ title?: string }>().catch(() => undefined);
+    const updated = chats.setTitle(id, body?.title);
+    return c.json(updated);
+  });
+
+  chat.delete("/api/chats/:id", (c) => {
+    const id = c.req.param("id");
+    const removed = chats.delete(id);
+    if (!removed) return c.json({ error: "Chat not found" }, 404);
+    return c.json({ ok: true });
   });
 
   chat.post("/api/chat", async (c) => {
@@ -40,28 +80,38 @@ export function createChatRoute(ctx: ToolContext) {
       return c.json({ error: "AI chat not configured (AI_API_KEY not set)" }, 503);
     }
 
-    const body = await c.req.json<{ messages: UIMessage[] }>();
-    const { messages } = body;
+    const body = await c.req.json<{ id?: string; messages: UIMessage[] }>();
+    const requestedChatId = body.id;
+    const title = extractFirstUserText(body.messages);
+    const resolvedChat = requestedChatId
+      ? chats.ensure({ id: requestedChatId, source: "text", title })
+      : chats.create({ source: "text", title });
+    const chatId = resolvedChat.id;
+    const messages = body.messages;
+    const rawTools = buildAiTools(ctx);
+    const validatedMessages = await validateUIMessages({
+      messages,
+      tools: rawTools as any,
+    });
 
     const system = buildSystemPrompt(bridge, config, todos, automations, voiceDevices);
-    const modelMessages = await convertToModelMessages(messages);
+    const modelMessages = await convertToModelMessages(validatedMessages);
 
-    // Wrap tools to intercept tool calls and results
-    const rawTools = buildAiTools(ctx);
-    const instrumentedTools = Object.fromEntries(
-      Object.entries(rawTools).map(([name, tool]) => [
-        name,
-        {
-          ...tool,
-          execute: async (params: unknown) => {
-            debugLog.add("chat_tool_call", `Tool: ${name}`, { tool: name, params });
-            const result = await (tool as any).execute(params);
-            debugLog.add("chat_tool_result", `Tool result: ${name}`, { tool: name, result: tryParse(result) });
-            return result;
-          },
-        },
-      ]),
-    );
+    // // Wrap tools to intercept tool calls and results
+    // const instrumentedTools = Object.fromEntries(
+    //   Object.entries(rawTools).map(([name, tool]) => [
+    //     name,
+    //     {
+    //       ...tool,
+    //       execute: async (params: unknown) => {
+    //         debugLog.add("chat_tool_call", `Tool: ${name}`, { tool: name, params });
+    //         const result = await (tool as any).execute(params);
+    //         debugLog.add("chat_tool_result", `Tool result: ${name}`, { tool: name, result: tryParse(result) });
+    //         return result;
+    //       },
+    //     },
+    //   ]),
+    // );
 
     // Log the chat request
     const lastUserMsg = messages.filter(m => m.role === "user").at(-1);
@@ -75,7 +125,7 @@ export function createChatRoute(ctx: ToolContext) {
       model: openai.chat(modelId),
       system,
       messages: modelMessages,
-      tools: instrumentedTools,
+      tools: rawTools,
       stopWhen: stepCountIs(10),
       onFinish: ({ text, usage, steps }) => {
         debugLog.add("chat_response", `Response: ${truncate(text, 120)}`, {
@@ -88,7 +138,23 @@ export function createChatRoute(ctx: ToolContext) {
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    result.consumeStream();
+
+    return result.toUIMessageStreamResponse({
+      originalMessages: validatedMessages,
+      generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
+      headers: {
+        "x-chat-id": chatId,
+      },
+      onFinish: ({ messages: finishedMessages }) => {
+        chats.upsertHistory({
+          id: chatId,
+          source: "text",
+          title,
+          messages: finishedMessages,
+        });
+      },
+    });
   });
 
   return chat;
@@ -108,6 +174,13 @@ function extractText(msg: UIMessage | undefined): string {
     if (textPart && "text" in textPart) return (textPart as { type: "text"; text: string }).text;
   }
   return "(non-text)";
+}
+
+function extractFirstUserText(messages: UIMessage[]): string | undefined {
+  const firstUser = messages.find((msg) => msg.role === "user");
+  if (!firstUser) return undefined;
+  const text = extractText(firstUser).trim();
+  return text && text !== "(non-text)" ? truncate(text, 80) : undefined;
 }
 
 function tryParse(s: unknown): unknown {

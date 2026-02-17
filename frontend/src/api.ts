@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tansta
 import type { AppType } from "@minhome/server/app";
 import { useEffect, useRef, useCallback } from "react";
 
-export const api = hc<AppType>("/");
+export const api: any = hc<AppType>("/");
 
 // --- Auth ---
 
@@ -11,7 +11,7 @@ export function useAuthCheck() {
   return useQuery({
     queryKey: ["auth"],
     queryFn: async () => {
-      const res = await fetch("/api/auth/check");
+      const res = await api.api.auth.check.$get();
       return res.json() as Promise<{ required: boolean; authenticated: boolean }>;
     },
     retry: false,
@@ -23,10 +23,8 @@ export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (password: string) => {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+      const res = await api.api.auth.login.$post({
+        json: { password },
       });
       if (!res.ok) throw new Error("Invalid password");
       return res.json();
@@ -41,10 +39,90 @@ export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await api.api.auth.logout.$post();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+// --- Chats ---
+
+export interface PersistedChatSummary {
+  id: string;
+  title?: string;
+  source: "text" | "voice";
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  lastDeviceId?: string;
+}
+
+export interface PersistedChat {
+  id: string;
+  title?: string;
+  source: "text" | "voice";
+  createdAt: string;
+  updatedAt: string;
+  messages: Array<{
+    id: string;
+    role: "user" | "assistant" | "system";
+    parts: Array<Record<string, unknown>>;
+  }>;
+  lastDeviceId?: string;
+}
+
+export function useChats() {
+  return useQuery({
+    queryKey: ["chats"],
+    queryFn: async () => {
+      const res = await api.api.chats.$get();
+      if (!res.ok) throw new Error("Failed to fetch chats");
+      return res.json() as Promise<PersistedChatSummary[]>;
+    },
+  });
+}
+
+export function useChatById(chatId: string | null) {
+  return useQuery({
+    queryKey: ["chat", chatId],
+    enabled: Boolean(chatId),
+    queryFn: async () => {
+      const res = await api.api.chats[":id"].$get({ param: { id: chatId! } });
+      if (!res.ok) throw new Error("Failed to fetch chat");
+      return res.json() as Promise<PersistedChat>;
+    },
+  });
+}
+
+export function useCreateChat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload?: { title?: string; source?: "text" | "voice" }) => {
+      const res = await api.api.chats.$post({ json: payload ?? {} });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to create chat");
+      return data as PersistedChat;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chats"] });
+    },
+  });
+}
+
+export function useDeleteChat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (chatId: string) => {
+      const res = await api.api.chats[":id"].$delete({ param: { id: chatId } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to delete chat");
+      return data as { ok: true };
+    },
+    onSuccess: (_data, chatId) => {
+      qc.invalidateQueries({ queryKey: ["chats"] });
+      qc.removeQueries({ queryKey: ["chat", chatId] });
     },
   });
 }
@@ -234,7 +312,7 @@ export function useTodoLists() {
   return useQuery({
     queryKey: ["todos"],
     queryFn: async () => {
-      const res = await fetch("/api/todos");
+      const res = await api.api.todos.$get();
       if (!res.ok) throw new Error("Failed to fetch todo lists");
       return res.json() as Promise<TodoList[]>;
     },
@@ -246,7 +324,9 @@ export function useTodoList(listId: string | null) {
     queryKey: ["todos", listId],
     enabled: Boolean(listId),
     queryFn: async () => {
-      const res = await fetch(`/api/todos/${encodeURIComponent(listId!)}`);
+      const res = await api.api.todos[":listId"].$get({
+        param: { listId: listId! },
+      });
       if (!res.ok) throw new Error("Failed to fetch todo list");
       return res.json() as Promise<TodoList>;
     },
@@ -257,10 +337,8 @@ export function useCreateTodoList() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: { id: string; name: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: TodoColumn[] }) => {
-      const res = await fetch("/api/todos/lists", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const res = await api.api.todos.lists.$post({
+        json: payload,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to create todo list");
@@ -282,10 +360,9 @@ export function useUpdateTodoList() {
       listId: string;
       patch: { name?: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: TodoColumn[] };
     }) => {
-      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+      const res = await api.api.todos[":listId"].$patch({
+        param: { listId },
+        json: patch,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to update todo list");
@@ -302,8 +379,8 @@ export function useDeleteTodoList() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (listId: string) => {
-      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}`, {
-        method: "DELETE",
+      const res = await api.api.todos[":listId"].$delete({
+        param: { listId },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to delete todo list");
@@ -333,10 +410,9 @@ export function useUpsertTodoItem() {
         include_in_system_prompt?: boolean;
       };
     }) => {
-      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+      const res = await api.api.todos[":listId"].items[":itemId"].$put({
+        param: { listId, itemId: String(itemId) },
+        json: patch,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to upsert todo item");
@@ -361,10 +437,9 @@ export function useSetTodoItemStatus() {
       itemId: number;
       status: TodoStatus;
     }) => {
-      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+      const res = await api.api.todos[":listId"].items[":itemId"].status.$patch({
+        param: { listId, itemId: String(itemId) },
+        json: { status },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to set todo status");
@@ -381,8 +456,8 @@ export function useDeleteTodoItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ listId, itemId }: { listId: string; itemId: number }) => {
-      const res = await fetch(`/api/todos/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}`, {
-        method: "DELETE",
+      const res = await api.api.todos[":listId"].items[":itemId"].$delete({
+        param: { listId, itemId: String(itemId) },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to delete todo item");
@@ -418,12 +493,12 @@ export function useDebugLogsInfinite() {
     queryKey: ["debug-logs"],
     initialPageParam: undefined as number | undefined,
     queryFn: async ({ pageParam }) => {
-      const params = new URLSearchParams();
-      params.set("limit", String(DEBUG_LOG_PAGE_SIZE));
-      if (pageParam != null) {
-        params.set("before", String(pageParam));
-      }
-      const res = await fetch(`/api/debug/logs?${params.toString()}`);
+      const res = await api.api.debug.logs.$get({
+        query: {
+          limit: String(DEBUG_LOG_PAGE_SIZE),
+          before: pageParam != null ? String(pageParam) : undefined,
+        },
+      });
       return res.json() as Promise<DebugLogPage>;
     },
     getNextPageParam: (lastPage) => (lastPage.hasMore ? (lastPage.nextBefore ?? undefined) : undefined),
@@ -435,7 +510,7 @@ export function useClearDebugLogs() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      await fetch("/api/debug/logs", { method: "DELETE" });
+      await api.api.debug.logs.$delete();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["debug-logs"] });
@@ -528,6 +603,10 @@ export function useRealtimeUpdates() {
         }
         if (msg.type === "todos_change") {
           qc.invalidateQueries({ queryKey: ["todos"] });
+        }
+        if (msg.type === "chats_change") {
+          qc.invalidateQueries({ queryKey: ["chats"] });
+          qc.invalidateQueries({ queryKey: ["chat"] });
         }
       } catch { /* ignore */ }
     };

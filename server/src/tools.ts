@@ -2,6 +2,7 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import type { MqttBridge } from "./mqtt.js";
 import type { ConfigStore } from "./config/config.js";
+import type { ChatStore } from "./config/chats.js";
 import { TodoStatusSchema, type TodoStore } from "./config/todos.js";
 import type { AutomationEngine } from "./automations.js";
 import {
@@ -27,6 +28,7 @@ export interface VoiceDeviceInfo {
 export interface ToolContext {
   bridge: MqttBridge;
   config: ConfigStore;
+  chats: ChatStore;
   todos: TodoStore;
   automations: AutomationEngine;
   /** Send a JSON message to the connected voice bridge. */
@@ -46,6 +48,32 @@ export interface ToolDef {
   parameters: z.ZodType;
   execute: (params: any, ctx: ToolContext) => Promise<unknown>;
 }
+
+const ColorHSPayloadSchema = z.object({
+  hue: z.number().min(0).max(360),
+  saturation: z.number().min(0).max(100),
+}).strict();
+
+const ColorHexPayloadSchema = z.object({
+  hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+}).strict();
+
+const ColorXYPayloadSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+}).strict();
+
+const ColorPayloadSchema = z.union([ColorHSPayloadSchema, ColorHexPayloadSchema, ColorXYPayloadSchema]);
+
+const StatePayloadSchema = z.union([z.enum(["ON", "OFF", "TOGGLE"]), z.boolean()]);
+
+const DeviceCommandPayloadSchema = z.object({
+  // Canonical entity properties (resolved to endpoint-specific MQTT properties server-side).
+  state: StatePayloadSchema.optional(),
+  brightness: z.number().int().min(0).max(254).optional(),
+  color_temp: z.number().int().positive().optional(),
+  color: ColorPayloadSchema.optional(),
+}).passthrough();
 
 // ── Helper: build full device response (shared with app.ts) ─
 
@@ -97,7 +125,9 @@ export const toolSchemas = {
     parameters: z.object({
       id: z.string().describe("Device IEEE address"),
       entity: z.string().describe("Entity key, e.g. 'main' for single-entity devices, 'l1'/'l2'/'l3' for multi-entity"),
-      payload: z.record(z.string(), z.unknown()).describe('Command payload with canonical property names, e.g. {"state":"ON","brightness":200,"color":{"hue":120,"saturation":100}}'),
+      payload: DeviceCommandPayloadSchema.describe(
+        'Command payload with canonical property names, e.g. {"state":"ON","brightness":200,"color":{"hue":120,"saturation":100}}',
+      ),
     }),
   },
   control_device: {
@@ -106,7 +136,7 @@ export const toolSchemas = {
       "(e.g. power_on_behavior). For entity state changes (on/off, brightness, color), use control_entity instead.",
     parameters: z.object({
       id: z.string().describe("Device IEEE address"),
-      payload: z.record(z.string(), z.unknown()).describe('Command payload, e.g. {"power_on_behavior":"previous"}'),
+      payload: DeviceCommandPayloadSchema.describe('Command payload, e.g. {"power_on_behavior":"previous"}'),
     }),
   },
   rename_device: {

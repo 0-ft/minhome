@@ -1,4 +1,4 @@
-import { Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, ChevronRight } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import type { TodoItem, TodoStatus } from "../../api.js";
@@ -115,7 +115,6 @@ export function KanbanColumn({
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-sand-900 cursor-pointer hover:text-sand-700"
           onClick={() => onToggleCollapse(status)}
         >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           <LucideIcon name={icon} className="h-4 w-4" />
           <span>{label}</span>
         </button>

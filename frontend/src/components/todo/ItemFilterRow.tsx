@@ -24,7 +24,7 @@ export function ItemFilterRow({
 }) {
   return (
     <div className="flex items-center gap-3">
-      {viewMode === "list" ? (
+      {viewMode === "list" && (
         <ToggleGroup
           type="multiple"
           value={statusFilter}
@@ -42,7 +42,7 @@ export function ItemFilterRow({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-      ) : <div />}
+      )}
       <div className="flex-1 relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-sand-400 pointer-events-none" />
         <input

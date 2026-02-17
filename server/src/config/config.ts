@@ -17,6 +17,11 @@ export type { RoomConfig, RoomDimensions, FurniturePrimitive, FurnitureGroup, Fu
 export const VoiceOptions = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"] as const;
 export const VoiceSchema = z.enum(VoiceOptions);
 export type Voice = z.infer<typeof VoiceSchema>;
+export const VoiceConfigSchema = z.object({
+  voice_name: VoiceSchema.default("ash"),
+  chat_id: z.string().trim().min(1).optional(),
+});
+export type VoiceConfig = z.infer<typeof VoiceConfigSchema>;
 
 export const CalendarSourceSchema = z.object({
   source_url: z.string().url(),
@@ -50,7 +55,7 @@ export type DisplaysConfig = z.infer<typeof DisplaysConfigSchema>;
 const ConfigSchema = z.object({
   devices: z.record(z.string(), DeviceConfigSchema).default({}),
   room: RoomSchema.optional(),
-  voice: VoiceSchema.optional(),
+  voice: VoiceConfigSchema.optional(),
   calendars: CalendarsConfigSchema.optional(),
   displays: DisplaysConfigSchema.optional(),
   /** Maximum debug log file size in MB before old entries are dropped. Default 10. */
@@ -67,7 +72,7 @@ export class ConfigStore {
   constructor(private filePath: string) {
     if (existsSync(filePath)) {
       const raw = readFileSync(filePath, "utf-8");
-      this.data = ConfigSchema.parse(JSON.parse(raw));
+      this.data = this.parseConfig(JSON.parse(raw));
     } else {
       this.data = ConfigSchema.parse({ devices: {} });
       this.save();
@@ -78,7 +83,7 @@ export class ConfigStore {
   private reload(): void {
     if (existsSync(this.filePath)) {
       const raw = readFileSync(this.filePath, "utf-8");
-      this.data = ConfigSchema.parse(JSON.parse(raw));
+      this.data = this.parseConfig(JSON.parse(raw));
     }
   }
 
@@ -105,12 +110,30 @@ export class ConfigStore {
 
   getVoice(): Voice {
     this.reload();
-    return this.data.voice ?? "ash";
+    return this.data.voice?.voice_name ?? "ash";
   }
 
   setVoice(voice: Voice): void {
     this.reload();
-    this.data.voice = voice;
+    this.data.voice = {
+      voice_name: voice,
+      chat_id: this.data.voice?.chat_id,
+    };
+    this.save();
+  }
+
+  getVoiceChatId(): string | undefined {
+    this.reload();
+    return this.data.voice?.chat_id;
+  }
+
+  setVoiceChatId(chatId: string | undefined): void {
+    this.reload();
+    const trimmed = chatId?.trim();
+    this.data.voice = {
+      voice_name: this.data.voice?.voice_name ?? "ash",
+      chat_id: trimmed || undefined,
+    };
     this.save();
   }
 
@@ -253,5 +276,19 @@ export class ConfigStore {
 
   private save(): void {
     writeFileSync(this.filePath, JSON.stringify(this.data, null, 2) + "\n");
+  }
+
+  private parseConfig(raw: unknown): Config {
+    if (!raw || typeof raw !== "object") {
+      return ConfigSchema.parse({ devices: {} });
+    }
+    const normalized = { ...(raw as Record<string, unknown>) };
+    const voiceRaw = normalized.voice;
+    if (typeof voiceRaw === "string") {
+      normalized.voice = {
+        voice_name: voiceRaw,
+      };
+    }
+    return ConfigSchema.parse(normalized);
   }
 }

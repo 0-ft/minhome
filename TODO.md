@@ -5,7 +5,7 @@
 - [x] Room as config
 - [ ] Split config into files (room, devices, llm)
 - [x] Extract logo to component
-- [ ] Server side chats
+- [x] Server side chats
 - [x] MCP for updating room
   - [x] Furniture groups
 - [ ] ZigBee pairing
@@ -35,7 +35,7 @@
 - [ ] Fix immediate automation timing
 - [ ] Multiple device sets per invocation
 - [x] TRMNL server
-a - [x] Dev tunnel
+- [x] Dev tunnel
 - [ ] Display & voice PE auto flashing from device
 - [ ] ConfigStore and AutomationEngine and TokenStore and TodoStore should share a base class
 - [ ] Automation edits auto-save
@@ -43,8 +43,9 @@ a - [x] Dev tunnel
 - [x] Todo lists
 - [ ] System prompt to use XML structuring
 - [ ] Global data access to avoid passing bits around
-- [ ] Voice chat should be persistent
+- [x] Voice chat should be persistent
 - [ ] Emoji pickers everywhere
 - [x] Todo markdown mermaid
 - [ ] Check how much voice heartbeat hammers server
 - [ ] Voice bridge to support announcement queue
+- [ ] Proper chat steps processing

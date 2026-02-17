@@ -85,6 +85,22 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
               );
 
               const sessionId = conversationId || `voice-${Date.now()}`;
+              let chatId = opts.toolCtx.config.getVoiceChatId();
+              if (!chatId) {
+                const created = opts.toolCtx.chats.create({
+                  source: "voice",
+                  lastDeviceId: deviceId,
+                });
+                opts.toolCtx.config.setVoiceChatId(created.id);
+                chatId = created.id;
+                console.log(`[voice] Created default voice chat ${chatId}`);
+              }
+              opts.toolCtx.chats.ensure({
+                id: chatId,
+                source: "voice",
+                lastDeviceId: deviceId,
+              });
+              opts.toolCtx.chats.touch(chatId, deviceId);
 
               // Track active streaming device
               activeStreamingDevice = deviceId;
@@ -138,7 +154,7 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
                 },
               };
 
-              const session = new RealtimeSession(sessionId, callbacks, opts.toolCtx);
+              const session = new RealtimeSession(sessionId, chatId, callbacks, opts.toolCtx);
               sessions.set(deviceId, session);
 
               // Register the audio stream for HTTP serving

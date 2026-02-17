@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { MqttBridge } from "./mqtt.js";
 import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, resolveEntityPayload } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
+import type { ChatStore } from "./config/chats.js";
 import { TodoStatusSchema, type TodoStore } from "./config/todos.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
@@ -20,6 +21,7 @@ import { debugLog, type DebugLogType } from "./debug-log.js";
 export function createApp(
   bridge: MqttBridge,
   config: ConfigStore,
+  chats: ChatStore,
   todos: TodoStore,
   automations: AutomationEngine,
   tokens: TokenStore,
@@ -46,7 +48,7 @@ export function createApp(
     bridgeRef.current.send(JSON.stringify(msg));
   };
 
-  const toolCtx: ToolContext = { bridge, config, todos, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
+  const toolCtx: ToolContext = { bridge, config, chats, todos, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
 
   // --- Auth (no-ops when AUTH_PASSWORD is unset) ---
   app.route("/", authRoutes());
@@ -406,12 +408,14 @@ export function createApp(
           const onConfigChange = () => ws.send(JSON.stringify({ type: "config_change" }));
           const onAutomationsChange = () => ws.send(JSON.stringify({ type: "automations_change" }));
           const onTodosChange = () => ws.send(JSON.stringify({ type: "todos_change" }));
+          const onChatsChange = () => ws.send(JSON.stringify({ type: "chats_change" }));
 
           bridge.on("state_change", onStateChange);
           bridge.on("devices", onDevices);
           bridge.on("config_change", onConfigChange);
           automations.onChanged(onAutomationsChange);
           todos.onChanged(onTodosChange);
+          chats.onChanged(onChatsChange);
 
           // Store cleanup refs on the ws object
           (ws as unknown as Record<string, unknown>).__cleanup = () => {
@@ -420,6 +424,7 @@ export function createApp(
             bridge.off("config_change", onConfigChange);
             automations.offChanged(onAutomationsChange);
             todos.offChanged(onTodosChange);
+            chats.offChanged(onChatsChange);
           };
         },
         onClose(_evt, ws) {

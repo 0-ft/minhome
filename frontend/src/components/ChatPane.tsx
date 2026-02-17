@@ -1,11 +1,14 @@
 import { useChat } from "@ai-sdk/react";
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Send, X, Loader2 } from "lucide-react";
+import { Send, X, Loader2, History } from "lucide-react";
 import type { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
 import { ToolCallPart, isToolPart } from "./ToolCallDisplay.js";
 import type { ToolPart } from "./ToolCallDisplay.js";
+import { useChats, useChatById, useCreateChat, useDeleteChat } from "../api.js";
+import { ChatHistoryModal } from "./ChatHistoryModal.js";
+import { ConfirmDialog } from "./ui/ConfirmDialog.js";
 
 function useChatInfo() {
   return useQuery({
@@ -19,7 +22,21 @@ function useChatInfo() {
 }
 
 export function ChatPane({ onClose }: { onClose: () => void }) {
-  const { messages, sendMessage, status, stop, error, setMessages } = useChat();
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const bootstrappedRef = useRef(false);
+  const creatingInitialChatRef = useRef(false);
+  const hydratedChatIdRef = useRef<string | null>(null);
+  const hydratedChatUpdatedAtRef = useRef<string | null>(null);
+
+  const { data: chats = [], isFetched: chatsFetched } = useChats();
+  const { data: activeChat } = useChatById(activeChatId);
+  const createChat = useCreateChat();
+  const deleteChat = useDeleteChat();
+  const { messages, sendMessage, status, stop, error, setMessages } = useChat({
+    id: activeChatId ?? undefined,
+  });
   const { data: chatInfo } = useChatInfo();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -38,10 +55,58 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (bootstrappedRef.current) return;
+    if (!chatsFetched) return;
+    if (activeChatId) {
+      bootstrappedRef.current = true;
+      return;
+    }
+    if (chats.length > 0) {
+      setActiveChatId(chats[0].id);
+      hydratedChatIdRef.current = null;
+      bootstrappedRef.current = true;
+      return;
+    }
+    if (creatingInitialChatRef.current) return;
+    creatingInitialChatRef.current = true;
+    bootstrappedRef.current = true;
+    createChat.mutate(
+      { source: "text" },
+      {
+        onSuccess: (created) => {
+          setActiveChatId(created.id);
+          hydratedChatIdRef.current = created.id;
+          hydratedChatUpdatedAtRef.current = created.updatedAt;
+          setMessages((created.messages ?? []) as UIMessage[]);
+          creatingInitialChatRef.current = false;
+        },
+        onError: () => {
+          creatingInitialChatRef.current = false;
+          bootstrappedRef.current = false;
+        },
+      },
+    );
+  }, [activeChatId, chats, chatsFetched, createChat, setMessages]);
+
+  useEffect(() => {
+    if (!activeChat || !activeChatId) return;
+    if (activeChat.id !== activeChatId) return;
+    if (
+      hydratedChatIdRef.current === activeChatId
+      && hydratedChatUpdatedAtRef.current === activeChat.updatedAt
+    ) {
+      return;
+    }
+    setMessages((activeChat.messages ?? []) as UIMessage[]);
+    hydratedChatIdRef.current = activeChatId;
+    hydratedChatUpdatedAtRef.current = activeChat.updatedAt;
+  }, [activeChat, activeChatId, setMessages]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || !activeChatId) return;
     sendMessage({ text });
     setInput("");
   };
@@ -63,12 +128,21 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
             {isLoading ? "thinking…" : chatInfo?.model ?? "…"}
           </p>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
+            title="Chat history"
+          >
+            <History className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -129,7 +203,7 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
           ) : (
             <button
               type="submit"
-              disabled={!input.trim()}
+              disabled={!input.trim() || !activeChatId}
               className="shrink-0 p-2 rounded-lg bg-teal-400 text-teal-900 hover:bg-teal-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               title="Send message"
             >
@@ -138,6 +212,67 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </form>
+
+      <ChatHistoryModal
+        open={historyOpen}
+        chats={chats}
+        activeChatId={activeChatId}
+        onClose={() => setHistoryOpen(false)}
+        onSelect={(chatId) => {
+          hydratedChatIdRef.current = null;
+          hydratedChatUpdatedAtRef.current = null;
+          setActiveChatId(chatId);
+          setHistoryOpen(false);
+        }}
+        onDeleteRequested={(chatId) => setDeleteTargetId(chatId)}
+        onNewChat={() => {
+          createChat.mutate(
+            { source: "text" },
+            {
+              onSuccess: (created) => {
+                hydratedChatIdRef.current = created.id;
+                hydratedChatUpdatedAtRef.current = created.updatedAt;
+                setActiveChatId(created.id);
+                setMessages((created.messages ?? []) as UIMessage[]);
+                setHistoryOpen(false);
+              },
+            },
+          );
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTargetId)}
+        title="Delete chat?"
+        message="This will permanently remove the selected chat history."
+        confirmLabel="Delete"
+        pending={deleteChat.isPending}
+        onCancel={() => setDeleteTargetId(null)}
+        onConfirm={async () => {
+          if (!deleteTargetId) return;
+          const deletingId = deleteTargetId;
+          const remaining = chats.filter((chat) => chat.id !== deletingId);
+          try {
+            await deleteChat.mutateAsync(deletingId);
+            setDeleteTargetId(null);
+            if (activeChatId === deletingId) {
+              if (remaining.length > 0) {
+                hydratedChatIdRef.current = null;
+                hydratedChatUpdatedAtRef.current = null;
+                setActiveChatId(remaining[0].id);
+              } else {
+                const created = await createChat.mutateAsync({ source: "text" });
+                hydratedChatIdRef.current = created.id;
+                hydratedChatUpdatedAtRef.current = created.updatedAt;
+                setActiveChatId(created.id);
+                setMessages((created.messages ?? []) as UIMessage[]);
+              }
+            }
+          } catch {
+            // Surface API errors via existing mutation state handling.
+          }
+        }}
+      />
     </div>
   );
 }

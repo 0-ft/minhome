@@ -11,12 +11,23 @@
  */
 
 import { OpenAIRealtimeWebSocket } from "openai/realtime/websocket";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import type { UIMessage } from "ai";
 import { createTools, type ToolContext } from "./tools.js";
 import { createAutomationTools } from "./automation-tools.js";
 import { buildSystemPrompt } from "./chat/context.js";
 import { debugLog } from "./debug-log.js";
 import { createStreamingWavHeader, resample24to48 } from "./audio-utils.js";
+
+interface PersistedToolPart {
+  type: `tool-${string}`;
+  toolCallId: string;
+  state: "output-available" | "output-error";
+  input?: unknown;
+  output?: unknown;
+  errorText?: string;
+}
 
 // ── Convert Zod tool defs → OpenAI Realtime tool format ──────
 
@@ -61,6 +72,7 @@ export interface RealtimeCallbacks {
 
 export class RealtimeSession {
   readonly sessionId: string;
+  readonly chatId: string;
   readonly audioStream: ReadableStream<Uint8Array>;
 
   private rt: OpenAIRealtimeWebSocket | null = null;
@@ -74,10 +86,12 @@ export class RealtimeSession {
 
   constructor(
     sessionId: string,
+    chatId: string,
     callbacks: RealtimeCallbacks,
     toolCtx: ToolContext,
   ) {
     this.sessionId = sessionId;
+    this.chatId = chatId;
     this.callbacks = callbacks;
     this.toolCtx = toolCtx;
 
@@ -240,6 +254,13 @@ export class RealtimeSession {
     this.rt.on("conversation.item.input_audio_transcription.completed" as any, (e: any) => {
       console.log(`[realtime] User said: "${e.transcript}"`);
       debugLog.add("voice_transcript", `User: "${e.transcript}"`, { sessionId: this.sessionId, role: "user", transcript: e.transcript });
+      const transcript = typeof e.transcript === "string" ? e.transcript.trim() : "";
+      if (transcript) {
+        this.appendChatMessage({
+          role: "user",
+          parts: [{ type: "text", text: transcript }],
+        });
+      }
     });
 
     // Audio output
@@ -254,6 +275,13 @@ export class RealtimeSession {
       if (e.transcript) {
         console.log(`\n[realtime] Response transcript: "${e.transcript}"`);
         debugLog.add("voice_transcript", `Assistant: "${e.transcript}"`, { sessionId: this.sessionId, role: "assistant", transcript: e.transcript });
+        const transcript = e.transcript.trim();
+        if (transcript) {
+          this.appendChatMessage({
+            role: "assistant",
+            parts: [{ type: "text", text: transcript }],
+          });
+        }
       }
     });
 
@@ -310,13 +338,33 @@ export class RealtimeSession {
     if (functionCalls.length > 0) {
       console.log(`[realtime] ${functionCalls.length} tool call(s)`);
       const { executeTool } = buildRealtimeTools(this.toolCtx);
+      const toolParts: PersistedToolPart[] = [];
 
       for (const call of functionCalls) {
         console.log(`[realtime] Calling tool: ${call.name}(${call.arguments})`);
-        debugLog.add("voice_tool_call", `Voice tool: ${call.name}`, { sessionId: this.sessionId, tool: call.name, args: tryParseJSON(call.arguments) });
+        const parsedInput = tryParseJSON(call.arguments);
+        debugLog.add("voice_tool_call", `Voice tool: ${call.name}`, {
+          sessionId: this.sessionId,
+          tool: call.name,
+          args: parsedInput,
+        });
         const result = await executeTool(call.name, call.arguments);
         console.log(`[realtime] Tool result [${call.name}]: ${result}`);
-        debugLog.add("voice_tool_result", `Voice tool result: ${call.name}`, { sessionId: this.sessionId, tool: call.name, result: tryParseJSON(result) });
+        const parsedOutput = tryParseJSON(result);
+        debugLog.add("voice_tool_result", `Voice tool result: ${call.name}`, {
+          sessionId: this.sessionId,
+          tool: call.name,
+          result: parsedOutput,
+        });
+
+        const errorText = extractToolError(parsedOutput);
+        toolParts.push(buildToolPart({
+          toolName: call.name,
+          toolCallId: call.call_id,
+          input: parsedInput,
+          output: parsedOutput,
+          errorText,
+        }));
 
         // Send tool result back to OpenAI
         this.rt?.send({
@@ -326,6 +374,13 @@ export class RealtimeSession {
             call_id: call.call_id,
             output: result,
           } as any,
+        });
+      }
+
+      if (toolParts.length > 0) {
+        this.appendChatMessage({
+          role: "assistant",
+          parts: toolParts as unknown as UIMessage["parts"],
         });
       }
 
@@ -350,10 +405,45 @@ export class RealtimeSession {
     this.callbacks.onVoiceDone();
     this.close();
   }
+
+  private appendChatMessage(message: Pick<UIMessage, "role" | "parts">): void {
+    this.toolCtx.chats.appendMessage({
+      id: this.chatId,
+      source: "voice",
+      message: {
+        id: `msg-${randomUUID()}`,
+        role: message.role,
+        parts: message.parts,
+      } as UIMessage,
+    });
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────
 
 function tryParseJSON(s: string): unknown {
   try { return JSON.parse(s); } catch { return s; }
+}
+
+function buildToolPart(args: {
+  toolName: string;
+  toolCallId: string;
+  input: unknown;
+  output: unknown;
+  errorText?: string;
+}): PersistedToolPart {
+  return {
+    type: `tool-${args.toolName}`,
+    toolCallId: args.toolCallId,
+    state: args.errorText ? "output-error" : "output-available",
+    input: args.input,
+    output: args.output,
+    ...(args.errorText ? { errorText: args.errorText } : {}),
+  };
+}
+
+function extractToolError(output: unknown): string | undefined {
+  if (!output || typeof output !== "object") return undefined;
+  const candidate = (output as { error?: unknown }).error;
+  return typeof candidate === "string" ? candidate : undefined;
 }
