@@ -19,8 +19,8 @@ COPY server/src server/src
 COPY server/tsconfig.json server/
 COPY frontend/ frontend/
 
-# Build frontend and server
-RUN pnpm --filter @minhome/frontend build
+# Build frontend and server (constrain heap for low-memory devices)
+RUN NODE_OPTIONS=--max-old-space-size=2048 pnpm --filter @minhome/frontend build
 RUN pnpm --filter @minhome/server build
 
 # Production stage
@@ -47,4 +47,4 @@ ENV NODE_ENV=production
 ENV PORT=3111
 EXPOSE 3111
 
-CMD ["node", "--max-old-space-size=256", "server/dist/index.js"]
+CMD ["node", "server/dist/index.js"]
