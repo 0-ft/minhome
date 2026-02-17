@@ -19,6 +19,7 @@ import { createAutomationTools } from "./automation-tools.js";
 import { buildSystemPrompt } from "./chat/context.js";
 import { debugLog } from "./debug-log.js";
 import { createStreamingWavHeader, resample24to48 } from "./audio-utils.js";
+import { VoiceAudioCapture } from "./voice-audio-capture.js";
 
 interface PersistedToolPart {
   type: `tool-${string}`;
@@ -64,8 +65,8 @@ export interface RealtimeCallbacks {
   onTtsStart: (audioPath: string) => void;
   /** Session complete — bridge should send RUN_END */
   onVoiceDone: () => void;
-  /** Error occurred */
-  onError: (err: Error) => void;
+  /** Error occurred — code is a short identifier for the device (e.g. "rate-limit") */
+  onError: (err: Error, code?: string) => void;
 }
 
 // ── RealtimeSession ──────────────────────────────────────────
@@ -73,6 +74,7 @@ export interface RealtimeCallbacks {
 export class RealtimeSession {
   readonly sessionId: string;
   readonly chatId: string;
+  readonly deviceId: string;
   readonly audioStream: ReadableStream<Uint8Array>;
 
   private rt: OpenAIRealtimeWebSocket | null = null;
@@ -83,17 +85,38 @@ export class RealtimeSession {
   private pendingAudio: Buffer[] = [];
   private callbacks: RealtimeCallbacks;
   private toolCtx: ToolContext;
+  private audioCapture: VoiceAudioCapture | null = null;
+  private audioCaptureFlushed = false;
+  private lastAudioTime = 0;
+  private audioSilenceTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     sessionId: string,
     chatId: string,
+    deviceId: string,
     callbacks: RealtimeCallbacks,
     toolCtx: ToolContext,
   ) {
     this.sessionId = sessionId;
     this.chatId = chatId;
+    this.deviceId = deviceId;
     this.callbacks = callbacks;
     this.toolCtx = toolCtx;
+    if (this.toolCtx.config.getVoiceDebugCaptureEnabled()) {
+      this.audioCapture = new VoiceAudioCapture({
+        captureDir: this.toolCtx.config.getVoiceDebugCaptureDir(),
+        sessionId: this.sessionId,
+        deviceId: this.deviceId,
+        sampleRate: 24_000,
+      });
+      debugLog.add("voice_audio", `Capture enabled for ${this.sessionId}`, {
+        sessionId: this.sessionId,
+        chatId: this.chatId,
+        deviceId: this.deviceId,
+        captureDir: this.toolCtx.config.getVoiceDebugCaptureDir(),
+        partialPath: this.audioCapture.getPartialPath(),
+      });
+    }
 
     // Create the ReadableStream that the HTTP endpoint will serve
     this.audioStream = new ReadableStream<Uint8Array>({
@@ -143,11 +166,13 @@ export class RealtimeSession {
   /** Feed incoming 24kHz PCM audio from the bridge. */
   feedAudio(pcm24: Buffer): void {
     if (this.closed) return;
+    this.lastAudioTime = Date.now();
     if (!this.connected || !this.rt) {
-      // Buffer audio until OpenAI WS is connected
+      // Buffer audio until OpenAI WS is connected — capture happens on flush
       this.pendingAudio.push(pcm24);
       return;
     }
+    this.audioCapture?.appendPcmChunk(pcm24);
     try {
       const base64 = pcm24.toString("base64");
       this.rt.send({
@@ -175,6 +200,11 @@ export class RealtimeSession {
     if (this.closed) return;
     this.closed = true;
     console.log(`[realtime] Closing session ${this.sessionId}`);
+    if (this.audioSilenceTimer) {
+      clearInterval(this.audioSilenceTimer);
+      this.audioSilenceTimer = null;
+    }
+    this.flushAudioCapture("close");
 
     try { this.audioController?.close(); } catch { /* already closed */ }
     try { this.rt?.close(); } catch { /* ignore */ }
@@ -182,6 +212,16 @@ export class RealtimeSession {
   }
 
   // ── Private ──────────────────────────────────────────────
+
+  private startAudioSilenceMonitor(): void {
+    this.audioSilenceTimer = setInterval(() => {
+      if (this.closed || !this.lastAudioTime) return;
+      const silenceMs = Date.now() - this.lastAudioTime;
+      if (silenceMs >= 3000) {
+        console.log(`[realtime] No audio received for ${(silenceMs / 1000).toFixed(1)}s — input may have stopped`);
+      }
+    }, 3000);
+  }
 
   private configureSession(): void {
     if (!this.rt) return;
@@ -230,14 +270,29 @@ export class RealtimeSession {
   private bindEvents(): void {
     if (!this.rt) return;
 
+    // Log ALL events from OpenAI for diagnostics
+    this.rt.on("event", (event: any) => {
+      const type = event?.type ?? "unknown";
+      // Skip high-volume audio delta events
+      if (type === "response.output_audio.delta" || type === "response.output_audio_transcript.delta") return;
+      const preview = JSON.stringify(event).substring(0, 300);
+      console.log(`[realtime:event] ${type} ${preview}`);
+    });
+
     // Session lifecycle
     this.rt.on("session.created", () => {
       console.log(`[realtime] Session created`);
     });
-    this.rt.on("session.updated", () => {
-      console.log(`[realtime] Session configured — ready for audio`);
+    this.rt.on("session.updated", (e: any) => {
+      // Log the turn detection config that OpenAI actually accepted
+      const td = e?.session?.audio?.input?.turn_detection
+        ?? e?.session?.turn_detection
+        ?? "NOT_FOUND";
+      console.log(`[realtime] Session configured — turn_detection: ${JSON.stringify(td)}`);
+      console.log(`[realtime] Ready for audio`);
       this.connected = true;
       this.flushPendingAudio();
+      this.startAudioSilenceMonitor();
     });
 
     // VAD — speech detection
@@ -261,6 +316,16 @@ export class RealtimeSession {
           parts: [{ type: "text", text: transcript }],
         });
       }
+    });
+    this.rt.on("conversation.item.input_audio_transcription.failed" as any, (e: any) => {
+      const errMsg = e?.error?.message ?? "unknown transcription error";
+      const errCode = e?.error?.code ?? "unknown";
+      console.error(`[realtime] Transcription failed (${errCode}): ${errMsg}`);
+      debugLog.add("voice_error", `Transcription failed: ${errMsg}`, {
+        sessionId: this.sessionId,
+        errorCode: errCode,
+        errorType: e?.error?.type,
+      });
     });
 
     // Audio output
@@ -294,7 +359,9 @@ export class RealtimeSession {
     this.rt.on("error", (err) => {
       console.error("[realtime] Error:", err.message);
       debugLog.add("voice_error", `Voice error: ${err.message}`, { sessionId: this.sessionId, error: err.message });
-      this.callbacks.onError(new Error(err.message));
+      const code = (err as any).error?.code ?? "realtime-error";
+      this.callbacks.onError(new Error(err.message), code);
+      this.close();
     });
 
     this.rt.socket.addEventListener("close", () => {
@@ -328,7 +395,33 @@ export class RealtimeSession {
 
   private async handleResponseDone(e: any): Promise<void> {
     const response = e.response;
-    if (!response?.output) return;
+    if (!response) return;
+
+    // Check for failed response (rate limit, quota, etc.)
+    if (response.status === "failed") {
+      const detail = response.status_details?.error;
+      const errCode = detail?.code ?? "unknown";
+      const errMsg = detail?.message ?? "Response failed";
+      const errType = detail?.type ?? "unknown";
+      console.error(`[realtime] Response FAILED (${errCode}): ${errMsg}`);
+      debugLog.add("voice_error", `Response failed: ${errMsg}`, {
+        sessionId: this.sessionId,
+        errorCode: errCode,
+        errorType: errType,
+        responseId: response.id,
+      });
+      this.callbacks.onError(new Error(`OpenAI response failed (${errCode}): ${errMsg}`), errCode);
+      this.close();
+      return;
+    }
+
+    // Cancelled response (e.g. user interrupted) — don't finalize, wait for next response
+    if (response.status === "cancelled") {
+      console.log(`[realtime] Response cancelled (likely user interruption)`);
+      return;
+    }
+
+    if (!response.output) return;
 
     // Check for function calls
     const functionCalls = response.output.filter(
@@ -399,6 +492,7 @@ export class RealtimeSession {
 
     // Close the audio stream
     try { this.audioController?.close(); } catch { /* already closed */ }
+    this.flushAudioCapture("finalize");
 
     console.log(`[realtime] Session ${this.sessionId} finalized`);
     debugLog.add("voice_session_end", `Voice session ended: ${this.sessionId}`, { sessionId: this.sessionId });
@@ -416,6 +510,35 @@ export class RealtimeSession {
         parts: message.parts,
       } as UIMessage,
     });
+  }
+
+  private flushAudioCapture(reason: "close" | "finalize"): void {
+    if (this.audioCaptureFlushed || !this.audioCapture) return;
+    this.audioCaptureFlushed = true;
+    void this.audioCapture.finalize()
+      .then((info) => {
+        if (!info) return;
+        debugLog.add("voice_audio", `Captured voice input for ${this.sessionId}`, {
+          sessionId: this.sessionId,
+          chatId: this.chatId,
+          deviceId: this.deviceId,
+          reason,
+          filePath: info.path,
+          pcmBytes: info.pcmBytes,
+          sampleRate: info.sampleRate,
+          durationSeconds: Number(info.durationSeconds.toFixed(3)),
+        });
+      })
+      .catch((err) => {
+        console.error(`[realtime] Failed to save audio capture for ${this.sessionId}:`, err);
+        debugLog.add("voice_error", `Capture save failed: ${this.sessionId}`, {
+          sessionId: this.sessionId,
+          chatId: this.chatId,
+          deviceId: this.deviceId,
+          reason,
+          error: String(err),
+        });
+      });
   }
 }
 

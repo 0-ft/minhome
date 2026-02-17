@@ -11,6 +11,7 @@
  * Protocol (server → bridge):
  *   - JSON: { type: "speech_stopped", device_id }
  *   - JSON: { type: "tts_start", device_id, audio_path }
+ *   - JSON: { type: "voice_error", device_id, code, message }
  *   - JSON: { type: "voice_done", device_id, conversation_id }
  */
 
@@ -139,8 +140,15 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
                     console.log(`[voice] Cleaned up audio stream for ${sessionId}`);
                   }, 30_000);
                 },
-                onError: (err: Error) => {
+                onError: (err: Error, code?: string) => {
                   console.error(`[voice] Realtime session error (device=${deviceId}):`, err.message);
+                  // Send error event first so the device can show error LED
+                  bridgeWs?.send(JSON.stringify({
+                    type: "voice_error",
+                    device_id: deviceId,
+                    code: code ?? "server-error",
+                    message: err.message,
+                  }));
                   bridgeWs?.send(JSON.stringify({
                     type: "voice_done",
                     device_id: deviceId,
@@ -154,7 +162,7 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
                 },
               };
 
-              const session = new RealtimeSession(sessionId, chatId, callbacks, opts.toolCtx);
+              const session = new RealtimeSession(sessionId, chatId, deviceId, callbacks, opts.toolCtx);
               sessions.set(deviceId, session);
 
               // Register the audio stream for HTTP serving

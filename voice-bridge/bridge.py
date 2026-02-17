@@ -306,6 +306,15 @@ class DeviceHandler:
                 {"url": audio_url},
             )
 
+        elif msg_type == "voice_error":
+            error_code = msg.get("code", "server-error")
+            error_message = msg.get("message", "An error occurred")
+            log.warning("[%s] Server: voice_error (%s) → sending ERROR event", self.device_id, error_code)
+            self.cli.send_voice_assistant_event(
+                VoiceAssistantEventType.VOICE_ASSISTANT_ERROR,
+                {"code": error_code, "message": error_message},
+            )
+
         elif msg_type == "voice_done":
             conv_id = msg.get("conversation_id", "")
             log.info("[%s] Server: voice_done (conversation=%s) → sending RUN_END", self.device_id, conv_id)

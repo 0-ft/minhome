@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { dirname, resolve } from "path";
 import { z } from "zod";
 import { DeviceConfigSchema, EntityConfigSchema, extractEntitiesFromExposes } from "./devices.js";
 import { RoomSchema, type FurnitureItem } from "./room.js";
@@ -20,6 +21,8 @@ export type Voice = z.infer<typeof VoiceSchema>;
 export const VoiceConfigSchema = z.object({
   voice_name: VoiceSchema.default("ash"),
   chat_id: z.string().trim().min(1).optional(),
+  debug_capture_enabled: z.boolean().optional(),
+  debug_capture_dir: z.string().trim().min(1).optional(),
 });
 export type VoiceConfig = z.infer<typeof VoiceConfigSchema>;
 
@@ -118,6 +121,8 @@ export class ConfigStore {
     this.data.voice = {
       voice_name: voice,
       chat_id: this.data.voice?.chat_id,
+      debug_capture_enabled: this.data.voice?.debug_capture_enabled,
+      debug_capture_dir: this.data.voice?.debug_capture_dir,
     };
     this.save();
   }
@@ -133,8 +138,21 @@ export class ConfigStore {
     this.data.voice = {
       voice_name: this.data.voice?.voice_name ?? "ash",
       chat_id: trimmed || undefined,
+      debug_capture_enabled: this.data.voice?.debug_capture_enabled,
+      debug_capture_dir: this.data.voice?.debug_capture_dir,
     };
     this.save();
+  }
+
+  getVoiceDebugCaptureEnabled(): boolean {
+    this.reload();
+    return this.data.voice?.debug_capture_enabled ?? false;
+  }
+
+  getVoiceDebugCaptureDir(): string {
+    this.reload();
+    const configured = this.data.voice?.debug_capture_dir?.trim() || "voice-captures";
+    return resolve(dirname(this.filePath), configured);
   }
 
   getDisplays(): DisplaysConfig {
