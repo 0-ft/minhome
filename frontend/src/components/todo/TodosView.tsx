@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -7,7 +7,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { Columns3, ListChecks, Plus, Settings } from "lucide-react";
+import { ArrowLeft, Columns3, ListChecks, Plus, Settings } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   type TodoList,
@@ -124,6 +124,16 @@ export function TodosView() {
     () => activeList?.items.find((item) => item.id === routeState.itemId) ?? null,
     [activeList, routeState.itemId],
   );
+  const backToTodosPath = useMemo(() => {
+    if (routeState.listId) {
+      return `/todos/${encodeURIComponent(routeState.listId)}`;
+    }
+    const firstListId = lists?.[0]?.id;
+    if (firstListId) {
+      return `/todos/${encodeURIComponent(firstListId)}`;
+    }
+    return "/todos";
+  }, [lists, routeState.listId]);
 
   const searchedItems = useMemo(() => {
     const items = activeList?.items ?? [];
@@ -161,6 +171,10 @@ export function TodosView() {
   );
 
   const createListDisabled = createList.isPending || newListName.trim().length === 0;
+
+  const getTitleTransitionName = useCallback((itemId: number) => `todo-title-${itemId}`, []);
+  const getCardTransitionName = useCallback((itemId: number) => `todo-card-${itemId}`, []);
+  const getStatusTransitionName = useCallback((itemId: number) => `todo-status-${itemId}`, []);
 
   const addPlaceholderItem = (status?: TodoStatus) => {
     if (!activeList) return;
@@ -225,6 +239,9 @@ export function TodosView() {
         {routeState.panel === "items" && selectedItem && activeList ? (
           <ItemDetailView
             item={selectedItem}
+            cardViewTransitionName={getCardTransitionName(selectedItem.id)}
+            titleViewTransitionName={getTitleTransitionName(selectedItem.id)}
+            statusViewTransitionName={getStatusTransitionName(selectedItem.id)}
             statusOptions={statusOptions}
             statusIconByStatus={statusIconByStatus}
             onBack={() => navigate(`/todos/${encodeURIComponent(activeList.id)}`)}
@@ -241,6 +258,46 @@ export function TodosView() {
               );
             }}
           />
+        ) : routeState.panel === "config" ? (
+          <>
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => navigate(backToTodosPath)}
+                className="inline-flex items-center gap-1.5 text-sm text-sand-700 hover:text-sand-900 cursor-pointer"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to todos
+              </button>
+            </div>
+            <TodoConfigView
+              lists={lists ?? []}
+              activeListId={routeState.listId}
+              expandedListId={routeState.listId}
+              onExpandedListChange={(listId) => {
+                if (!listId) {
+                  navigate("/todos/settings");
+                  return;
+                }
+                navigate(`/todos/settings/${encodeURIComponent(listId)}`);
+              }}
+              onCreateListRequested={() => setCreateModalOpen(true)}
+              onSaveList={({ listId, patch }) => {
+                updateList.mutate({ listId, patch });
+              }}
+              onDeleteList={(listId) => {
+                deleteList.mutate(listId, {
+                  onSuccess: () => {
+                    if (routeState.listId === listId) {
+                      navigate("/todos/settings");
+                    }
+                  },
+                });
+              }}
+              savePending={updateList.isPending}
+              deletePending={deleteList.isPending}
+            />
+          </>
         ) : (
           <>
             <div className="flex items-center justify-between gap-3">
@@ -294,35 +351,7 @@ export function TodosView() {
               </div>
             </div>
 
-            {routeState.panel === "config" ? (
-              <TodoConfigView
-                lists={lists ?? []}
-                activeListId={routeState.listId}
-                expandedListId={routeState.listId}
-                onExpandedListChange={(listId) => {
-                  if (!listId) {
-                    navigate("/todos/settings");
-                    return;
-                  }
-                  navigate(`/todos/settings/${encodeURIComponent(listId)}`);
-                }}
-                onCreateListRequested={() => setCreateModalOpen(true)}
-                onSaveList={({ listId, patch }) => {
-                  updateList.mutate({ listId, patch });
-                }}
-                onDeleteList={(listId) => {
-                  deleteList.mutate(listId, {
-                    onSuccess: () => {
-                      if (routeState.listId === listId) {
-                        navigate("/todos/settings");
-                      }
-                    },
-                  });
-                }}
-                savePending={updateList.isPending}
-                deletePending={deleteList.isPending}
-              />
-            ) : activeList ? (
+            {activeList ? (
               <>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
@@ -358,9 +387,16 @@ export function TodosView() {
                         <ListItemCard
                           key={item.id}
                           item={item}
+                          cardViewTransitionName={getCardTransitionName(item.id)}
+                          titleViewTransitionName={getTitleTransitionName(item.id)}
+                          statusViewTransitionName={getStatusTransitionName(item.id)}
                           statusOptions={statusOptions}
                           statusIconByStatus={statusIconByStatus}
-                          onOpen={() => navigate(`/todos/${encodeURIComponent(activeList.id)}/${item.id}`)}
+                          onOpen={() =>
+                            startTransition(() =>
+                              navigate(`/todos/${encodeURIComponent(activeList.id)}/${item.id}`),
+                            )
+                          }
                           onStatusSet={(status) =>
                             setTodoItemStatus.mutate({ listId: activeList.id, itemId: item.id, status })
                           }
@@ -382,8 +418,14 @@ export function TodosView() {
                             collapsed={false}
                             items={col.items}
                             onAddItem={(status) => addPlaceholderItem(status)}
-                            onOpenItem={(itemId) => navigate(`/todos/${encodeURIComponent(activeList.id)}/${itemId}`)}
+                            onOpenItem={(itemId) =>
+                              startTransition(() =>
+                                navigate(`/todos/${encodeURIComponent(activeList.id)}/${itemId}`),
+                              )
+                            }
                             onToggleCollapse={toggleColumnCollapsed}
+                            getCardTransitionName={getCardTransitionName}
+                            getTitleTransitionName={getTitleTransitionName}
                           />
                         ))}
                         {collapsedKanbanColumns.map((col) => (
@@ -396,8 +438,14 @@ export function TodosView() {
                             collapsed={true}
                             items={col.items}
                             onAddItem={(status) => addPlaceholderItem(status)}
-                            onOpenItem={(itemId) => navigate(`/todos/${encodeURIComponent(activeList.id)}/${itemId}`)}
+                            onOpenItem={(itemId) =>
+                              startTransition(() =>
+                                navigate(`/todos/${encodeURIComponent(activeList.id)}/${itemId}`),
+                              )
+                            }
                             onToggleCollapse={toggleColumnCollapsed}
+                            getCardTransitionName={getCardTransitionName}
+                            getTitleTransitionName={getTitleTransitionName}
                           />
                         ))}
                       </div>

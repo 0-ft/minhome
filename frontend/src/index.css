@@ -348,3 +348,51 @@ input[type="range"].color-track::-moz-range-track {
 .prose-float .automation-badge {
   color: #fbbf24 !important;
 }
+
+/* ── View transition polish ───────────────── */
+::view-transition-group(.todo-card-share) {
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+::view-transition-old(.todo-card-share),
+::view-transition-new(.todo-card-share) {
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+::view-transition-group(.todo-title-share) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+::view-transition-old(.todo-title-share),
+::view-transition-new(.todo-title-share) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+::view-transition-group(.todo-status-share) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+::view-transition-old(.todo-status-share),
+::view-transition-new(.todo-status-share) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.todo-card-share),
+  ::view-transition-old(.todo-card-share),
+  ::view-transition-new(.todo-card-share),
+  ::view-transition-group(.todo-title-share),
+  ::view-transition-old(.todo-title-share),
+  ::view-transition-new(.todo-title-share),
+  ::view-transition-group(.todo-status-share),
+  ::view-transition-old(.todo-status-share),
+  ::view-transition-new(.todo-status-share) {
+    animation-duration: 1ms;
+  }
+}

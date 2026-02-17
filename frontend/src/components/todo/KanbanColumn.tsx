@@ -1,6 +1,7 @@
 import { Plus, ChevronRight } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { ViewTransition } from "react";
 import type { TodoItem, TodoStatus } from "../../api.js";
 import { LucideIcon } from "./LucideIcon.js";
 
@@ -8,10 +9,14 @@ function KanbanCard({
   listId,
   item,
   onOpen,
+  cardViewTransitionName,
+  titleViewTransitionName,
 }: {
   listId: string;
   item: TodoItem;
   onOpen: () => void;
+  cardViewTransitionName?: string;
+  titleViewTransitionName?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `todo-item:${listId}:${item.id}`,
@@ -23,14 +28,8 @@ function KanbanCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className="rounded-md bg-sand-50 border border-sand-300 p-2 cursor-grab active:cursor-grabbing shadow-sm"
-    >
+  const cardBody = (
+    <div className="rounded-md bg-sand-50 border border-sand-300 p-2 shadow-sm">
       <button
         type="button"
         className="w-full text-left cursor-pointer hover:text-sand-700"
@@ -39,11 +38,38 @@ function KanbanCard({
           onOpen();
         }}
       >
-        <div className="text-sm text-sand-900 flex items-baseline gap-2">
-          <span className="text-xs font-mono text-sand-500">#{item.id}</span>
-          <span>{item.title}</span>
-        </div>
+        {titleViewTransitionName ? (
+          <ViewTransition name={titleViewTransitionName} share="todo-title-share">
+            <div className="text-sm text-sand-900 flex items-baseline gap-2">
+              <span className="text-xs font-mono text-sand-500">#{item.id}</span>
+              <span>{item.title}</span>
+            </div>
+          </ViewTransition>
+        ) : (
+          <div className="text-sm text-sand-900 flex items-baseline gap-2">
+            <span className="text-xs font-mono text-sand-500">#{item.id}</span>
+            <span>{item.title}</span>
+          </div>
+        )}
       </button>
+    </div>
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="cursor-grab active:cursor-grabbing"
+    >
+      {cardViewTransitionName ? (
+        <ViewTransition name={cardViewTransitionName} share="todo-card-share">
+          {cardBody}
+        </ViewTransition>
+      ) : (
+        cardBody
+      )}
     </div>
   );
 }
@@ -58,6 +84,8 @@ export function KanbanColumn({
   onAddItem,
   onOpenItem,
   onToggleCollapse,
+  getCardTransitionName,
+  getTitleTransitionName,
 }: {
   listId: string;
   status: TodoStatus;
@@ -68,6 +96,8 @@ export function KanbanColumn({
   onAddItem: (status: TodoStatus) => void;
   onOpenItem: (itemId: number) => void;
   onToggleCollapse: (status: TodoStatus) => void;
+  getCardTransitionName?: (itemId: number) => string;
+  getTitleTransitionName?: (itemId: number) => string;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `todo-column:${status}`,
@@ -137,6 +167,8 @@ export function KanbanColumn({
             listId={listId}
             item={item}
             onOpen={() => onOpenItem(item.id)}
+            cardViewTransitionName={getCardTransitionName?.(item.id)}
+            titleViewTransitionName={getTitleTransitionName?.(item.id)}
           />
         ))}
       </div>
