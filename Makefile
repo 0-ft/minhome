@@ -1,4 +1,4 @@
-.PHONY: up up-tunnel up-dev up-dev-tunnel up-hybrid up-hybrid-tunnel down down-tunnel down-dev down-dev-tunnel down-hybrid down-hybrid-tunnel logs logs-dev logs-dev-tunnel logs-hybrid logs-hybrid-tunnel reload reload-bridge logs-bridge
+.PHONY: up up-tunnel up-dev up-dev-tunnel up-hybrid up-hybrid-tunnel down down-tunnel down-dev down-dev-tunnel down-hybrid down-hybrid-tunnel logs logs-tunnel logs-dev logs-dev-tunnel logs-hybrid logs-hybrid-tunnel reload reload-bridge logs-bridge
 
 up:
 	docker compose up -d $(if $(BUILD),--build)
@@ -38,6 +38,9 @@ down-hybrid-tunnel:
 
 logs:
 	docker compose logs -f
+
+logs-tunnel:
+	docker compose -f docker-compose.yml -f docker-compose.tunnel.yml logs -f
 
 logs-dev:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f

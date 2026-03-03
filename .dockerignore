@@ -1,0 +1,17 @@
+# Dependencies
+**/node_modules
+
+# Build outputs
+**/dist
+**/build
+**/.vite
+
+# VCS and editor metadata
+.git
+.gitignore
+.cursor
+
+# Logs and temp files
+**/*.log
+**/.DS_Store
+**/Thumbs.db

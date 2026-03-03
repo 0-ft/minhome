@@ -1,11 +1,42 @@
 services:
-  tunnel:
-    container_name: cloudflared
-    image: cloudflare/cloudflared:latest
+  caddy:
+    container_name: minhome-caddy
+    build:
+      context: .
+      dockerfile: infra/tunnel/caddy/Dockerfile
     restart: unless-stopped
-    command: tunnel run
     environment:
-      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+      - TUNNEL_HOSTNAME=${TUNNEL_HOSTNAME}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    volumes:
+      - ./infra/tunnel/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       - server
+
+  tunnel:
+    container_name: cloudflared
+    build:
+      context: .
+      dockerfile: infra/tunnel/cloudflared/Dockerfile
+    restart: unless-stopped
+    command:
+      - sh
+      - -ec
+      - |
+        sed -e "s|__TUNNEL_HOSTNAME__|$${TUNNEL_HOSTNAME}|g" -e "s|__TUNNEL_ID__|$${TUNNEL_ID}|g" /etc/cloudflared/config.template.yml > /tmp/config.yml
+        exec cloudflared --no-autoupdate tunnel --config /tmp/config.yml run
+    volumes:
+      - ./infra/tunnel/cloudflared/config.template.yml:/etc/cloudflared/config.template.yml:ro
+      - ${TUNNEL_CREDENTIALS_FILE}:/etc/cloudflared/credentials.json:ro
+    environment:
+      - TUNNEL_HOSTNAME=${TUNNEL_HOSTNAME}
+      - TUNNEL_ID=${TUNNEL_ID}
+    depends_on:
+      - caddy
+
+volumes:
+  caddy_data:
+  caddy_config:
 

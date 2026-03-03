@@ -1,0 +1,11 @@
+{
+  auto_https disable_redirects
+}
+
+{$TUNNEL_HOSTNAME} {
+  tls {
+    dns cloudflare {$CF_DNS_API_TOKEN}
+  }
+
+  reverse_proxy server:3111
+}

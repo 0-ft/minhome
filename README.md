@@ -142,6 +142,46 @@ pnpm dev:server   # server only
 pnpm dev:frontend # frontend only
 ```
 
+### Tunnel deployment with origin HTTPS
+
+The tunnel overlay (`docker-compose.tunnel.yml`) runs:
+
+- `caddy` as the local HTTPS terminator
+- `cloudflared` as an outbound-only tunnel connector
+
+Traffic flow is:
+
+`Cloudflare Edge -> cloudflared -> https://caddy:443 -> server:3111`
+
+Setup:
+
+1. Add these values to `.env`:
+
+```env
+TUNNEL_HOSTNAME=home.example.com
+TUNNEL_ID=ad874a13-abcd-469b-90f4-6079e2417632
+TUNNEL_CREDENTIALS_FILE=./infra/tunnel/cloudflared/credentials.json
+CF_DNS_API_TOKEN=...
+```
+
+2. Add the named tunnel credentials JSON at the path configured in `TUNNEL_CREDENTIALS_FILE` (default shown above).
+3. The tunnel config is generated at container start from `infra/tunnel/cloudflared/config.template.yml` using `TUNNEL_HOSTNAME` and `TUNNEL_ID`.
+4. Ensure your tunnel has a DNS route for that hostname (for example via `cloudflared tunnel route dns <tunnel-name> <hostname>`).
+5. Start with tunnel overlay:
+
+```bash
+make up-tunnel BUILD=1
+```
+
+6. Check logs:
+
+```bash
+make logs-tunnel
+```
+
+The `CF_DNS_API_TOKEN` should be scoped with least privilege (Zone DNS edit only for the relevant zone).
+The tunnel credentials JSON should be treated as a secret and kept out of git.
+
 ### 5. Pair Zigbee devices
 
 Open the Zigbee2MQTT dashboard at **http://localhost:8099** and pair your devices. They will appear in the minhome UI automatically.
@@ -211,6 +251,10 @@ Stores automation rules. All triggers, conditions, and actions that reference de
 | `AI_BASE_URL` | _(OpenAI default)_ | Custom base URL for AI provider |
 | `AI_MODEL` | `gpt-4o` | Model identifier |
 | `MINHOME_URL` | `http://localhost:3111` | Server URL (used by CLI and MCP server) |
+| `TUNNEL_HOSTNAME` | _(none)_ | Public hostname Caddy should obtain a certificate for |
+| `TUNNEL_ID` | _(none)_ | Named Cloudflare tunnel UUID for locally-managed tunnel mode |
+| `TUNNEL_CREDENTIALS_FILE` | _(none)_ | Host path to named tunnel credentials JSON mounted into `cloudflared` |
+| `CF_DNS_API_TOKEN` | _(none)_ | Cloudflare API token used by Caddy for DNS-01 challenges |
 
 ## Docker Compose Services
 
@@ -220,9 +264,12 @@ Stores automation rules. All triggers, conditions, and actions that reference de
 | `zigbee2mqtt` | `ghcr.io/koenkk/zigbee2mqtt` | 8099 | Zigbee-to-MQTT bridge |
 | `server` | built from `server/Dockerfile` | 3111 | minhome server (+ frontend in production) |
 | `frontend` _(dev only)_ | `node:22-slim` | 5173 | Vite dev server with hot-reload |
+| `caddy` _(tunnel overlay)_ | built from `infra/tunnel/caddy/Dockerfile` | internal 443 | Origin HTTPS terminator with Let's Encrypt DNS-01 |
+| `tunnel` _(tunnel overlay)_ | built from `infra/tunnel/cloudflared/Dockerfile` | n/a | Outbound tunnel to Cloudflare edge with env-rendered ingress config |
 
 The dev overlay (`docker-compose.dev.yml`) replaces the built server image with a source-mounted hot-reload setup and adds the frontend dev server.
 The hybrid overlay (`docker-compose.hybrid.yml`) keeps server hot-reload but builds and serves static frontend assets from `frontend/dist`.
+The tunnel overlay (`docker-compose.tunnel.yml`) adds `caddy` and `cloudflared` for HTTPS origin + Cloudflare Tunnel.
 
 ## MCP Integration
 

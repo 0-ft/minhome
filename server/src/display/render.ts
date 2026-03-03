@@ -60,7 +60,10 @@ let cachedFontFaces: Array<{
 }> | null = null;
 
 function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  // Copy into a fresh ArrayBuffer so the return type is never SharedArrayBuffer.
+  const copy = new Uint8Array(buffer.byteLength);
+  copy.set(buffer);
+  return copy.buffer;
 }
 
 function getFontFaces() {

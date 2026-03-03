@@ -12,3 +12,4 @@ data/z2m/
 data/server/debug.jsonl
 voice-recordings/
 data/
+infra/tunnel/cloudflared/credentials.json

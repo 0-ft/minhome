@@ -25,8 +25,7 @@ RUN NODE_OPTIONS=--max-old-space-size=2048 pnpm --filter @minhome/server build
 
 # Production stage
 FROM node:22-slim
-RUN apt-get update && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
-ENV FONTCONFIG_PATH=/etc/fonts
+
 RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
 
