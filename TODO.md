@@ -55,3 +55,4 @@
 - [ ] Undo action
 - [ ] List in display order to match list view
 - [ ] Remove monospacing
+- [ ] Choose model in chat

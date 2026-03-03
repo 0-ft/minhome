@@ -20,7 +20,13 @@ function useChatInfo() {
   });
 }
 
-export function ChatPane({ onClose }: { onClose: () => void }) {
+export function ChatPane({
+  onClose,
+  showCloseButton = true,
+}: {
+  onClose: () => void;
+  showCloseButton?: boolean;
+}) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const deleteChat = useDeleteChat();
@@ -70,7 +76,7 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-sand-100 border-l border-sand-300">
+    <div className="flex flex-col h-full bg-sand-100">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-sand-300">
         <div>
@@ -87,12 +93,14 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
           >
             <History className="h-4 w-4" />
           </button>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {showCloseButton && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 

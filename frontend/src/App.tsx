@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, type ComponentType } from "react";
 import { useLocation, useNavigate, Routes, Route, Navigate, Link } from "react-router-dom";
 import { useRealtimeUpdates, useAuthCheck, useLogout } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
@@ -10,11 +10,28 @@ import { ListsView } from "./components/lists/ListsView.js";
 import { DebugView } from "./components/DebugView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { LoginPage } from "./components/LoginPage.js";
-import { MessageSquare, LogOut } from "lucide-react";
+import {
+  Boxes,
+  LampDesk,
+  ListChecks,
+  MessageSquare,
+  Bot,
+  LogOut,
+  Plug,
+} from "lucide-react";
 import { Logo } from "./components/Logo.js";
 
-const TABS = ["entities", "devices", "automations", "room", "lists"] as const;
-type Tab = (typeof TABS)[number];
+const DESKTOP_TABS = ["entities", "devices", "automations", "room", "lists"] as const;
+const MOBILE_TABS = [...DESKTOP_TABS, "chat"] as const;
+type Tab = (typeof MOBILE_TABS)[number];
+const TAB_META: Record<Tab, { label: string; Icon: ComponentType<{ className?: string }> }> = {
+  entities: { label: "Entities", Icon: Boxes },
+  devices: { label: "Devices", Icon: Plug },
+  automations: { label: "Automations", Icon: Bot },
+  room: { label: "Room", Icon: LampDesk },
+  lists: { label: "Lists", Icon: ListChecks },
+  chat: { label: "Chat", Icon: MessageSquare },
+};
 
 const MIN_CHAT_WIDTH = 300;
 const MAX_CHAT_WIDTH = 700;
@@ -51,7 +68,7 @@ function AuthenticatedApp({ showLogout }: { showLogout: boolean }) {
 function MainLayout({ showLogout }: { showLogout: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const tab = (TABS.find((t) => location.pathname === `/${t}` || location.pathname.startsWith(`/${t}/`)) ?? "entities") as Tab;
+  const tab = (MOBILE_TABS.find((t) => location.pathname === `/${t}` || location.pathname.startsWith(`/${t}/`)) ?? "entities") as Tab;
   const logout = useLogout();
   const [chatOpen, setChatOpen] = useState(
     () => window.matchMedia("(min-width: 768px)").matches,
@@ -68,7 +85,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
     const onMove = (ev: MouseEvent) => {
       if (!dragging.current) return;
       const delta = ev.clientX - startX;
-      setChatWidth(Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, startWidth + delta)));
+      setChatWidth(Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, startWidth - delta)));
     };
 
     const onUp = () => {
@@ -86,89 +103,118 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
   }, [chatWidth]);
 
   return (
-    <div className="h-screen flex flex-col bg-sand-50">
-      {/* Header */}
-      <header className="shrink-0 bg-blood-300/80 backdrop-blur-lg">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-end justify-between">
+    <div className="h-screen flex bg-sand-100 md:bg-sand-50">
+      <aside className="hidden md:flex w-56 shrink-0 border-r border-sand-300 bg-blood-300/80 backdrop-blur-lg p-4 flex-col gap-4">
+        <div className="px-1">
           <Logo />
-
-          <div className="flex items-center gap-2">
-            <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
-              {TABS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => navigate(`/${t}`)}
-                  className={`px-3.5 py-1.5 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                    tab === t
-                      ? "bg-sand-50/90 text-blood-600"
-                      : "text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </nav>
-
-            <button
-              onClick={() => setChatOpen(!chatOpen)}
-              className={`p-2 rounded-lg transition-all cursor-pointer ${
-                chatOpen
-                  ? "bg-teal-400 text-teal-900"
-                  : "bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80"
-              }`}
-              title={chatOpen ? "Close AI chat" : "Open AI chat"}
-            >
-              <MessageSquare className="h-4 w-4" />
-            </button>
-
-            {showLogout && (
-              <button
-                onClick={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
-                className="p-2 rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
-                title="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            )}
-          </div>
         </div>
-      </header>
+        <nav className="flex flex-col gap-1 bg-blood-400/60 rounded-lg p-1">
+          {DESKTOP_TABS.map((t) => {
+            const { Icon, label } = TAB_META[t];
+            return (
+              <button
+                key={t}
+                onClick={() => navigate(`/${t}`)}
+                className={`w-full text-left px-3 py-2 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                  tab === t
+                    ? "bg-sand-50/90 text-blood-600"
+                    : "text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
+                }`}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{label}</span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+        <div className="mt-auto flex items-center gap-2">
+          <button
+            onClick={() => setChatOpen(!chatOpen)}
+            className={`h-9 w-9 inline-flex items-center justify-center rounded-lg transition-all cursor-pointer ${
+              chatOpen
+                ? "bg-teal-400 text-teal-900"
+                : "bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80"
+            }`}
+            title={chatOpen ? "Close AI chat" : "Open AI chat"}
+            aria-label={chatOpen ? "Close AI chat" : "Open AI chat"}
+          >
+            <MessageSquare className="h-4 w-4" />
+          </button>
+          {showLogout && (
+            <button
+              onClick={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </aside>
 
-      {/* Body: optional chat pane + scrollable main content */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 min-w-0 flex">
+        <div className="flex-1 min-w-0 overflow-hidden pb-14 md:pb-0">
+          <main className="h-full overflow-hidden p-0 md:p-4">
+            <div className="w-full h-full overflow-hidden md:min-h-[500px] md:rounded-xl md:bg-sand-100 md:border md:border-sand-300">
+              <Routes>
+                <Route
+                  path="entities"
+                  element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div></div>}
+                />
+                <Route
+                  path="devices"
+                  element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div></div>}
+                />
+                <Route
+                  path="automations"
+                  element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div></div>}
+                />
+                <Route path="room" element={<div className="h-full"><RoomView /></div>} />
+                <Route path="lists/*" element={<div className="h-full"><ListsView /></div>} />
+                <Route path="chat" element={<div className="h-full"><ChatPane onClose={() => navigate("/entities")} showCloseButton={false} /></div>} />
+                <Route path="*" element={<Navigate to="/404" replace />} />
+              </Routes>
+            </div>
+          </main>
+        </div>
+
         {chatOpen && (
-          <aside className="shrink-0 relative border-r border-sand-300 shadow-lg" style={{ width: chatWidth }}>
-            <ChatPane onClose={() => setChatOpen(false)} />
-            {/* Resize handle */}
+          <aside className="hidden md:block shrink-0 relative border-l border-sand-300 shadow-lg bg-sand-100" style={{ width: chatWidth }}>
             <div
               onMouseDown={onResizeStart}
-              className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-teal-300/40 active:bg-teal-300/60 transition-colors z-10"
+              className="absolute top-0 left-0 w-1.5 h-full cursor-col-resize hover:bg-teal-300/40 active:bg-teal-300/60 transition-colors z-10"
             />
+            <ChatPane onClose={() => setChatOpen(false)} />
           </aside>
         )}
-
-        <main className="flex-1 overflow-hidden p-4">
-          <div className="w-full h-full min-h-[500px] rounded-xl overflow-hidden bg-sand-100 border border-sand-300">
-            <Routes>
-              <Route
-                path="entities"
-                element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div></div>}
-              />
-              <Route
-                path="devices"
-                element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div></div>}
-              />
-              <Route
-                path="automations"
-                element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div></div>}
-              />
-              <Route path="room" element={<div className="h-full"><RoomView /></div>} />
-              <Route path="lists/*" element={<div className="h-full"><ListsView /></div>} />
-              <Route path="*" element={<Navigate to="/404" replace />} />
-            </Routes>
-          </div>
-        </main>
       </div>
+
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-sand-300 bg-sand-100/95 backdrop-blur px-2 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1">
+        <div className="grid grid-cols-6 gap-1">
+          {MOBILE_TABS.map((t) => {
+            const { Icon, label } = TAB_META[t];
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => navigate(`/${t}`)}
+                className={`h-10 rounded-md inline-flex items-center justify-center transition-colors cursor-pointer ${
+                  tab === t
+                    ? "bg-blood-100 text-blood-700"
+                    : "text-sand-600 hover:bg-sand-200"
+                }`}
+                title={label}
+                aria-label={label}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
@@ -186,7 +232,7 @@ function DebugLayout({ showLogout }: { showLogout: boolean }) {
 
           <div className="flex items-center gap-2">
             <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
-              {TABS.map((t) => (
+              {DESKTOP_TABS.map((t) => (
                 <button
                   key={t}
                   onClick={() => navigate(`/${t}`)}
@@ -244,7 +290,7 @@ function NotFoundPage({ showLogout }: { showLogout: boolean }) {
 
           <div className="flex items-center gap-2">
             <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
-              {TABS.map((t) => (
+              {DESKTOP_TABS.map((t) => (
                 <button
                   key={t}
                   onClick={() => navigate(`/${t}`)}
