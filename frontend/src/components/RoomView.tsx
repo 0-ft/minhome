@@ -853,7 +853,7 @@ export function RoomView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
+      <div className="h-full flex items-center gap-2 text-sm text-sand-600 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading room…
       </div>
@@ -862,7 +862,7 @@ export function RoomView() {
 
   if (!roomConfig) {
     return (
-      <div className="flex items-center justify-center py-12 text-sm text-sand-500 font-mono">
+      <div className="h-full flex items-center justify-center text-sm text-sand-500 font-mono">
         Room not configured
       </div>
     );
@@ -871,7 +871,7 @@ export function RoomView() {
   const cam = roomConfig.camera;
 
   return (
-    <div className="w-full h-full min-h-[500px] rounded-xl overflow-hidden bg-sand-200/60 border border-sand-300">
+    <div className="w-full h-full overflow-hidden">
       <Canvas
         orthographic
         camera={{

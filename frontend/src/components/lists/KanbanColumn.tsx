@@ -29,7 +29,7 @@ function KanbanCard({
   });
 
   const style = {
-    transform: CSS.Translate.toString(transform),
+    transform: isDragging ? undefined : CSS.Translate.toString(transform),
   };
 
   const cardBody = (
@@ -42,19 +42,19 @@ function KanbanCard({
         }}
       >
         {titleViewTransitionName ? (
-          <ViewTransition name={titleViewTransitionName} share="list-title-share">
-            <div className="text-sand-900 min-w-0">
-              <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
-                <LucideIcon name={statusIcon} className="h-3 w-3" />
-                <span>{item.id}</span>
-              </div>
+          <div className="text-sand-900 min-w-0">
+            <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
+              <LucideIcon name={statusIcon} className="h-3 w-3" />
+              <span>{item.id}</span>
+            </div>
+            <ViewTransition name={titleViewTransitionName} share="list-title-share">
               <EditableText
                 value={item.title}
                 onSave={onSaveTitle}
                 textClassName="text-sm leading-snug font-medium text-sand-900"
               />
-            </div>
-          </ViewTransition>
+            </ViewTransition>
+          </div>
         ) : (
           <div className="text-sand-900 min-w-0">
             <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
@@ -78,7 +78,7 @@ function KanbanCard({
       style={style}
       {...listeners}
       {...attributes}
-      className="cursor-grab active:cursor-grabbing"
+      className={`cursor-grab active:cursor-grabbing ${isDragging ? "opacity-0" : ""}`}
     >
       {cardViewTransitionName ? (
         <ViewTransition name={cardViewTransitionName} share="list-card-share">
@@ -127,7 +127,7 @@ export function KanbanColumn({
     return (
       <div
         ref={setNodeRef}
-        className={`h-[320px] w-12 shrink-0 rounded-lg transition-colors ${
+        className={`h-full min-h-[320px] w-12 shrink-0 rounded-lg transition-colors ${
           isOver ? "bg-teal-100" : "bg-sand-200/50"
         }`}
       >
@@ -150,11 +150,11 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`w-80 shrink-0 rounded-lg p-3 transition-colors ${
+      className={`w-80 h-full min-h-0 shrink-0 rounded-lg p-3 transition-colors flex flex-col ${
         isOver ? "bg-teal-100" : "bg-sand-200/50"
       }`}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 shrink-0">
         <button
           type="button"
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-sand-900 cursor-pointer hover:text-sand-700"
@@ -175,7 +175,7 @@ export function KanbanColumn({
           </button>
         </div>
       </div>
-      <div className="space-y-2 min-h-20">
+      <div className="scrollbar-outside space-y-2 min-h-0 flex-1 overflow-y-auto">
         {items.map((item) => (
           <KanbanCard
             key={item.id}

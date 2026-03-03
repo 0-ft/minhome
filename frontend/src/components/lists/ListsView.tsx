@@ -1,11 +1,13 @@
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   pointerWithin,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import { ArrowLeft, Columns3, ListChecks, Plus, Settings } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -70,6 +72,7 @@ export function ListsView() {
   const [newListName, setNewListName] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [draggedKanbanItem, setDraggedKanbanItem] = useState<{ id: number; title: string } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
@@ -202,6 +205,7 @@ export function ListsView() {
   };
 
   const onKanbanDragEnd = (event: DragEndEvent) => {
+    setDraggedKanbanItem(null);
     if (!activeList) return;
     const { active, over } = event;
     if (!over) return;
@@ -213,6 +217,15 @@ export function ListsView() {
     const activeStatusId = active.data.current?.statusId as ListStatusId | undefined;
     if (!activeItemId || !activeStatusId || activeStatusId === nextStatusId) return;
     setListItemStatus.mutate({ listId: activeList.id, itemId: activeItemId, statusId: nextStatusId });
+  };
+
+  const onKanbanDragStart = (event: DragStartEvent) => {
+    if (!activeList) return;
+    const activeItemId = event.active.data.current?.itemId as number | undefined;
+    if (!activeItemId) return;
+    const item = activeList.items.find((candidate) => candidate.id === activeItemId);
+    if (!item) return;
+    setDraggedKanbanItem({ id: item.id, title: item.title });
   };
 
   const toggleColumnCollapsed = (statusId: ListStatusId) => {
@@ -275,7 +288,7 @@ export function ListsView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
+      <div className="h-full flex items-center gap-2 text-sm text-sand-600 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading lists...
       </div>
@@ -284,39 +297,40 @@ export function ListsView() {
 
   if (error) {
     return (
-      <div className="py-10 text-sm text-blood-600">
+      <div className="h-full flex items-center justify-center text-sm text-blood-600">
         Failed to load lists.
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-4">
+    <div className="h-full flex flex-col gap-4 p-4">
         {routeState.panel === "items" && selectedItem && activeList ? (
-          <ItemDetailView
-            item={selectedItem}
-            cardViewTransitionName={getCardTransitionName(selectedItem.id)}
-            titleViewTransitionName={getTitleTransitionName(selectedItem.id)}
-            statusViewTransitionName={getStatusTransitionName(selectedItem.id)}
-            statusOptions={statusOptions}
-            onBack={() => navigate(`/lists/${encodeURIComponent(activeList.id)}`)}
-            onSavePatch={(patch) =>
-              upsertListItem.mutate({ listId: activeList.id, itemId: selectedItem.id, patch })
-            }
-            onSetStatus={(statusId) =>
-              setListItemStatus.mutate({ listId: activeList.id, itemId: selectedItem.id, statusId })
-            }
-            onDelete={() => {
-              deleteListItem.mutate(
-                { listId: activeList.id, itemId: selectedItem.id },
-                { onSuccess: () => navigate(`/lists/${encodeURIComponent(activeList.id)}`) },
-              );
-            }}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+            <ItemDetailView
+              item={selectedItem}
+              cardViewTransitionName={getCardTransitionName(selectedItem.id)}
+              titleViewTransitionName={getTitleTransitionName(selectedItem.id)}
+              statusViewTransitionName={getStatusTransitionName(selectedItem.id)}
+              statusOptions={statusOptions}
+              onBack={() => navigate(`/lists/${encodeURIComponent(activeList.id)}`)}
+              onSavePatch={(patch) =>
+                upsertListItem.mutate({ listId: activeList.id, itemId: selectedItem.id, patch })
+              }
+              onSetStatus={(statusId) =>
+                setListItemStatus.mutate({ listId: activeList.id, itemId: selectedItem.id, statusId })
+              }
+              onDelete={() => {
+                deleteListItem.mutate(
+                  { listId: activeList.id, itemId: selectedItem.id },
+                  { onSuccess: () => navigate(`/lists/${encodeURIComponent(activeList.id)}`) },
+                );
+              }}
+            />
+          </div>
         ) : routeState.panel === "config" ? (
           <>
-            <div className="flex items-center">
+            <div className="flex items-center shrink-0">
               <button
                 type="button"
                 onClick={() => navigate(backToListsPath)}
@@ -326,21 +340,23 @@ export function ListsView() {
                 Back to lists
               </button>
             </div>
-            <ListsConfigView
-              lists={lists ?? []}
-              activeListId={routeState.listId}
-              expandedListId={routeState.listId}
-              onExpandedListChange={onExpandedListChange}
-              onCreateListRequested={onCreateListRequested}
-              onSaveList={onSaveConfigList}
-              onDeleteList={onDeleteConfigList}
-              savePending={updateList.isPending}
-              deletePending={deleteList.isPending}
-            />
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+              <ListsConfigView
+                lists={lists ?? []}
+                activeListId={routeState.listId}
+                expandedListId={routeState.listId}
+                onExpandedListChange={onExpandedListChange}
+                onCreateListRequested={onCreateListRequested}
+                onSaveList={onSaveConfigList}
+                onDeleteList={onDeleteConfigList}
+                savePending={updateList.isPending}
+                deletePending={deleteList.isPending}
+              />
+            </div>
           </>
         ) : (
           <>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 shrink-0">
               <div className="flex gap-0.5 bg-sand-200 rounded-lg p-0.5 max-w-full overflow-x-auto">
                 {(lists ?? []).map((list) => (
                   <button
@@ -373,9 +389,8 @@ export function ListsView() {
                     Kanban
                   </ToggleGroupItem>
                 </ToggleGroup>
-                <Button
-                  size="icon"
-                  variant={routeState.panel === "config" ? "default" : "outline"}
+                <button
+                  type="button"
                   onClick={() => {
                     if (routeState.listId) {
                       navigate(`/lists/settings/${encodeURIComponent(routeState.listId)}`);
@@ -383,17 +398,22 @@ export function ListsView() {
                       navigate("/lists/settings");
                     }
                   }}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors cursor-pointer ${
+                    routeState.panel === "config"
+                      ? "text-blood-700 bg-blood-100/70"
+                      : "text-blood-500 hover:text-blood-700 hover:bg-blood-100/60"
+                  }`}
                   title="List configuration"
                   aria-label="Open list configuration"
                 >
                   <Settings className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             </div>
 
             {activeList ? (
               <>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="flex-1 min-w-0">
                     <ItemFilterRow
                       viewMode={viewMode}
@@ -415,18 +435,18 @@ export function ListsView() {
                 </div>
 
                 {viewMode === "list" ? (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex-1 min-h-0 flex flex-col gap-2">
                     {filteredListItems.length === 0 ? (
-                      <div className="text-center py-12 text-sm text-sand-600 rounded-xl border border-sand-300 bg-sand-50">
+                      <div className="flex-1 min-h-0 overflow-y-auto text-center py-12 text-sm text-sand-600 rounded-xl border border-sand-300 bg-sand-50">
                         No matching items.
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-sand-300 bg-sand-50 overflow-hidden">
+                      <div className="h-full min-h-0 rounded-xl border border-sand-300 bg-sand-50 overflow-hidden flex flex-col">
                         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 border-b border-sand-300 bg-sand-100/70 text-[10px] uppercase tracking-wider text-sand-500">
                           <span>Issue</span>
                           <span className="pr-0.5">Status</span>
                         </div>
-                        <div className="divide-y divide-sand-300">
+                        <div className="divide-y divide-sand-300 overflow-y-auto min-h-0">
                           {filteredListItems.map((item) => (
                             <ListItemCard
                               key={item.id}
@@ -451,58 +471,78 @@ export function ListsView() {
                     )}
                   </div>
                 ) : (
-                  <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={onKanbanDragEnd}>
-                    <div className="overflow-x-auto pb-2">
-                      <div className="flex items-start gap-3 w-max min-w-full">
-                        {expandedKanbanColumns.map((col) => (
-                          <KanbanColumn
-                            key={col.id}
-                            listId={activeList.id}
-                            statusId={col.id}
-                            label={col.label}
-                            icon={col.icon}
-                            collapsed={false}
-                            items={col.items}
-                            onAddItem={(statusId) => addPlaceholderItem(statusId)}
-                            onOpenItem={(itemId) =>
-                              startTransition(() =>
-                                navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
-                              )
-                            }
-                            onSaveItemTitle={saveItemTitle}
-                            onToggleCollapse={toggleColumnCollapsed}
-                            getCardTransitionName={getCardTransitionName}
-                            getTitleTransitionName={getTitleTransitionName}
-                          />
-                        ))}
-                        {collapsedKanbanColumns.map((col) => (
-                          <KanbanColumn
-                            key={col.id}
-                            listId={activeList.id}
-                            statusId={col.id}
-                            label={col.label}
-                            icon={col.icon}
-                            collapsed={true}
-                            items={col.items}
-                            onAddItem={(statusId) => addPlaceholderItem(statusId)}
-                            onOpenItem={(itemId) =>
-                              startTransition(() =>
-                                navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
-                              )
-                            }
-                            onSaveItemTitle={saveItemTitle}
-                            onToggleCollapse={toggleColumnCollapsed}
-                            getCardTransitionName={getCardTransitionName}
-                            getTitleTransitionName={getTitleTransitionName}
-                          />
-                        ))}
+                  <div className="flex-1 min-h-0">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={pointerWithin}
+                      onDragStart={onKanbanDragStart}
+                      onDragCancel={() => setDraggedKanbanItem(null)}
+                      onDragEnd={onKanbanDragEnd}
+                    >
+                      <div className="h-full overflow-x-auto pb-2">
+                        <div className="flex items-start gap-3 w-max min-w-full h-full">
+                          {expandedKanbanColumns.map((col) => (
+                            <KanbanColumn
+                              key={col.id}
+                              listId={activeList.id}
+                              statusId={col.id}
+                              label={col.label}
+                              icon={col.icon}
+                              collapsed={false}
+                              items={col.items}
+                              onAddItem={(statusId) => addPlaceholderItem(statusId)}
+                              onOpenItem={(itemId) =>
+                                startTransition(() =>
+                                  navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
+                                )
+                              }
+                              onSaveItemTitle={saveItemTitle}
+                              onToggleCollapse={toggleColumnCollapsed}
+                              getCardTransitionName={getCardTransitionName}
+                              getTitleTransitionName={getTitleTransitionName}
+                            />
+                          ))}
+                          {collapsedKanbanColumns.map((col) => (
+                            <KanbanColumn
+                              key={col.id}
+                              listId={activeList.id}
+                              statusId={col.id}
+                              label={col.label}
+                              icon={col.icon}
+                              collapsed={true}
+                              items={col.items}
+                              onAddItem={(statusId) => addPlaceholderItem(statusId)}
+                              onOpenItem={(itemId) =>
+                                startTransition(() =>
+                                  navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
+                                )
+                              }
+                              onSaveItemTitle={saveItemTitle}
+                              onToggleCollapse={toggleColumnCollapsed}
+                              getCardTransitionName={getCardTransitionName}
+                              getTitleTransitionName={getTitleTransitionName}
+                            />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </DndContext>
+                      <DragOverlay dropAnimation={null}>
+                        {draggedKanbanItem ? (
+                          <div className="w-72 rounded-md bg-sand-50 border border-sand-300 p-2 shadow-lg opacity-95">
+                            <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
+                              <span>{draggedKanbanItem.id}</span>
+                            </div>
+                            <div className="text-sm leading-snug font-medium text-sand-900 whitespace-pre-wrap break-words">
+                              {draggedKanbanItem.title}
+                            </div>
+                          </div>
+                        ) : null}
+                      </DragOverlay>
+                    </DndContext>
+                  </div>
                 )}
               </>
             ) : (
-              <div className="text-sm text-sand-600 py-10 text-center rounded-xl border border-sand-300 bg-sand-50">
+              <div className="flex-1 min-h-0 overflow-y-auto text-sm text-sand-600 py-10 text-center rounded-xl border border-sand-300 bg-sand-50">
                 No lists yet. Open settings to create one.
                 <div className="mt-3">
                   <Button variant="outline" size="sm" onClick={() => navigate("/lists/settings")}>
@@ -513,8 +553,6 @@ export function ListsView() {
             )}
           </>
         )}
-      </div>
-
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button

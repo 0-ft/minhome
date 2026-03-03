@@ -86,7 +86,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
   }, [chatWidth]);
 
   return (
-    <div className="h-screen flex flex-col bg-sand-100">
+    <div className="h-screen flex flex-col bg-sand-50">
       {/* Header */}
       <header className="shrink-0 bg-blood-300/80 backdrop-blur-lg">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-end justify-between">
@@ -147,15 +147,26 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
           </aside>
         )}
 
-        <main className="flex-1 overflow-y-auto">
-          <Routes>
-            <Route path="entities" element={<div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div>} />
-            <Route path="devices" element={<div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div>} />
-            <Route path="automations" element={<div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div>} />
-            <Route path="room" element={<div className="h-full p-4"><RoomView /></div>} />
-            <Route path="lists/*" element={<div className="max-w-6xl mx-auto px-6 py-8"><ListsView /></div>} />
-            <Route path="*" element={<Navigate to="/404" replace />} />
-          </Routes>
+        <main className="flex-1 overflow-hidden p-4">
+          <div className="w-full h-full min-h-[500px] rounded-xl overflow-hidden bg-sand-100 border border-sand-300">
+            <Routes>
+              <Route
+                path="entities"
+                element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div></div>}
+              />
+              <Route
+                path="devices"
+                element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><DevicesView /></div></div>}
+              />
+              <Route
+                path="automations"
+                element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><AutomationsView /></div></div>}
+              />
+              <Route path="room" element={<div className="h-full"><RoomView /></div>} />
+              <Route path="lists/*" element={<div className="h-full"><ListsView /></div>} />
+              <Route path="*" element={<Navigate to="/404" replace />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </div>
