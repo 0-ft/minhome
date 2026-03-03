@@ -38,7 +38,7 @@ export function StatusPicker({
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        className={`text-[10px] uppercase font-mono px-2 py-1 rounded cursor-pointer inline-flex items-center gap-1 ${statusPillClass(value)}`}
+        className={`text-[10px] uppercase px-2 py-1 rounded cursor-pointer inline-flex items-center gap-1 ${statusPillClass(value)}`}
         onClick={() => setOpen((v) => !v)}
       >
         <LucideIcon name={active?.icon} className="h-3 w-3" />
@@ -50,7 +50,7 @@ export function StatusPicker({
             <button
               key={option.id}
               type="button"
-              className={`w-full text-left px-2 py-1 rounded text-xs font-mono cursor-pointer inline-flex items-center gap-1.5 ${
+              className={`w-full text-left px-2 py-1 rounded text-xs cursor-pointer inline-flex items-center gap-1.5 ${
                 option.id === value ? "bg-sand-200 text-sand-900" : "text-sand-700 hover:bg-sand-100"
               }`}
               onClick={() => {

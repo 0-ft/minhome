@@ -61,7 +61,7 @@ export function ItemDetailView({
       <div>
         <div className="flex items-start justify-between gap-3 py-1">
           <div className="flex items-baseline gap-3 min-w-0 flex-1">
-            <span className="text-3xl md:text-4xl font-normal text-sand-500 font-mono">{item.id}</span>
+            <span className="text-3xl md:text-4xl font-normal text-sand-500">{item.id}</span>
             {titleViewTransitionName ? (
               <ViewTransition name={titleViewTransitionName} share="list-title-share">
                 <EditableText

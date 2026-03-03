@@ -2,7 +2,7 @@ import { startTransition, useCallback, useEffect, useMemo, useState } from "reac
 import {
   DndContext,
   PointerSensor,
-  closestCenter,
+  pointerWithin,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -284,7 +284,7 @@ export function ListsView() {
 
   if (error) {
     return (
-      <div className="py-10 text-sm text-blood-600 font-mono">
+      <div className="py-10 text-sm text-blood-600">
         Failed to load lists.
       </div>
     );
@@ -346,7 +346,7 @@ export function ListsView() {
                   <button
                     key={list.id}
                     onClick={() => navigate(`/lists/${encodeURIComponent(list.id)}`)}
-                    className={`px-3 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+                    className={`px-3 py-1 rounded-md text-[11px] uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
                       routeState.listId === list.id
                         ? "bg-sand-50 text-sand-900 shadow-sm"
                         : "text-sand-500 hover:text-sand-700 hover:bg-sand-100/60"
@@ -422,7 +422,7 @@ export function ListsView() {
                       </div>
                     ) : (
                       <div className="rounded-xl border border-sand-300 bg-sand-50 overflow-hidden">
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 border-b border-sand-300 bg-sand-100/70 text-[10px] font-mono uppercase tracking-wider text-sand-500">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 border-b border-sand-300 bg-sand-100/70 text-[10px] uppercase tracking-wider text-sand-500">
                           <span>Issue</span>
                           <span className="pr-0.5">Status</span>
                         </div>
@@ -451,7 +451,7 @@ export function ListsView() {
                     )}
                   </div>
                 ) : (
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onKanbanDragEnd}>
+                  <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={onKanbanDragEnd}>
                     <div className="overflow-x-auto pb-2">
                       <div className="flex items-start gap-3 w-max min-w-full">
                         {expandedKanbanColumns.map((col) => (
@@ -502,7 +502,7 @@ export function ListsView() {
                 )}
               </>
             ) : (
-              <div className="text-sm text-sand-600 font-mono py-10 text-center rounded-xl border border-sand-300 bg-sand-50">
+              <div className="text-sm text-sand-600 py-10 text-center rounded-xl border border-sand-300 bg-sand-50">
                 No lists yet. Open settings to create one.
                 <div className="mt-3">
                   <Button variant="outline" size="sm" onClick={() => navigate("/lists/settings")}>

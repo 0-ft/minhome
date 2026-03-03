@@ -31,7 +31,7 @@ export function ListItemCard({
       onClick={onOpen}
     >
       <div className="min-w-0">
-        <div className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-sand-500 mb-1">
+        <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
           <LucideIcon name={activeStatus?.icon} className="h-3 w-3" />
           <span>{item.id}</span>
         </div>

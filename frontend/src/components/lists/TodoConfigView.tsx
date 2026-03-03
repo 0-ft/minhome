@@ -156,11 +156,6 @@ export function ListsConfigView({
                 <span className="text-sm font-medium text-sand-900">{list.name}</span>
               </div>
               <div className="flex items-center gap-2">
-                {list.includeInSystemPrompt && (
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wider bg-teal-50 text-teal-600">
-                    Prompt
-                  </span>
-                )}
                 {!isExpanded && (
                   <button
                     type="button"
@@ -181,10 +176,10 @@ export function ListsConfigView({
 
             {!isExpanded && (
               <div className="flex gap-4 mt-2 ml-5">
-                <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
+                <span className="text-[10px] text-sand-500 uppercase tracking-wider">
                   columns: {columnsSummary}
                 </span>
-                <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
+                <span className="text-[10px] text-sand-500 uppercase tracking-wider">
                   items: {list.items.length}
                 </span>
               </div>

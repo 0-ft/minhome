@@ -13,7 +13,7 @@ type ToggleGroupContextValue = {
 const ToggleGroupContext = createContext<ToggleGroupContextValue | null>(null);
 
 const itemVariants = cva(
-  "inline-flex items-center justify-center rounded-md px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors cursor-pointer",
+  "inline-flex items-center justify-center rounded-md px-2.5 py-1 text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer",
   {
     variants: {
       pressed: {

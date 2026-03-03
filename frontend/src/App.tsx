@@ -6,7 +6,7 @@ import { EntitiesView } from "./components/EntitiesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { RoomView } from "./components/RoomView.js";
 import { RoomFullView } from "./components/RoomFullView.js";
-import { ListsView } from "./components/ListsView.js";
+import { ListsView } from "./components/lists/ListsView.js";
 import { DebugView } from "./components/DebugView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { LoginPage } from "./components/LoginPage.js";
@@ -98,7 +98,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
                 <button
                   key={t}
                   onClick={() => navigate(`/${t}`)}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer ${
                     tab === t
                       ? "bg-sand-50/90 text-blood-600"
                       : "text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
@@ -179,7 +179,7 @@ function DebugLayout({ showLogout }: { showLogout: boolean }) {
                 <button
                   key={t}
                   onClick={() => navigate(`/${t}`)}
-                  className="px-3.5 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
+                  className="px-3.5 py-1.5 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
                 >
                   {t}
                 </button>
@@ -237,7 +237,7 @@ function NotFoundPage({ showLogout }: { showLogout: boolean }) {
                 <button
                   key={t}
                   onClick={() => navigate(`/${t}`)}
-                  className="px-3.5 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
+                  className="px-3.5 py-1.5 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
                 >
                   {t}
                 </button>

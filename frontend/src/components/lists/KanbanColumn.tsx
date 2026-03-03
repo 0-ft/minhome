@@ -44,7 +44,7 @@ function KanbanCard({
         {titleViewTransitionName ? (
           <ViewTransition name={titleViewTransitionName} share="list-title-share">
             <div className="text-sand-900 min-w-0">
-              <div className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-sand-500 mb-1">
+              <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
                 <LucideIcon name={statusIcon} className="h-3 w-3" />
                 <span>{item.id}</span>
               </div>
@@ -57,7 +57,7 @@ function KanbanCard({
           </ViewTransition>
         ) : (
           <div className="text-sand-900 min-w-0">
-            <div className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-sand-500 mb-1">
+            <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
               <LucideIcon name={statusIcon} className="h-3 w-3" />
               <span>{item.id}</span>
             </div>
@@ -164,7 +164,7 @@ export function KanbanColumn({
           <span>{label}</span>
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-sand-600">{items.length}</span>
+          <span className="text-xs text-sand-600">{items.length}</span>
           <button
             type="button"
             onClick={() => onAddItem(statusId)}

@@ -48,7 +48,7 @@
 - [x] Todo markdown mermaid
 - [ ] Check how much voice heartbeat hammers server
 - [ ] Voice bridge to support announcement queue
-- [ ] Proper chat steps processing
+- [x] Proper chat steps processing
 - [ ] Configurable sysprompt instructions for persona/conciseness
 - [ ] HTTPS endpoint & e2ee tunnel
 - [ ] Push notifications

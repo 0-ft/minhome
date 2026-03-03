@@ -56,12 +56,12 @@ export function ListSettingsView({
           </button>
         ) : <div />}
         {saving && (
-          <span className="text-xs text-sand-500 font-mono">Saving…</span>
+          <span className="text-xs text-sand-500">Saving…</span>
         )}
       </div>
 
       <div>
-        <label className="block text-[11px] font-mono uppercase tracking-wider text-sand-500 mb-1">
+        <label className="block text-[11px] uppercase tracking-wider text-sand-500 mb-1">
           List name
         </label>
         <Input
@@ -82,13 +82,13 @@ export function ListSettingsView({
       </div>
 
       <div className="space-y-2">
-        <div className="text-[11px] font-mono uppercase tracking-wider text-sand-500">
+        <div className="text-[11px] uppercase tracking-wider text-sand-500">
           Columns
         </div>
         <div className="space-y-2">
           {columns.map((column, idx) => (
             <div key={idx} className="rounded-md border border-sand-300 bg-sand-100/40 p-2 space-y-2">
-              <div className="grid grid-cols-[1fr_220px_auto] gap-2 items-center">
+              <div className="grid grid-cols-[1fr_180px_auto] gap-2 items-center">
                 <Input
                   value={column.name}
                   onChange={(e) => {

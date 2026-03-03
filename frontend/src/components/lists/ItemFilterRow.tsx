@@ -29,7 +29,7 @@ export function ItemFilterRow({
           }}
         >
           {statusFilters.map((f) => (
-            <ToggleGroupItem key={f.id} value={f.id} className="px-3 py-1 text-[11px]">
+            <ToggleGroupItem key={f.id} value={f.id} className="px-3 py-1">
               <span className="inline-flex items-center gap-1.5">
                 <LucideIcon name={f.icon} className="h-3 w-3" />
                 <span>{f.label}</span>
