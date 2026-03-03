@@ -20,7 +20,7 @@ export function Toggle({
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         "relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-blood-500",
+        "focus-visible:outline-none",
         checked ? "bg-teal-400" : "bg-blood-700/70",
         disabled ? "opacity-60 cursor-not-allowed" : "",
         className,

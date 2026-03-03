@@ -349,7 +349,7 @@ export function DebugView() {
               placeholder="Filter logs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-sand-50 border border-sand-300 text-sm text-sand-800 placeholder:text-sand-400 focus:outline-none focus:ring-2 focus:ring-teal-300/50"
+              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-sand-50 border border-sand-300 text-sm text-sand-800 placeholder:text-sand-400 focus:outline-none focus:bg-sand-100 transition-colors"
             />
           </div>
         </div>

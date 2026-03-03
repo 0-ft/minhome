@@ -57,7 +57,7 @@ function defaultAction(type: string = "device_set"): Action {
 
 // ── Shared styling ────────────────────────────────────────
 
-const fieldCls = "w-full rounded-lg bg-sand-100 border border-sand-300 px-3 py-1.5 text-sm text-sand-900 focus:outline-none focus:ring-2 focus:ring-teal-300/50";
+const fieldCls = "w-full rounded-lg bg-sand-100 border border-sand-300 px-3 py-1.5 text-sm text-sand-900 focus:outline-none focus:bg-sand-50 transition-colors";
 const selectCls = fieldCls + " appearance-none cursor-pointer";
 const labelCls = "text-[11px] font-mono text-sand-500 uppercase tracking-wider mb-1";
 const removeBtnCls = "h-6 w-6 inline-flex items-center justify-center rounded text-sand-400 hover:text-blood-500 hover:bg-sand-200 transition-colors cursor-pointer shrink-0";

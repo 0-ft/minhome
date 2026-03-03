@@ -97,7 +97,7 @@ export function IconPicker({
           }}
           placeholder={placeholder}
           className={cn(
-            "h-8 w-full rounded-md border border-sand-300 bg-sand-50 pl-8 pr-8 text-sm text-sand-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/50",
+            "h-8 w-full rounded-md border border-sand-300 bg-sand-50 pl-8 pr-8 text-sm text-sand-900 focus-visible:outline-none focus-visible:bg-sand-100 transition-colors",
             className,
           )}
         />

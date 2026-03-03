@@ -70,7 +70,6 @@ export function ListsView() {
   const [newListName, setNewListName] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ListStatusId[]>([]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
@@ -113,12 +112,12 @@ export function ListsView() {
     () => statusOptions.map((option) => option.id),
     [statusOptions],
   );
-
-  useEffect(() => {
-    const validSelected = statusFilter.filter((statusId) => statusOptionIds.includes(statusId));
-    if (validSelected.length === statusFilter.length && validSelected.length > 0) return;
-    setStatusFilter(statusOptionIds);
-  }, [statusFilter, statusOptionIds]);
+  const statusFilter = useMemo<ListStatusId[]>(
+    () => (activeList?.columns ?? [])
+      .filter((column) => !column.collapsed)
+      .map((column) => column.id),
+    [activeList?.columns],
+  );
 
   const statusFilters = useMemo(
     () => statusOptions.map((option) => ({ id: option.id, label: option.label, icon: option.icon })),
@@ -154,11 +153,10 @@ export function ListsView() {
   }, [activeList, searchQuery]);
 
   const filteredListItems = useMemo(() => {
-    const selected = statusFilter.length > 0 ? statusFilter : statusOptionIds;
     return searchedItems
-      .filter((item) => selected.includes(item.statusId))
+      .filter((item) => statusFilter.includes(item.statusId))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [searchedItems, statusFilter, statusOptionIds]);
+  }, [searchedItems, statusFilter]);
 
   const groupedByColumn = useMemo(() => {
     return (activeList?.columns ?? []).map((column) => ({
@@ -217,6 +215,19 @@ export function ListsView() {
     const nextColumns = activeList.columns.map((column) =>
       column.id === statusId ? { ...column, collapsed: !column.collapsed } : column,
     );
+    updateList.mutate({ listId: activeList.id, patch: { columns: nextColumns } });
+  };
+
+  const onStatusFilterChange = (next: string[]) => {
+    if (!activeList) return;
+    const allowed = new Set(statusOptionIds);
+    const visible = new Set(next.filter((statusId): statusId is ListStatusId => allowed.has(statusId)));
+    const nextColumns = activeList.columns.map((column) => ({
+      ...column,
+      collapsed: !visible.has(column.id),
+    }));
+    const hasChange = nextColumns.some((column, idx) => column.collapsed !== activeList.columns[idx]?.collapsed);
+    if (!hasChange) return;
     updateList.mutate({ listId: activeList.id, patch: { columns: nextColumns } });
   };
 
@@ -383,8 +394,7 @@ export function ListsView() {
                       viewMode={viewMode}
                       statusFilter={statusFilter}
                       statusFilters={statusFilters}
-                      statusOptions={statusOptionIds}
-                      onStatusFilterChange={setStatusFilter}
+                      onStatusFilterChange={onStatusFilterChange}
                       searchQuery={searchQuery}
                       onSearchQueryChange={setSearchQuery}
                     />
