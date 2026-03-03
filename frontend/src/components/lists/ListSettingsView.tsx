@@ -1,6 +1,7 @@
 import { ArrowLeft, Trash2 } from "lucide-react";
 import type { ListColumn } from "../../api.js";
 import { Button } from "../ui/button.js";
+import { IconPicker } from "../ui/icon-picker.js";
 import { Input } from "../ui/input.js";
 import { Toggle } from "../ui/toggle.js";
 
@@ -87,7 +88,7 @@ export function ListSettingsView({
         <div className="space-y-2">
           {columns.map((column, idx) => (
             <div key={idx} className="rounded-md border border-sand-300 bg-sand-100/40 p-2 space-y-2">
-              <div className="grid grid-cols-[1fr_140px_auto] gap-2 items-center">
+              <div className="grid grid-cols-[1fr_220px_auto] gap-2 items-center">
                 <Input
                   value={column.name}
                   onChange={(e) => {
@@ -96,13 +97,11 @@ export function ListSettingsView({
                   placeholder="Status"
                   className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
                 />
-                <Input
-                  value={column.icon ?? ""}
-                  onChange={(e) => {
-                    onColumnsChange(columns.map((c, i) => (i === idx ? { ...c, icon: e.target.value } : c)));
+                <IconPicker
+                  value={column.icon}
+                  onChange={(icon) => {
+                    onColumnsChange(columns.map((c, i) => (i === idx ? { ...c, icon } : c)));
                   }}
-                  placeholder="Icon (optional)"
-                  className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
                 />
                 <button
                   type="button"

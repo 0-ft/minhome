@@ -25,9 +25,20 @@ export interface ListProvider {
   getList(listId: string): List | undefined;
 }
 
+const KEBAB_ICON_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function kebabToPascalCase(value: string): string {
+  return value
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join("");
+}
+
 function getLucideIconSvgByName(name: string | undefined): string | null {
-  if (!name) return null;
-  const maybeSvg = (LucideStatic as Record<string, unknown>)[name];
+  if (!name || !KEBAB_ICON_NAME_RE.test(name)) return null;
+  const iconsByName = LucideStatic as Record<string, unknown>;
+  const maybeSvg = iconsByName[kebabToPascalCase(name)];
   if (typeof maybeSvg !== "string") return null;
   return maybeSvg.replaceAll("currentColor", "#000");
 }
