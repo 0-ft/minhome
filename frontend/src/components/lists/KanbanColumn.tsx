@@ -8,12 +8,14 @@ import { LucideIcon } from "./LucideIcon.js";
 function KanbanCard({
   listId,
   item,
+  statusIcon,
   onOpen,
   cardViewTransitionName,
   titleViewTransitionName,
 }: {
   listId: string;
   item: ListItem;
+  statusIcon?: string;
   onOpen: () => void;
   cardViewTransitionName?: string;
   titleViewTransitionName?: string;
@@ -39,15 +41,25 @@ function KanbanCard({
       >
         {titleViewTransitionName ? (
           <ViewTransition name={titleViewTransitionName} share="list-title-share">
-            <div className="text-sm text-sand-900 flex items-baseline gap-2">
-              <span className="text-xs font-mono text-sand-500">#{item.id}</span>
-              <span>{item.title}</span>
+            <div className="text-sand-900 min-w-0">
+              <div className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-sand-500 mb-1">
+                <LucideIcon name={statusIcon} className="h-3 w-3" />
+                <span>#{item.id}</span>
+              </div>
+              <div className="text-sm leading-snug font-medium truncate">
+                {item.title}
+              </div>
             </div>
           </ViewTransition>
         ) : (
-          <div className="text-sm text-sand-900 flex items-baseline gap-2">
-            <span className="text-xs font-mono text-sand-500">#{item.id}</span>
-            <span>{item.title}</span>
+          <div className="text-sand-900 min-w-0">
+            <div className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-sand-500 mb-1">
+              <LucideIcon name={statusIcon} className="h-3 w-3" />
+              <span>#{item.id}</span>
+            </div>
+            <div className="text-sm leading-snug font-medium truncate">
+              {item.title}
+            </div>
           </div>
         )}
       </button>
@@ -161,6 +173,7 @@ export function KanbanColumn({
             key={item.id}
             listId={listId}
             item={item}
+            statusIcon={icon}
             onOpen={() => onOpenItem(item.id)}
             cardViewTransitionName={getCardTransitionName?.(item.id)}
             titleViewTransitionName={getTitleTransitionName?.(item.id)}

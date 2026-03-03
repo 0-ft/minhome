@@ -5,7 +5,55 @@ import type { AutomationEngine } from "../automations.js";
 import type { VoiceDeviceInfo } from "../tools.js";
 import { extractEntitiesFromExposes, buildEntityResponses } from "../config/devices.js";
 
+interface SystemPromptParts {
+  base: string;
+  inlineReferences: string;
+}
+
+function buildInlineReferencesPrompt(): string {
+  return `Inline references:
+When you mention a device in your response, ALWAYS wrap it in a tag:
+  <device id="IEEE_ADDRESS">Device Name</device>
+When you mention a specific entity on a device, use:
+  <entity id="ENTITY_KEY" device="IEEE_ADDRESS">Entity Name</entity>
+When you mention an automation, use:
+  <automation id="AUTOMATION_ID">Automation Name</automation>
+For example: I turned off <device id="0xc890a81f1ffe0000">Ceiling Light</device>.
+Or: The <entity id="l3" device="0xa4c138d2b1cf1389">Sunrise Lamp</entity> is now on.
+Or: I created <automation id="morning-lights">Morning Lights</automation>.
+Always use the exact ID and the friendly name as the text content.`;
+}
+
+export function buildSystemPromptParts(
+  bridge: MqttBridge,
+  config: ConfigStore,
+  lists: ListStore,
+  automations: AutomationEngine,
+  voiceDevices?: Map<string, VoiceDeviceInfo>,
+): SystemPromptParts {
+  const inlineReferences = buildInlineReferencesPrompt();
+  const base = buildBaseSystemPrompt(bridge, config, lists, automations, voiceDevices);
+  return { base, inlineReferences };
+}
+
 export function buildSystemPrompt(
+  bridge: MqttBridge,
+  config: ConfigStore,
+  lists: ListStore,
+  automations: AutomationEngine,
+  voiceDevices?: Map<string, VoiceDeviceInfo>,
+): string {
+  const { base, inlineReferences } = buildSystemPromptParts(
+    bridge,
+    config,
+    lists,
+    automations,
+    voiceDevices,
+  );
+  return `${base}\n\n${inlineReferences}`;
+}
+
+function buildBaseSystemPrompt(
   bridge: MqttBridge,
   config: ConfigStore,
   lists: ListStore,
@@ -81,7 +129,7 @@ ${JSON.stringify([...voiceDevices.entries()].map(([id, info]) => ({ id, name: in
 You can send spoken announcements to these devices using the announce tool. Omit device_id to announce on all devices, or provide a specific device_id to target one.
 ` : ""}
 Guidelines:
-- Be concise and helpful.
+- Be concise, direct, and helpful. Avoid unnecessary filler or repetitive closings.
 - When controlling devices, ALWAYS use control_entity with the entity key and canonical property names (state, brightness, color_temp, color). The server resolves actual MQTT property names automatically. For colour-changing lights, set colour with: {"color":{"hue":N,"saturation":N}} (hue 0-360, saturation 0-100) or {"color":{"hex":"#RRGGBB"}}.
 - For single-entity devices, use entity key "main".
 - Only use control_device for device-level properties that don't belong to any entity (e.g. power_on_behavior).
@@ -95,17 +143,5 @@ Guidelines:
 - After performing an action, briefly confirm what you did.
 - If you're unsure about a device or action, ask for clarification.
 - When asked to modify the room configuration, ALWAYS call get_room_config first to read the current state. Then use the appropriate granular tool: set_room_dimensions for size/floor, set_room_lights for light placements, upsert_furniture_item to add/edit a single named piece, remove_furniture_item to delete one, or update_room_furniture to replace the entire furniture array. Never guess at the existing config.
-- When modifying furniture, consider spatial dependencies: if you change a piece's position or size, check whether other objects sit on top of, attach to, or align with it and adjust them too. For example, raising a desk means monitors, lamps, and other items on the desk must also move up by the same amount. Always review the full furniture list from get_room_config for affected neighbours before making changes.
-
-Inline references:
-When you mention a device in your response, ALWAYS wrap it in a tag:
-  <device id="IEEE_ADDRESS">Device Name</device>
-When you mention a specific entity on a device, use:
-  <entity id="ENTITY_KEY" device="IEEE_ADDRESS">Entity Name</entity>
-When you mention an automation, use:
-  <automation id="AUTOMATION_ID">Automation Name</automation>
-For example: I turned off <device id="0xc890a81f1ffe0000">Ceiling Light</device>.
-Or: The <entity id="l3" device="0xa4c138d2b1cf1389">Sunrise Lamp</entity> is now on.
-Or: I created <automation id="morning-lights">Morning Lights</automation>.
-Always use the exact ID and the friendly name as the text content.`;
+- When modifying furniture, consider spatial dependencies: if you change a piece's position or size, check whether other objects sit on top of, attach to, or align with it and adjust them too. For example, raising a desk means monitors, lamps, and other items on the desk must also move up by the same amount. Always review the full furniture list from get_room_config for affected neighbours before making changes.`;
 }

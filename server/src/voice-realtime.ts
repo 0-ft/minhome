@@ -16,7 +16,7 @@ import { z } from "zod";
 import type { UIMessage } from "ai";
 import { createTools, type ToolContext } from "./tools.js";
 import { createAutomationTools } from "./automation-tools.js";
-import { buildSystemPrompt } from "./chat/context.js";
+import { buildSystemPromptParts } from "./chat/context.js";
 import { debugLog } from "./debug-log.js";
 import { createStreamingWavHeader, resample24to48 } from "./audio-utils.js";
 import { VoiceAudioCapture } from "./voice-audio-capture.js";
@@ -209,7 +209,7 @@ export class RealtimeSession {
   private configureSession(): void {
     if (!this.rt) return;
 
-    const system = buildSystemPrompt(
+    const { base } = buildSystemPromptParts(
       this.toolCtx.bridge,
       this.toolCtx.config,
       this.toolCtx.lists,
@@ -217,9 +217,14 @@ export class RealtimeSession {
       this.toolCtx.voiceDevices,
     );
 
-    // Strip inline reference instructions — the Realtime API outputs audio, not text with XML tags
-    const voiceSystem = system.replace(/Inline references:[\s\S]*$/, "").trim()
-      + "\n\nYou are responding via voice. Be concise. Do not use markdown or XML tags.";
+    const voiceSystem = base
+      + "\n\nVoice response rules:\n"
+      + "- Speak in plain text only. Do not use markdown or XML tags.\n"
+      + "- Keep responses very short: one brief sentence by default.\n"
+      + "- State only the essential result or next question.\n"
+      + "- Do not add conversational sign-offs or filler (for example: \"let me know if you need anything else\", \"feel free to ask\", \"anything else\").\n"
+      + "- If the user asks a yes/no action and it succeeded, confirm directly and stop.\n"
+      + "- If the requested state is already true, say that briefly and stop.";
 
     const { tools } = buildRealtimeTools(this.toolCtx);
 
