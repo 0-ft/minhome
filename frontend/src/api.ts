@@ -282,75 +282,76 @@ export function useDeleteAutomation() {
   });
 }
 
-// --- Todos ---
+// --- Lists ---
 
-export type TodoStatus = string;
+export type ListStatus = string;
 
-export interface TodoItem {
+export interface ListItem {
   id: number;
   title: string;
   body: string;
-  status: TodoStatus;
+  status: ListStatus;
 }
 
-export interface TodoColumn {
-  status: TodoStatus;
+export interface ListColumn {
+  status: ListStatus;
   collapsed: boolean;
   icon?: string;
 }
 
-export interface TodoList {
+export interface List {
   id: string;
   name: string;
   includeInSystemPrompt: boolean;
   view: "list" | "kanban";
-  columns: TodoColumn[];
-  items: TodoItem[];
+  columns: ListColumn[];
+  items: ListItem[];
+  completeStatuses?: string[];
 }
 
-export function useTodoLists() {
+export function useLists() {
   return useQuery({
-    queryKey: ["todos"],
+    queryKey: ["lists"],
     queryFn: async () => {
-      const res = await api.api.todos.$get();
-      if (!res.ok) throw new Error("Failed to fetch todo lists");
-      return res.json() as Promise<TodoList[]>;
+      const res = await api.api.lists.$get();
+      if (!res.ok) throw new Error("Failed to fetch lists");
+      return res.json() as Promise<List[]>;
     },
   });
 }
 
-export function useTodoList(listId: string | null) {
+export function useList(listId: string | null) {
   return useQuery({
-    queryKey: ["todos", listId],
+    queryKey: ["lists", listId],
     enabled: Boolean(listId),
     queryFn: async () => {
-      const res = await api.api.todos[":listId"].$get({
+      const res = await api.api.lists[":listId"].$get({
         param: { listId: listId! },
       });
-      if (!res.ok) throw new Error("Failed to fetch todo list");
-      return res.json() as Promise<TodoList>;
+      if (!res.ok) throw new Error("Failed to fetch list");
+      return res.json() as Promise<List>;
     },
   });
 }
 
-export function useCreateTodoList() {
+export function useCreateList() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { id: string; name: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: TodoColumn[] }) => {
-      const res = await api.api.todos.lists.$post({
+    mutationFn: async (payload: { id: string; name: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: ListColumn[]; complete_statuses?: string[] }) => {
+      const res = await api.api.lists.$post({
         json: payload,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Failed to create todo list");
-      return data as TodoList;
+      if (!res.ok) throw new Error(data?.error ?? "Failed to create list");
+      return data as List;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["todos"] });
+      qc.invalidateQueries({ queryKey: ["lists"] });
     },
   });
 }
 
-export function useUpdateTodoList() {
+export function useUpdateList() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -358,41 +359,41 @@ export function useUpdateTodoList() {
       patch,
     }: {
       listId: string;
-      patch: { name?: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: TodoColumn[] };
+      patch: { name?: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: ListColumn[]; complete_statuses?: string[] };
     }) => {
-      const res = await api.api.todos[":listId"].$patch({
+      const res = await api.api.lists[":listId"].$patch({
         param: { listId },
         json: patch,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Failed to update todo list");
-      return data as { ok: true; list: TodoList };
+      if (!res.ok) throw new Error(data?.error ?? "Failed to update list");
+      return data as { ok: true; list: List };
     },
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["todos"] });
-      qc.invalidateQueries({ queryKey: ["todos", vars.listId] });
+      qc.invalidateQueries({ queryKey: ["lists"] });
+      qc.invalidateQueries({ queryKey: ["lists", vars.listId] });
     },
   });
 }
 
-export function useDeleteTodoList() {
+export function useDeleteList() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (listId: string) => {
-      const res = await api.api.todos[":listId"].$delete({
+      const res = await api.api.lists[":listId"].$delete({
         param: { listId },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Failed to delete todo list");
+      if (!res.ok) throw new Error(data?.error ?? "Failed to delete list");
       return data as { ok: true };
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["todos"] });
+      qc.invalidateQueries({ queryKey: ["lists"] });
     },
   });
 }
 
-export function useUpsertTodoItem() {
+export function useUpsertListItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -405,27 +406,27 @@ export function useUpsertTodoItem() {
       patch: {
         title?: string;
         body?: string;
-        status?: TodoStatus;
+        status?: ListStatus;
         list_name?: string;
         include_in_system_prompt?: boolean;
       };
     }) => {
-      const res = await api.api.todos[":listId"].items[":itemId"].$put({
+      const res = await api.api.lists[":listId"].items[":itemId"].$put({
         param: { listId, itemId: String(itemId) },
         json: patch,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Failed to upsert todo item");
-      return data as { ok: true; item: TodoItem };
+      if (!res.ok) throw new Error(data?.error ?? "Failed to upsert list item");
+      return data as { ok: true; item: ListItem };
     },
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["todos"] });
-      qc.invalidateQueries({ queryKey: ["todos", vars.listId] });
+      qc.invalidateQueries({ queryKey: ["lists"] });
+      qc.invalidateQueries({ queryKey: ["lists", vars.listId] });
     },
   });
 }
 
-export function useSetTodoItemStatus() {
+export function useSetListItemStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -435,37 +436,37 @@ export function useSetTodoItemStatus() {
     }: {
       listId: string;
       itemId: number;
-      status: TodoStatus;
+      status: ListStatus;
     }) => {
-      const res = await api.api.todos[":listId"].items[":itemId"].status.$patch({
+      const res = await api.api.lists[":listId"].items[":itemId"].status.$patch({
         param: { listId, itemId: String(itemId) },
         json: { status },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Failed to set todo status");
-      return data as { ok: true; item: TodoItem };
+      if (!res.ok) throw new Error(data?.error ?? "Failed to set list item status");
+      return data as { ok: true; item: ListItem };
     },
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["todos"] });
-      qc.invalidateQueries({ queryKey: ["todos", vars.listId] });
+      qc.invalidateQueries({ queryKey: ["lists"] });
+      qc.invalidateQueries({ queryKey: ["lists", vars.listId] });
     },
   });
 }
 
-export function useDeleteTodoItem() {
+export function useDeleteListItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ listId, itemId }: { listId: string; itemId: number }) => {
-      const res = await api.api.todos[":listId"].items[":itemId"].$delete({
+      const res = await api.api.lists[":listId"].items[":itemId"].$delete({
         param: { listId, itemId: String(itemId) },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "Failed to delete todo item");
+      if (!res.ok) throw new Error(data?.error ?? "Failed to delete list item");
       return data as { ok: true };
     },
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["todos"] });
-      qc.invalidateQueries({ queryKey: ["todos", vars.listId] });
+      qc.invalidateQueries({ queryKey: ["lists"] });
+      qc.invalidateQueries({ queryKey: ["lists", vars.listId] });
     },
   });
 }
@@ -601,8 +602,8 @@ export function useRealtimeUpdates() {
         if (msg.type === "automations_change") {
           qc.invalidateQueries({ queryKey: ["automations"] });
         }
-        if (msg.type === "todos_change") {
-          qc.invalidateQueries({ queryKey: ["todos"] });
+        if (msg.type === "lists_change") {
+          qc.invalidateQueries({ queryKey: ["lists"] });
         }
         if (msg.type === "chats_change") {
           qc.invalidateQueries({ queryKey: ["chats"] });

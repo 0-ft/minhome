@@ -2,7 +2,7 @@ import { Plus, ChevronRight } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { ViewTransition } from "react";
-import type { TodoItem, TodoStatus } from "../../api.js";
+import type { ListItem, ListStatus } from "../../api.js";
 import { LucideIcon } from "./LucideIcon.js";
 
 function KanbanCard({
@@ -13,13 +13,13 @@ function KanbanCard({
   titleViewTransitionName,
 }: {
   listId: string;
-  item: TodoItem;
+  item: ListItem;
   onOpen: () => void;
   cardViewTransitionName?: string;
   titleViewTransitionName?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `todo-item:${listId}:${item.id}`,
+    id: `list-item:${listId}:${item.id}`,
     data: { itemId: item.id, status: item.status },
   });
 
@@ -39,7 +39,7 @@ function KanbanCard({
         }}
       >
         {titleViewTransitionName ? (
-          <ViewTransition name={titleViewTransitionName} share="todo-title-share">
+          <ViewTransition name={titleViewTransitionName} share="list-title-share">
             <div className="text-sm text-sand-900 flex items-baseline gap-2">
               <span className="text-xs font-mono text-sand-500">#{item.id}</span>
               <span>{item.title}</span>
@@ -64,7 +64,7 @@ function KanbanCard({
       className="cursor-grab active:cursor-grabbing"
     >
       {cardViewTransitionName ? (
-        <ViewTransition name={cardViewTransitionName} share="todo-card-share">
+        <ViewTransition name={cardViewTransitionName} share="list-card-share">
           {cardBody}
         </ViewTransition>
       ) : (
@@ -88,19 +88,19 @@ export function KanbanColumn({
   getTitleTransitionName,
 }: {
   listId: string;
-  status: TodoStatus;
+  status: ListStatus;
   label: string;
   icon?: string;
   collapsed: boolean;
-  items: TodoItem[];
-  onAddItem: (status: TodoStatus) => void;
+  items: ListItem[];
+  onAddItem: (status: ListStatus) => void;
   onOpenItem: (itemId: number) => void;
-  onToggleCollapse: (status: TodoStatus) => void;
+  onToggleCollapse: (status: ListStatus) => void;
   getCardTransitionName?: (itemId: number) => string;
   getTitleTransitionName?: (itemId: number) => string;
 }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: `todo-column:${status}`,
+    id: `list-column:${status}`,
     data: { status },
   });
 

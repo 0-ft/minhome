@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { TodoStatus } from "../../api.js";
+import type { ListStatus } from "../../api.js";
 import { formatStatusLabel, statusPillClass } from "./helpers.js";
 import { LucideIcon } from "./LucideIcon.js";
 
@@ -9,10 +9,10 @@ export function StatusPicker({
   iconByStatus,
   onChange,
 }: {
-  value: TodoStatus;
-  options: TodoStatus[];
-  iconByStatus?: Partial<Record<TodoStatus, string | undefined>>;
-  onChange: (status: TodoStatus) => void;
+  value: ListStatus;
+  options: ListStatus[];
+  iconByStatus?: Partial<Record<ListStatus, string | undefined>>;
+  onChange: (status: ListStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);

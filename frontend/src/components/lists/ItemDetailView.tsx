@@ -1,7 +1,7 @@
 import { ViewTransition, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import ReactMarkdown, { MarkdownHooks } from "react-markdown";
-import type { TodoItem, TodoStatus } from "../../api.js";
+import type { ListItem, ListStatus } from "../../api.js";
 import { Button } from "../ui/button.js";
 import { markdownRehypePlugins } from "../markdownPlugins.js";
 import { StatusPicker } from "./StatusPicker.js";
@@ -18,15 +18,15 @@ export function ItemDetailView({
   onSetStatus,
   onDelete,
 }: {
-  item: TodoItem;
+  item: ListItem;
   cardViewTransitionName?: string;
   titleViewTransitionName?: string;
   statusViewTransitionName?: string;
-  statusOptions: TodoStatus[];
-  statusIconByStatus?: Partial<Record<TodoStatus, string | undefined>>;
+  statusOptions: ListStatus[];
+  statusIconByStatus?: Partial<Record<ListStatus, string | undefined>>;
   onBack: () => void;
   onSavePatch: (patch: { title?: string; body?: string }) => void;
-  onSetStatus: (status: TodoStatus) => void;
+  onSetStatus: (status: ListStatus) => void;
   onDelete: () => void;
 }) {
   const [titleDraft, setTitleDraft] = useState(item.title);
@@ -90,7 +90,7 @@ export function ItemDetailView({
             <div className="flex items-center gap-2 shrink-0 pt-1">
               <div className="origin-right scale-110">
                 {statusViewTransitionName ? (
-                  <ViewTransition name={statusViewTransitionName} share="todo-status-share">
+                  <ViewTransition name={statusViewTransitionName} share="list-status-share">
                     <StatusPicker value={item.status} options={statusOptions} iconByStatus={statusIconByStatus} onChange={onSetStatus} />
                   </ViewTransition>
                 ) : (
@@ -110,7 +110,7 @@ export function ItemDetailView({
               className="min-w-0 flex-1 text-left cursor-text"
             >
               {titleViewTransitionName ? (
-                <ViewTransition name={titleViewTransitionName} share="todo-title-share">
+                <ViewTransition name={titleViewTransitionName} share="list-title-share">
                   <div className="flex items-baseline gap-3 w-fit">
                     <span className="text-3xl md:text-4xl font-normal text-sand-500 font-mono">#{item.id}</span>
                     <div className="text-3xl md:text-4xl leading-tight font-normal text-sand-900">
@@ -154,7 +154,7 @@ export function ItemDetailView({
             <div className="flex items-center gap-2 shrink-0 pt-1">
               <div className="origin-right scale-110">
                 {statusViewTransitionName ? (
-                  <ViewTransition name={statusViewTransitionName} share="todo-status-share">
+                  <ViewTransition name={statusViewTransitionName} share="list-status-share">
                     <StatusPicker value={item.status} options={statusOptions} iconByStatus={statusIconByStatus} onChange={onSetStatus} />
                   </ViewTransition>
                 ) : (
@@ -218,7 +218,7 @@ export function ItemDetailView({
           <ArrowLeft className="h-4 w-4" />
           Back to list
         </button>
-        <ViewTransition name={cardViewTransitionName} share="todo-card-share">
+        <ViewTransition name={cardViewTransitionName} share="list-card-share">
           {detailCard}
         </ViewTransition>
       </div>

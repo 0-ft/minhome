@@ -1,4 +1,4 @@
-import type { TodoItem, TodoStatus } from "../../api.js";
+import type { ListItem, ListStatus } from "../../api.js";
 import { ViewTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import { StatusPicker } from "./StatusPicker.js";
@@ -13,14 +13,14 @@ export function ListItemCard({
   onOpen,
   onStatusSet,
 }: {
-  item: TodoItem;
+  item: ListItem;
   cardViewTransitionName?: string;
   titleViewTransitionName?: string;
   statusViewTransitionName?: string;
-  statusOptions: TodoStatus[];
-  statusIconByStatus?: Partial<Record<TodoStatus, string | undefined>>;
+  statusOptions: ListStatus[];
+  statusIconByStatus?: Partial<Record<ListStatus, string | undefined>>;
   onOpen: () => void;
-  onStatusSet: (status: TodoStatus) => void;
+  onStatusSet: (status: ListStatus) => void;
 }) {
   const cardBody = (
     <div className="rounded-lg bg-sand-50 border border-sand-300 p-3 h-fit">
@@ -31,7 +31,7 @@ export function ListItemCard({
           onClick={onOpen}
         >
           {titleViewTransitionName ? (
-            <ViewTransition name={titleViewTransitionName} share="todo-title-share">
+            <ViewTransition name={titleViewTransitionName} share="list-title-share">
               <div className="text-sand-900 flex items-center gap-2 min-w-0 w-fit">
                 <span className="text-lg leading-snug font-medium font-mono text-sand-500 shrink-0">#{item.id}</span>
                 <div className="text-lg leading-snug font-medium min-w-0 truncate">
@@ -69,7 +69,7 @@ export function ListItemCard({
           )}
         </button>
         {statusViewTransitionName ? (
-          <ViewTransition name={statusViewTransitionName} share="todo-status-share">
+          <ViewTransition name={statusViewTransitionName} share="list-status-share">
             <StatusPicker
               value={item.status}
               options={statusOptions}
@@ -91,7 +91,7 @@ export function ListItemCard({
 
   if (cardViewTransitionName) {
     return (
-      <ViewTransition name={cardViewTransitionName} share="todo-card-share">
+      <ViewTransition name={cardViewTransitionName} share="list-card-share">
         {cardBody}
       </ViewTransition>
     );

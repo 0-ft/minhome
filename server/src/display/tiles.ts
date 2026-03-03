@@ -3,7 +3,7 @@ import { CalendarDisplayComponentConfigSchema } from "./components/calendar-disp
 import { ColorTestComponentConfigSchema } from "./components/color-test.js";
 import { PolymarketGraphDisplayComponentConfigSchema } from "./components/polymarket-graph-display.js";
 import { StringDisplayComponentConfigSchema } from "./components/string-display.js";
-import { TodoDisplayComponentConfigSchema } from "./components/todo-display.js";
+import { ListDisplayComponentConfigSchema, TodoDisplayComponentConfigSchema } from "./components/list-display.js";
 
 export const TileRegionSchema = z.object({
   x: z.number().min(0).max(1),
@@ -23,6 +23,7 @@ export type TileRegion = z.infer<typeof TileRegionSchema>;
 export const TileComponentConfigSchema = z.discriminatedUnion("kind", [
   CalendarDisplayComponentConfigSchema,
   ColorTestComponentConfigSchema,
+  ListDisplayComponentConfigSchema,
   PolymarketGraphDisplayComponentConfigSchema,
   StringDisplayComponentConfigSchema,
   TodoDisplayComponentConfigSchema,

@@ -10,7 +10,7 @@ import { type DisplayComponentResult, componentFailure } from "./components/comp
 import { createErrorDisplayElement } from "./components/error-display.js";
 import { createPolymarketGraphDisplayElement } from "./components/polymarket-graph-display.js";
 import { createStringDisplayElement } from "./components/string-display.js";
-import { createTodoDisplayElement, type TodoListProvider } from "./components/todo-display.js";
+import { createListDisplayElement, type ListProvider } from "./components/list-display.js";
 
 const FONT_NAME = "DejaVu Sans";
 const FONT_MONO_NAME = "DejaVu Sans Mono";
@@ -129,7 +129,7 @@ function renderResultToElement(
 export async function createComponentElement(
   component: TileComponentConfig,
   calendarService: CalendarService,
-  todoListProvider: TodoListProvider,
+  listProvider: ListProvider,
 ): Promise<ReactElement> {
   switch (component.kind) {
     case "string_display":
@@ -162,8 +162,9 @@ export async function createComponentElement(
       }
       return renderResultToElement(result);
     }
+    case "list_display":
     case "todo_display":
-      return renderResultToElement(createTodoDisplayElement(component, todoListProvider));
+      return renderResultToElement(createListDisplayElement(component, listProvider));
     default: {
       const _exhaustive: never = component;
       throw new Error(`Unsupported tile component: ${String(_exhaustive)}`);

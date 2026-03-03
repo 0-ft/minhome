@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { MqttBridge } from "./mqtt.js";
 import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
-import { TodoStatusSchema, type TodoStore } from "./config/todos.js";
+import { ListStatusSchema, type ListStore } from "./config/lists.js";
 import type { AutomationEngine } from "./automations.js";
 import {
   RoomDimensionsSchema,
@@ -29,7 +29,7 @@ export interface ToolContext {
   bridge: MqttBridge;
   config: ConfigStore;
   chats: ChatStore;
-  todos: TodoStore;
+  lists: ListStore;
   automations: AutomationEngine;
   /** Send a JSON message to the connected voice bridge. */
   sendToBridge?: (msg: object) => void;
@@ -197,42 +197,42 @@ export const toolSchemas = {
       name: z.string().describe("Name of the furniture item to remove"),
     }),
   },
-  list_todo_lists: {
-    description: "List all todo lists and their items.",
+  list_lists: {
+    description: "List all lists and their items.",
     parameters: z.object({}),
   },
-  get_todo_list: {
-    description: "Get a single todo list by ID.",
+  get_list: {
+    description: "Get a single list by ID.",
     parameters: z.object({
-      list_id: z.string().describe("Todo list ID"),
+      list_id: z.string().describe("List ID"),
     }),
   },
-  upsert_todo_item: {
+  upsert_list_item: {
     description:
-      "Create or update a todo item in a list. If the list does not exist it will be created.",
+      "Create or update a list item. If the list does not exist it will be created.",
     parameters: z.object({
-      list_id: z.string().describe("Todo list ID"),
-      item_id: z.number().int().positive().describe("Todo item ID"),
-      title: z.string().optional().describe("Todo title (required when creating a new item)"),
+      list_id: z.string().describe("List ID"),
+      item_id: z.number().int().positive().describe("List item ID"),
+      title: z.string().optional().describe("Item title (required when creating a new item)"),
       body: z.string().optional().describe("Optional markdown body text"),
-      status: TodoStatusSchema.optional().describe("Todo item status (must be a valid status on the target list)"),
-      list_name: z.string().optional().describe("Optional todo list name (used when creating/updating list metadata)"),
+      status: ListStatusSchema.optional().describe("Item status (must be a valid status on the target list)"),
+      list_name: z.string().optional().describe("Optional list name (used when creating/updating list metadata)"),
       include_in_system_prompt: z.boolean().optional().describe("Whether this list should be included in the AI system prompt"),
     }),
   },
-  set_todo_item_status: {
-    description: "Set the status for a todo item by list and item ID.",
+  set_list_item_status: {
+    description: "Set the status for a list item by list and item ID.",
     parameters: z.object({
-      list_id: z.string().describe("Todo list ID"),
-      item_id: z.number().int().positive().describe("Todo item ID"),
-      status: TodoStatusSchema.describe("Todo item status (must be a valid status on the target list)"),
+      list_id: z.string().describe("List ID"),
+      item_id: z.number().int().positive().describe("List item ID"),
+      status: ListStatusSchema.describe("Item status (must be a valid status on the target list)"),
     }),
   },
-  delete_todo_item: {
-    description: "Delete a todo item from a list.",
+  delete_list_item: {
+    description: "Delete a list item.",
     parameters: z.object({
-      list_id: z.string().describe("Todo list ID"),
-      item_id: z.number().int().positive().describe("Todo item ID"),
+      list_id: z.string().describe("List ID"),
+      item_id: z.number().int().positive().describe("List item ID"),
     }),
   },
   set_voice: {
@@ -391,31 +391,31 @@ export function createTools(): Record<string, ToolDef> {
       },
     },
 
-    // --- Todos ---
+    // --- Lists ---
 
-    list_todo_lists: {
-      ...toolSchemas.list_todo_lists,
-      execute: async (_params, { todos }) => {
-        return todos.getAllLists();
+    list_lists: {
+      ...toolSchemas.list_lists,
+      execute: async (_params, { lists }) => {
+        return lists.getAllLists();
       },
     },
 
-    get_todo_list: {
-      ...toolSchemas.get_todo_list,
-      execute: async ({ list_id }, { todos }) => {
-        const list = todos.getList(list_id);
-        if (!list) throw new Error("Todo list not found");
+    get_list: {
+      ...toolSchemas.get_list,
+      execute: async ({ list_id }, { lists }) => {
+        const list = lists.getList(list_id);
+        if (!list) throw new Error("List not found");
         return list;
       },
     },
 
-    upsert_todo_item: {
-      ...toolSchemas.upsert_todo_item,
+    upsert_list_item: {
+      ...toolSchemas.upsert_list_item,
       execute: async (
         { list_id, item_id, title, body, status, list_name, include_in_system_prompt },
-        { todos },
+        { lists },
       ) => {
-        const item = todos.upsertItem(
+        const item = lists.upsertItem(
           list_id,
           {
             id: item_id,
@@ -431,16 +431,16 @@ export function createTools(): Record<string, ToolDef> {
 
         return {
           ok: true,
-          list: todos.getList(list_id),
+          list: lists.getList(list_id),
           item,
         };
       },
     },
 
-    set_todo_item_status: {
-      ...toolSchemas.set_todo_item_status,
-      execute: async ({ list_id, item_id, status }, { todos }) => {
-        const item = todos.setItemStatus(list_id, item_id, status);
+    set_list_item_status: {
+      ...toolSchemas.set_list_item_status,
+      execute: async ({ list_id, item_id, status }, { lists }) => {
+        const item = lists.setItemStatus(list_id, item_id, status);
         return {
           ok: true,
           item,
@@ -448,11 +448,11 @@ export function createTools(): Record<string, ToolDef> {
       },
     },
 
-    delete_todo_item: {
-      ...toolSchemas.delete_todo_item,
-      execute: async ({ list_id, item_id }, { todos }) => {
-        const removed = todos.deleteItem(list_id, item_id);
-        if (!removed) throw new Error("Todo item not found");
+    delete_list_item: {
+      ...toolSchemas.delete_list_item,
+      execute: async ({ list_id, item_id }, { lists }) => {
+        const removed = lists.deleteItem(list_id, item_id);
+        if (!removed) throw new Error("List item not found");
         return { ok: true };
       },
     },

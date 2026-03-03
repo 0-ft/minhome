@@ -1,45 +1,47 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { z } from "zod";
 
-const DefaultTodoStatuses = ["backlog", "todo", "done", "cancelled"] as const;
+const DefaultListStatuses = ["backlog", "todo", "done", "cancelled"] as const;
+const DefaultCompleteStatuses = ["done", "cancelled"] as const;
 
-export const TodoStatusSchema = z.string().trim().min(1);
-export type TodoStatus = z.infer<typeof TodoStatusSchema>;
-export const TodoListViewSchema = z.enum(["list", "kanban"]);
-export type TodoListView = z.infer<typeof TodoListViewSchema>;
+export const ListStatusSchema = z.string().trim().min(1);
+export type ListStatus = z.infer<typeof ListStatusSchema>;
+export const ListViewSchema = z.enum(["list", "kanban"]);
+export type ListView = z.infer<typeof ListViewSchema>;
 
-export const TodoColumnSchema = z.object({
-  status: TodoStatusSchema,
+export const ListColumnSchema = z.object({
+  status: ListStatusSchema,
   collapsed: z.boolean().default(false),
   icon: z.string().optional(),
 });
-export type TodoColumn = z.infer<typeof TodoColumnSchema>;
+export type ListColumn = z.infer<typeof ListColumnSchema>;
 
-export const TodoItemSchema = z.object({
+export const ListItemSchema = z.object({
   id: z.number().int().positive(),
   title: z.string().trim().min(1),
   body: z.string().default(""),
-  status: TodoStatusSchema,
+  status: ListStatusSchema,
 });
-export type TodoItem = z.infer<typeof TodoItemSchema>;
+export type ListItem = z.infer<typeof ListItemSchema>;
 
-export const TodoListSchema = z.object({
+export const ListSchema = z.object({
   id: z.string().trim().min(1),
   name: z.string().trim().min(1),
   includeInSystemPrompt: z.boolean().default(false),
-  view: TodoListViewSchema.default("list"),
-  columns: z.array(TodoColumnSchema).min(1),
-  items: z.array(TodoItemSchema).default([]),
+  view: ListViewSchema.default("list"),
+  columns: z.array(ListColumnSchema).min(1),
+  items: z.array(ListItemSchema).default([]),
+  completeStatuses: z.array(ListStatusSchema).optional(),
 });
-export type TodoList = z.infer<typeof TodoListSchema>;
+export type List = z.infer<typeof ListSchema>;
 
-export const TodosFileSchema = z.object({
-  lists: z.array(TodoListSchema).default([]),
+export const ListsFileSchema = z.object({
+  lists: z.array(ListSchema).default([]),
 });
-export type TodosFile = z.infer<typeof TodosFileSchema>;
+export type ListsFile = z.infer<typeof ListsFileSchema>;
 
-export class TodoStore {
-  private data: TodosFile;
+export class ListStore {
+  private data: ListsFile;
   private changeListeners = new Set<() => void>();
 
   constructor(private filePath: string) {
@@ -52,7 +54,7 @@ export class TodoStore {
     }
   }
 
-  /** Re-read from disk so hand-edits to todos.json are picked up */
+  /** Re-read from disk so hand-edits to lists.json are picked up */
   private reload(): void {
     if (existsSync(this.filePath)) {
       const raw = readFileSync(this.filePath, "utf-8");
@@ -68,12 +70,12 @@ export class TodoStore {
   onChanged(fn: () => void): void { this.changeListeners.add(fn); }
   offChanged(fn: () => void): void { this.changeListeners.delete(fn); }
 
-  getAllLists(): TodoList[] {
+  getAllLists(): List[] {
     this.reload();
     return this.data.lists;
   }
 
-  getList(listId: string): TodoList | undefined {
+  getList(listId: string): List | undefined {
     this.reload();
     return this.data.lists.find((list) => list.id === listId);
   }
@@ -82,21 +84,23 @@ export class TodoStore {
     id: string;
     name: string;
     includeInSystemPrompt?: boolean;
-    view?: TodoListView;
+    view?: ListView;
     columns?: Array<{ status: string; collapsed?: boolean; icon?: string }>;
-  }): TodoList {
+    completeStatuses?: string[];
+  }): List {
     this.reload();
     if (this.data.lists.some((existing) => existing.id === list.id)) {
-      throw new Error("Todo list already exists");
+      throw new Error("List already exists");
     }
 
-    const created = TodoListSchema.parse({
+    const created = ListSchema.parse({
       id: list.id,
       name: list.name,
       includeInSystemPrompt: list.includeInSystemPrompt ?? false,
       view: list.view ?? "list",
-      columns: list.columns ?? DefaultTodoStatuses.map((status) => ({ status, collapsed: false })),
+      columns: list.columns ?? DefaultListStatuses.map((status) => ({ status, collapsed: false })),
       items: [],
+      completeStatuses: list.completeStatuses,
     });
     this.data.lists.push(created);
     this.save();
@@ -108,13 +112,14 @@ export class TodoStore {
     patch: {
       name?: string;
       includeInSystemPrompt?: boolean;
-      view?: TodoListView;
+      view?: ListView;
       columns?: Array<{ status: string; collapsed?: boolean; icon?: string }>;
+      completeStatuses?: string[];
     },
-  ): TodoList {
+  ): List {
     this.reload();
     const list = this.data.lists.find((existing) => existing.id === listId);
-    if (!list) throw new Error("Todo list not found");
+    if (!list) throw new Error("List not found");
     if (patch.name !== undefined) {
       list.name = z.string().trim().min(1).parse(patch.name);
     }
@@ -122,10 +127,15 @@ export class TodoStore {
       list.includeInSystemPrompt = patch.includeInSystemPrompt;
     }
     if (patch.view !== undefined) {
-      list.view = TodoListViewSchema.parse(patch.view);
+      list.view = ListViewSchema.parse(patch.view);
     }
     if (patch.columns !== undefined) {
       list.columns = this.parseColumnsPatch(patch.columns);
+    }
+    if (patch.completeStatuses !== undefined) {
+      list.completeStatuses = patch.completeStatuses.length > 0
+        ? patch.completeStatuses
+        : undefined;
     }
     this.save();
     return list;
@@ -140,7 +150,7 @@ export class TodoStore {
     return true;
   }
 
-  upsertList(list: Pick<TodoList, "id"> & Partial<Pick<TodoList, "name" | "includeInSystemPrompt" | "view">>): TodoList {
+  upsertList(list: Pick<List, "id"> & Partial<Pick<List, "name" | "includeInSystemPrompt" | "view">>): List {
     this.reload();
     const idx = this.data.lists.findIndex((existing) => existing.id === list.id);
     if (idx >= 0) {
@@ -154,12 +164,12 @@ export class TodoStore {
       };
     } else {
       this.data.lists.push(
-        TodoListSchema.parse({
+        ListSchema.parse({
           id: list.id,
           name: list.name ?? list.id,
           includeInSystemPrompt: list.includeInSystemPrompt ?? false,
           view: list.view ?? "list",
-          columns: DefaultTodoStatuses.map((status) => ({ status, collapsed: false })),
+          columns: DefaultListStatuses.map((status) => ({ status, collapsed: false })),
           items: [],
         }),
       );
@@ -174,10 +184,10 @@ export class TodoStore {
       id?: number;
       title?: string;
       body?: string;
-      status?: TodoStatus;
+      status?: ListStatus;
     },
-    listPatch?: Partial<Pick<TodoList, "name" | "includeInSystemPrompt">>,
-  ): TodoItem {
+    listPatch?: Partial<Pick<List, "name" | "includeInSystemPrompt">>,
+  ): ListItem {
     this.reload();
     const list = this.ensureList(listId, listPatch);
     const targetId = item.id ?? this.getNextItemId(list);
@@ -185,7 +195,7 @@ export class TodoStore {
 
     if (idx >= 0) {
       const existing = list.items[idx];
-      list.items[idx] = TodoItemSchema.parse({
+      list.items[idx] = ListItemSchema.parse({
         id: targetId,
         title: item.title ?? existing.title,
         body: item.body ?? existing.body,
@@ -196,10 +206,10 @@ export class TodoStore {
     }
 
     if (!item.title) {
-      throw new Error("New todo items require title");
+      throw new Error("New list items require title");
     }
 
-    const created = TodoItemSchema.parse({
+    const created = ListItemSchema.parse({
       id: targetId,
       title: item.title,
       body: item.body ?? "",
@@ -210,12 +220,12 @@ export class TodoStore {
     return created;
   }
 
-  setItemStatus(listId: string, itemId: number, status: TodoStatus): TodoItem {
+  setItemStatus(listId: string, itemId: number, status: ListStatus): ListItem {
     this.reload();
     const list = this.data.lists.find((existing) => existing.id === listId);
-    if (!list) throw new Error("Todo list not found");
+    if (!list) throw new Error("List not found");
     const item = list.items.find((existing) => existing.id === itemId);
-    if (!item) throw new Error("Todo item not found");
+    if (!item) throw new Error("List item not found");
     item.status = this.resolveStatus(list, status, `list ${list.id} item ${itemId}`);
     this.save();
     return item;
@@ -235,23 +245,27 @@ export class TodoStore {
   getPromptLists(): Array<{
     id: string;
     name: string;
-    items: TodoItem[];
+    items: ListItem[];
   }> {
     this.reload();
     return this.data.lists
       .filter((list) => list.includeInSystemPrompt)
-      .map((list) => ({
-        id: list.id,
-        name: list.name,
-        items: list.items.filter((item) => item.status !== "done" && item.status !== "cancelled"),
-      }))
+      .map((list) => {
+        const completeStatuses = list.completeStatuses ?? [...DefaultCompleteStatuses];
+        const completeSet = new Set(completeStatuses);
+        return {
+          id: list.id,
+          name: list.name,
+          items: list.items.filter((item) => !completeSet.has(item.status)),
+        };
+      })
       .filter((list) => list.items.length > 0);
   }
 
   private ensureList(
     listId: string,
-    listPatch?: Partial<Pick<TodoList, "name" | "includeInSystemPrompt">>,
-  ): TodoList {
+    listPatch?: Partial<Pick<List, "name" | "includeInSystemPrompt">>,
+  ): List {
     const existing = this.data.lists.find((list) => list.id === listId);
     if (existing) {
       if (listPatch?.name !== undefined) {
@@ -263,24 +277,24 @@ export class TodoStore {
       return existing;
     }
 
-    const created = TodoListSchema.parse({
+    const created = ListSchema.parse({
       id: listId,
       name: listPatch?.name ?? listId,
       includeInSystemPrompt: listPatch?.includeInSystemPrompt ?? false,
       view: "list",
-      columns: DefaultTodoStatuses.map((status) => ({ status, collapsed: false })),
+      columns: DefaultListStatuses.map((status) => ({ status, collapsed: false })),
       items: [],
     });
     this.data.lists.push(created);
     return created;
   }
 
-  private getNextItemId(list: TodoList): number {
+  private getNextItemId(list: List): number {
     const highest = list.items.reduce((max, item) => Math.max(max, item.id), 0);
     return Math.max(highest + 1, 1);
   }
 
-  private parseAndNormalize(raw: unknown): TodosFile {
+  private parseAndNormalize(raw: unknown): ListsFile {
     if (!raw || typeof raw !== "object") {
       return { lists: [] };
     }
@@ -288,21 +302,27 @@ export class TodoStore {
     const root = raw as { lists?: unknown };
     const rawLists = Array.isArray(root.lists) ? root.lists : [];
 
-    const lists: TodoList[] = rawLists.map((listRaw) => {
+    const lists: List[] = rawLists.map((listRaw) => {
       const listObj = (listRaw && typeof listRaw === "object") ? listRaw as Record<string, unknown> : {};
       const id = typeof listObj.id === "string" && listObj.id.trim() ? listObj.id.trim() : "list";
       const name = typeof listObj.name === "string" && listObj.name.trim() ? listObj.name.trim() : id;
       const includeInSystemPrompt = Boolean(listObj.includeInSystemPrompt);
-      const view = TodoListViewSchema.safeParse(listObj.view).success
-        ? listObj.view as TodoListView
+      const view = ListViewSchema.safeParse(listObj.view).success
+        ? listObj.view as ListView
         : "list";
       const columns = this.parseColumnsFromRawList(listObj, id);
       const statuses = this.getColumnStatuses(columns);
       const rawItems = Array.isArray(listObj.items) ? listObj.items : [];
 
+      const completeStatuses = Array.isArray(listObj.completeStatuses)
+        ? listObj.completeStatuses
+          .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+          .map((s) => s.trim())
+        : undefined;
+
       let maxId = 0;
       const usedIds = new Set<number>();
-      const items: TodoItem[] = rawItems.map((itemRaw) => {
+      const items: ListItem[] = rawItems.map((itemRaw) => {
         const itemObj = (itemRaw && typeof itemRaw === "object") ? itemRaw as Record<string, unknown> : {};
 
         let numericId: number | null = null;
@@ -320,15 +340,15 @@ export class TodoStore {
         const legacyText = typeof itemObj.text === "string" ? itemObj.text.trim() : "";
         const title = typeof itemObj.title === "string" && itemObj.title.trim()
           ? itemObj.title.trim()
-          : (legacyText || `Todo ${numericId}`);
+          : (legacyText || `Item ${numericId}`);
         const body = typeof itemObj.body === "string" ? itemObj.body : "";
-        const parsedStatus = TodoStatusSchema.safeParse(itemObj.status);
+        const parsedStatus = ListStatusSchema.safeParse(itemObj.status);
         if (!parsedStatus.success) {
-          throw new Error(`Todo list "${id}" item ${numericId} is missing a valid "status"`);
+          throw new Error(`List "${id}" item ${numericId} is missing a valid "status"`);
         }
         const status = this.resolveStatusForStatuses(statuses, parsedStatus.data, `list ${id} item ${numericId}`);
 
-        return TodoItemSchema.parse({
+        return ListItemSchema.parse({
           id: numericId,
           title,
           body,
@@ -336,22 +356,23 @@ export class TodoStore {
         });
       });
 
-      return TodoListSchema.parse({
+      return ListSchema.parse({
         id,
         name,
         includeInSystemPrompt,
         view,
         columns,
         items,
+        completeStatuses: completeStatuses && completeStatuses.length > 0 ? completeStatuses : undefined,
       });
     });
 
-    return TodosFileSchema.parse({ lists });
+    return ListsFileSchema.parse({ lists });
   }
 
-  private parseColumnsPatch(columns: Array<{ status: string; collapsed?: boolean; icon?: string }>): TodoColumn[] {
-    const parsed = z.array(TodoColumnSchema).min(1).parse(columns);
-    const deduped: TodoColumn[] = [];
+  private parseColumnsPatch(columns: Array<{ status: string; collapsed?: boolean; icon?: string }>): ListColumn[] {
+    const parsed = z.array(ListColumnSchema).min(1).parse(columns);
+    const deduped: ListColumn[] = [];
     const seen = new Set<string>();
     for (const column of parsed) {
       if (seen.has(column.status)) continue;
@@ -359,28 +380,28 @@ export class TodoStore {
       seen.add(column.status);
     }
     if (deduped.length === 0) {
-      throw new Error("Todo list must define at least one column");
+      throw new Error("List must define at least one column");
     }
     return deduped;
   }
 
-  private parseColumnsFromRawList(listObj: Record<string, unknown>, listId: string): TodoColumn[] {
+  private parseColumnsFromRawList(listObj: Record<string, unknown>, listId: string): ListColumn[] {
     if (Array.isArray(listObj.columns)) {
-      return this.parseColumnsPatch(listObj.columns as TodoColumn[]);
+      return this.parseColumnsPatch(listObj.columns as ListColumn[]);
     }
     if (Array.isArray(listObj.statuses)) {
       const parsedLegacy = z.array(z.string().trim().min(1)).min(1).parse(listObj.statuses);
       const deduped = [...new Set(parsedLegacy)];
       return deduped.map((status) => ({ status, collapsed: false }));
     }
-    throw new Error(`Todo list "${listId}" is missing required "columns" array`);
+    throw new Error(`List "${listId}" is missing required "columns" array`);
   }
 
-  private getColumnStatuses(columns: TodoColumn[]): string[] {
+  private getColumnStatuses(columns: ListColumn[]): string[] {
     return columns.map((column) => column.status);
   }
 
-  private resolveStatus(list: TodoList, status: string | undefined, context?: string): string {
+  private resolveStatus(list: List, status: string | undefined, context?: string): string {
     return this.resolveStatusForStatuses(this.getColumnStatuses(list.columns), status, context);
   }
 
@@ -389,6 +410,6 @@ export class TodoStore {
       return statuses.includes("todo") ? "todo" : statuses[0];
     }
     if (statuses.includes(status)) return status;
-    throw new Error(`Invalid todo status "${status}"${context ? ` for ${context}` : ""}`);
+    throw new Error(`Invalid status "${status}"${context ? ` for ${context}` : ""}`);
   }
 }

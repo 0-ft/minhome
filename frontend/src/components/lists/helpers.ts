@@ -1,6 +1,6 @@
-import type { TodoColumn, TodoStatus } from "../../api.js";
+import type { ListColumn, ListStatus } from "../../api.js";
 
-export const DEFAULT_COLUMNS: TodoColumn[] = [
+export const DEFAULT_COLUMNS: ListColumn[] = [
   { status: "backlog", collapsed: false },
   { status: "todo", collapsed: false },
   { status: "done", collapsed: false },
@@ -11,7 +11,7 @@ export function normalizeListId(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-export function formatStatusLabel(status: TodoStatus): string {
+export function formatStatusLabel(status: ListStatus): string {
   return status
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
@@ -19,7 +19,7 @@ export function formatStatusLabel(status: TodoStatus): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function statusPillClass(status: TodoStatus): string {
+export function statusPillClass(status: ListStatus): string {
   const hash = [...status].reduce((acc, char) => acc + char.charCodeAt(0), 0) % 4;
   if (hash === 0) return "bg-teal-100 text-teal-800 border border-teal-200";
   if (hash === 1) return "bg-blue-100 text-blue-700 border border-blue-200";
@@ -27,7 +27,7 @@ export function statusPillClass(status: TodoStatus): string {
   return "bg-sand-200 text-sand-700 border border-sand-300";
 }
 
-export function sanitizeColumns(columns: TodoColumn[]): TodoColumn[] {
+export function sanitizeColumns(columns: ListColumn[]): ListColumn[] {
   const seen = new Set<string>();
   const next: TodoColumn[] = [];
   for (const column of columns) {

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import type { TodoColumn, TodoList } from "../../api.js";
+import type { ListColumn, List } from "../../api.js";
 import { Button } from "../ui/button.js";
 import { ListSettingsView } from "./ListSettingsView.js";
 import { sanitizeColumns } from "./helpers.js";
 
-export function TodoConfigView({
+export function ListsConfigView({
   lists,
   activeListId,
   expandedListId,
@@ -16,20 +16,23 @@ export function TodoConfigView({
   savePending,
   deletePending,
 }: {
-  lists: TodoList[];
+  lists: List[];
   activeListId: string | null;
   expandedListId: string | null;
   onExpandedListChange: (listId: string | null) => void;
   onCreateListRequested: () => void;
-  onSaveList: (args: { listId: string; patch: { name: string; include_in_system_prompt: boolean; columns: TodoColumn[] } }) => void;
+  onSaveList: (args: { listId: string; patch: { name: string; include_in_system_prompt: boolean; columns: ListColumn[] } }) => void;
   onDeleteList: (listId: string) => void;
   savePending: boolean;
   deletePending: boolean;
 }) {
   const [draftName, setDraftName] = useState("");
   const [draftInclude, setDraftInclude] = useState(false);
-  const [draftColumns, setDraftColumns] = useState<TodoColumn[]>([]);
+  const [draftColumns, setDraftColumns] = useState<ListColumn[]>([]);
   const [newColumnDraft, setNewColumnDraft] = useState("");
+  const draftRef = useRef({ name: "", include: false, columns: [] as ListColumn[] });
+  const skipNextSaveRef = useRef(false);
+  draftRef.current = { name: draftName, include: draftInclude, columns: draftColumns };
 
   useEffect(() => {
     if (!lists.length) {
@@ -48,16 +51,58 @@ export function TodoConfigView({
 
   useEffect(() => {
     if (!expandedList) return;
+    skipNextSaveRef.current = true;
     setDraftName(expandedList.name);
     setDraftInclude(expandedList.includeInSystemPrompt);
     setDraftColumns(expandedList.columns);
     setNewColumnDraft("");
   }, [expandedList?.id, expandedList?.name, expandedList?.includeInSystemPrompt, expandedList?.columns]);
 
+  // Autosave: debounce name (400ms), save include and columns immediately
+  useEffect(() => {
+    if (!expandedList) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    const trimmedName = draftRef.current.name.trim();
+    const sanitized = sanitizeColumns(draftRef.current.columns);
+    if (trimmedName.length === 0 || sanitized.length === 0) return;
+    const sameAsServer =
+      trimmedName === expandedList.name &&
+      draftRef.current.include === expandedList.includeInSystemPrompt &&
+      JSON.stringify(sanitized) === JSON.stringify(expandedList.columns);
+    if (sameAsServer) return;
+
+    const isNameChange = trimmedName !== expandedList.name;
+    if (isNameChange) {
+      const t = setTimeout(() => {
+        onSaveList({
+          listId: expandedList.id,
+          patch: {
+            name: draftRef.current.name.trim(),
+            include_in_system_prompt: draftRef.current.include,
+            columns: sanitizeColumns(draftRef.current.columns),
+          },
+        });
+      }, 400);
+      return () => clearTimeout(t);
+    }
+
+    onSaveList({
+      listId: expandedList.id,
+      patch: {
+        name: draftRef.current.name.trim(),
+        include_in_system_prompt: draftRef.current.include,
+        columns: sanitizeColumns(draftRef.current.columns),
+      },
+    });
+  }, [draftName, draftInclude, draftColumns, expandedList, onSaveList]);
+
   if (lists.length === 0) {
     return (
       <div className="rounded-xl border border-sand-300 bg-sand-50 p-6 text-center space-y-3">
-        <p className="text-sm text-sand-700">No todo lists configured.</p>
+        <p className="text-sm text-sand-700">No lists configured.</p>
         <Button onClick={onCreateListRequested} className="gap-1.5">
           <Plus className="h-4 w-4" />
           Add list
@@ -143,19 +188,8 @@ export function TodoConfigView({
                   onColumnsChange={setDraftColumns}
                   newColumnStatus={newColumnDraft}
                   onNewColumnStatusChange={setNewColumnDraft}
-                  pending={savePending}
-                  onSave={() => {
-                    const columns = sanitizeColumns(draftColumns);
-                    if (columns.length === 0) return;
-                    onSaveList({
-                      listId: list.id,
-                      patch: {
-                        name: draftName.trim(),
-                        include_in_system_prompt: draftInclude,
-                        columns,
-                      },
-                    });
-                  }}
+                  onBack={undefined}
+                  saving={savePending}
                 />
                 <div className="mt-3 flex justify-end">
                   <Button

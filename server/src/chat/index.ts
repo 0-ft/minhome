@@ -10,7 +10,7 @@ import { debugLog } from "../debug-log.js";
 
 export function createChatRoute(ctx: ToolContext) {
   const chat = new Hono();
-  const { bridge, config, chats, todos, automations, voiceDevices } = ctx;
+  const { bridge, config, chats, lists, automations, voiceDevices } = ctx;
 
   chat.get("/api/chat/info", (c) => {
     return c.json({
@@ -20,7 +20,7 @@ export function createChatRoute(ctx: ToolContext) {
   });
 
   chat.get("/api/chat/debug", (c) => {
-    const system = buildSystemPrompt(bridge, config, todos, automations, voiceDevices);
+    const system = buildSystemPrompt(bridge, config, lists, automations, voiceDevices);
     const tools = buildAiTools(ctx);
 
     return c.json({
@@ -94,7 +94,7 @@ export function createChatRoute(ctx: ToolContext) {
       tools: rawTools as any,
     });
 
-    const system = buildSystemPrompt(bridge, config, todos, automations, voiceDevices);
+    const system = buildSystemPrompt(bridge, config, lists, automations, voiceDevices);
     const modelMessages = await convertToModelMessages(validatedMessages);
 
     // // Wrap tools to intercept tool calls and results

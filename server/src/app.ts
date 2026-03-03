@@ -5,7 +5,7 @@ import type { MqttBridge } from "./mqtt.js";
 import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, resolveEntityPayload } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
-import { TodoStatusSchema, type TodoStore } from "./config/todos.js";
+import { ListStatusSchema, type ListStore } from "./config/lists.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
@@ -22,7 +22,7 @@ export function createApp(
   bridge: MqttBridge,
   config: ConfigStore,
   chats: ChatStore,
-  todos: TodoStore,
+  lists: ListStore,
   automations: AutomationEngine,
   tokens: TokenStore,
 ) {
@@ -48,14 +48,14 @@ export function createApp(
     bridgeRef.current.send(JSON.stringify(msg));
   };
 
-  const toolCtx: ToolContext = { bridge, config, chats, todos, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
+  const toolCtx: ToolContext = { bridge, config, chats, lists, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
 
   // --- Auth (no-ops when AUTH_PASSWORD is unset) ---
   app.route("/", authRoutes());
   app.use("*", authMiddleware(tokens));
 
   // --- TRMNL e-ink display ---
-  app.route("/", createDisplayRoute(config, todos));
+  app.route("/", createDisplayRoute(config, lists));
 
   // --- AI Chat ---
   app.route("/", createChatRoute(toolCtx));
@@ -132,12 +132,12 @@ export function createApp(
       return c.json(config.get());
     })
 
-    // --- Todos ---
-    .get("/api/todos", (c) => {
-      return c.json(todos.getAllLists());
+    // --- Lists ---
+    .get("/api/lists", (c) => {
+      return c.json(lists.getAllLists());
     })
 
-    .post("/api/todos/lists",
+    .post("/api/lists",
       zValidator("json", z.object({
         id: z.string().trim().min(1),
         name: z.string().trim().min(1),
@@ -148,11 +148,12 @@ export function createApp(
           collapsed: z.boolean().optional(),
           icon: z.string().optional(),
         })).min(1).optional(),
+        complete_statuses: z.array(z.string().trim().min(1)).optional(),
       })),
       (c) => {
         const body = c.req.valid("json");
         try {
-          const list = todos.createList({
+          const list = lists.createList({
             id: body.id,
             name: body.name,
             includeInSystemPrompt: body.include_in_system_prompt,
@@ -162,6 +163,7 @@ export function createApp(
               collapsed: column.collapsed ?? false,
               icon: column.icon,
             })),
+            completeStatuses: body.complete_statuses,
           });
           return c.json(list, 201);
         } catch (e: unknown) {
@@ -172,14 +174,14 @@ export function createApp(
       },
     )
 
-    .get("/api/todos/:listId", (c) => {
+    .get("/api/lists/:listId", (c) => {
       const listId = c.req.param("listId");
-      const list = todos.getList(listId);
-      if (!list) return c.json({ error: "Todo list not found" }, 404);
+      const list = lists.getList(listId);
+      if (!list) return c.json({ error: "List not found" }, 404);
       return c.json(list);
     })
 
-    .patch("/api/todos/:listId",
+    .patch("/api/lists/:listId",
       zValidator("json", z.object({
         name: z.string().trim().min(1).optional(),
         include_in_system_prompt: z.boolean().optional(),
@@ -189,12 +191,13 @@ export function createApp(
           collapsed: z.boolean().optional(),
           icon: z.string().optional(),
         })).min(1).optional(),
+        complete_statuses: z.array(z.string().trim().min(1)).optional(),
       })),
       (c) => {
         const listId = c.req.param("listId");
         const body = c.req.valid("json");
         try {
-          const list = todos.updateList(listId, {
+          const list = lists.updateList(listId, {
             name: body.name,
             includeInSystemPrompt: body.include_in_system_prompt,
             view: body.view,
@@ -203,6 +206,7 @@ export function createApp(
               collapsed: column.collapsed ?? false,
               icon: column.icon,
             })),
+            completeStatuses: body.complete_statuses,
           });
           return c.json({ ok: true, list });
         } catch (e: unknown) {
@@ -213,18 +217,18 @@ export function createApp(
       },
     )
 
-    .delete("/api/todos/:listId", (c) => {
+    .delete("/api/lists/:listId", (c) => {
       const listId = c.req.param("listId");
-      const removed = todos.deleteList(listId);
-      if (!removed) return c.json({ error: "Todo list not found" }, 404);
+      const removed = lists.deleteList(listId);
+      if (!removed) return c.json({ error: "List not found" }, 404);
       return c.json({ ok: true });
     })
 
-    .put("/api/todos/:listId/items/:itemId",
+    .put("/api/lists/:listId/items/:itemId",
       zValidator("json", z.object({
         title: z.string().optional(),
         body: z.string().optional(),
-        status: TodoStatusSchema.optional(),
+        status: ListStatusSchema.optional(),
         list_name: z.string().optional(),
         include_in_system_prompt: z.boolean().optional(),
       })),
@@ -232,11 +236,11 @@ export function createApp(
         const listId = c.req.param("listId");
         const itemId = Number.parseInt(c.req.param("itemId"), 10);
         if (!Number.isInteger(itemId) || itemId < 1) {
-          return c.json({ error: "Invalid todo item ID" }, 400);
+          return c.json({ error: "Invalid item ID" }, 400);
         }
         const body = c.req.valid("json");
         try {
-          const item = todos.upsertItem(
+          const item = lists.upsertItem(
             listId,
             {
               id: itemId,
@@ -256,17 +260,17 @@ export function createApp(
       },
     )
 
-    .patch("/api/todos/:listId/items/:itemId/status",
-      zValidator("json", z.object({ status: TodoStatusSchema })),
+    .patch("/api/lists/:listId/items/:itemId/status",
+      zValidator("json", z.object({ status: ListStatusSchema })),
       (c) => {
         const listId = c.req.param("listId");
         const itemId = Number.parseInt(c.req.param("itemId"), 10);
         if (!Number.isInteger(itemId) || itemId < 1) {
-          return c.json({ error: "Invalid todo item ID" }, 400);
+          return c.json({ error: "Invalid item ID" }, 400);
         }
         const { status } = c.req.valid("json");
         try {
-          const item = todos.setItemStatus(listId, itemId, status);
+          const item = lists.setItemStatus(listId, itemId, status);
           return c.json({ ok: true, item });
         } catch (e: unknown) {
           const message = (e as Error).message;
@@ -276,14 +280,14 @@ export function createApp(
       },
     )
 
-    .delete("/api/todos/:listId/items/:itemId", (c) => {
+    .delete("/api/lists/:listId/items/:itemId", (c) => {
       const listId = c.req.param("listId");
       const itemId = Number.parseInt(c.req.param("itemId"), 10);
       if (!Number.isInteger(itemId) || itemId < 1) {
-        return c.json({ error: "Invalid todo item ID" }, 400);
+        return c.json({ error: "Invalid item ID" }, 400);
       }
-      const removed = todos.deleteItem(listId, itemId);
-      if (!removed) return c.json({ error: "Todo item not found" }, 404);
+      const removed = lists.deleteItem(listId, itemId);
+      if (!removed) return c.json({ error: "List item not found" }, 404);
       return c.json({ ok: true });
     })
 
@@ -407,14 +411,14 @@ export function createApp(
           const onDevices = (data: unknown) => ws.send(JSON.stringify({ type: "devices", data }));
           const onConfigChange = () => ws.send(JSON.stringify({ type: "config_change" }));
           const onAutomationsChange = () => ws.send(JSON.stringify({ type: "automations_change" }));
-          const onTodosChange = () => ws.send(JSON.stringify({ type: "todos_change" }));
+          const onListsChange = () => ws.send(JSON.stringify({ type: "lists_change" }));
           const onChatsChange = () => ws.send(JSON.stringify({ type: "chats_change" }));
 
           bridge.on("state_change", onStateChange);
           bridge.on("devices", onDevices);
           bridge.on("config_change", onConfigChange);
           automations.onChanged(onAutomationsChange);
-          todos.onChanged(onTodosChange);
+          lists.onChanged(onListsChange);
           chats.onChanged(onChatsChange);
 
           // Store cleanup refs on the ws object
@@ -423,7 +427,7 @@ export function createApp(
             bridge.off("devices", onDevices);
             bridge.off("config_change", onConfigChange);
             automations.offChanged(onAutomationsChange);
-            todos.offChanged(onTodosChange);
+            lists.offChanged(onListsChange);
             chats.offChanged(onChatsChange);
           };
         },

@@ -15,11 +15,11 @@ import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CalendarService } from "../calendar/service.js";
 import type { ConfigStore, DisplayDeviceConfig, DisplaysConfig } from "../config/config.js";
-import type { TodoStore } from "../config/todos.js";
+import type { ListStore } from "../config/lists.js";
 import { debugLog } from "../debug-log.js";
 import type { TileConfig } from "./tiles.js";
 import { createComponentElement, renderElementToPngBuffer } from "./render.js";
-import type { TodoListProvider } from "./components/todo-display.js";
+import type { ListProvider } from "./components/list-display.js";
 
 function normalizeMac(mac: string): string {
   return mac.replace(/[^a-fA-F0-9]/g, "").toLowerCase();
@@ -183,7 +183,7 @@ function getPaletteColourCount(colorDepth: DisplayDeviceConfig["color_depth"]): 
 async function buildDisplayRootElement(
   device: DeviceMatch | undefined,
   calendarService: CalendarService,
-  todoListProvider: TodoListProvider,
+  listProvider: ListProvider,
   orientation: DisplayDeviceConfig["orientation"],
   dimensions: DisplayDimensions,
 ): Promise<{ rootElement: ReactElement; renderSize: { width: number; height: number } }> {
@@ -199,7 +199,7 @@ async function buildDisplayRootElement(
     const tileElement = await createComponentElement(
       tile.component,
       calendarService,
-      todoListProvider,
+      listProvider,
     );
 
     tileElements.push(
@@ -262,7 +262,7 @@ async function buildDisplayRootElement(
 async function generateImage(
   device: DeviceMatch | undefined,
   calendarService: CalendarService,
-  todoListProvider: TodoListProvider,
+  listProvider: ListProvider,
   orientation: DisplayDeviceConfig["orientation"],
   colorDepth: DisplayDeviceConfig["color_depth"],
   dimensions: DisplayDimensions,
@@ -270,7 +270,7 @@ async function generateImage(
   const { rootElement, renderSize } = await buildDisplayRootElement(
     device,
     calendarService,
-    todoListProvider,
+    listProvider,
     orientation,
     dimensions,
   );
@@ -289,13 +289,13 @@ async function generateImage(
   return image.png({ palette: true, colours, dither: 0 }).toBuffer();
 }
 
-export function createDisplayRoute(config: ConfigStore, todos: TodoStore) {
+export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
   const display = new Hono();
   const calendarService = new CalendarService(config.getCalendars(), {
     credentialsBaseDir: config.getConfigDir(),
   });
-  const todoListProvider: TodoListProvider = {
-    getTodoList: (listId) => todos.getList(listId),
+  const listProvider: ListProvider = {
+    getList: (listId) => lists.getList(listId),
   };
 
   display.get("/display/api/setup", (c) => {
@@ -459,7 +459,7 @@ export function createDisplayRoute(config: ConfigStore, todos: TodoStore) {
     const png = await generateImage(
       matchedDevice,
       calendarService,
-      todoListProvider,
+      listProvider,
       orientation,
       colorDepth,
       dimensions,
@@ -517,7 +517,7 @@ export function createDisplayRoute(config: ConfigStore, todos: TodoStore) {
     const { rootElement, renderSize } = await buildDisplayRootElement(
       matchedDevice,
       calendarService,
-      todoListProvider,
+      listProvider,
       orientation,
       dimensions,
     );

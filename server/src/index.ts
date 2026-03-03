@@ -4,14 +4,14 @@ import { createApp } from "./app.js";
 import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config/config.js";
 import { ChatStore } from "./config/chats.js";
-import { TodoStore } from "./config/todos.js";
+import { ListStore } from "./config/lists.js";
 import { TokenStore } from "./config/tokens.js";
 import { AutomationEngine } from "./automations.js";
 import { createTools } from "./tools.js";
 import { createMcpRoute } from "./mcp.js";
 import { debugLog } from "./debug-log.js";
 import { resolve } from "path";
-import { existsSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 
 const PORT = parseInt(process.env.PORT ?? "3111", 10);
 const MQTT_URL = process.env.MQTT_URL ?? "mqtt://localhost:1883";
@@ -19,11 +19,19 @@ const DATA_DIR = process.env.DATA_DIR;
 if (!DATA_DIR) throw new Error("DATA_DIR environment variable is required");
 
 const configPath = resolve(DATA_DIR, "config.json");
+const listsPath = resolve(DATA_DIR, "lists.json");
 const todosPath = resolve(DATA_DIR, "todos.json");
 const chatsPath = resolve(DATA_DIR, "chats.json");
 const tokensPath = resolve(DATA_DIR, "tokens.json");
 const automationsPath = resolve(DATA_DIR, "automations.json");
 const debugLogPath = resolve(DATA_DIR, "debug.jsonl");
+
+// Migrate todos.json -> lists.json if needed
+if (!existsSync(listsPath) && existsSync(todosPath)) {
+  console.log("[server] Migrating todos.json -> lists.json");
+  const raw = readFileSync(todosPath, "utf-8");
+  writeFileSync(listsPath, raw);
+}
 
 console.log(`[server] MQTT_URL=${MQTT_URL}`);
 console.log(`[server] Config: ${configPath}`);
@@ -32,7 +40,7 @@ console.log(`[server] Automations: ${automationsPath}`);
 // Load config first so we can read debugLogMaxSizeMB
 const config = new ConfigStore(configPath);
 const chats = new ChatStore(chatsPath);
-const todos = new TodoStore(todosPath);
+const lists = new ListStore(listsPath);
 const tokens = new TokenStore(tokensPath);
 
 // Initialise file-backed debug log before anything else uses it
@@ -53,7 +61,7 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
   },
 });
 
-const { app, injectWebSocket, toolCtx } = createApp(bridge, config, chats, todos, automationEngine, tokens);
+const { app, injectWebSocket, toolCtx } = createApp(bridge, config, chats, lists, automationEngine, tokens);
 
 // Mount in-process MCP server at /mcp (for Cursor IDE remote MCP)
 app.route("/", createMcpRoute(toolCtx));

@@ -1,4 +1,4 @@
-import type { TodoStatus } from "../../api.js";
+import type { ListStatus } from "../../api.js";
 import { Search } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.js";
 import { LucideIcon } from "./LucideIcon.js";
@@ -14,11 +14,11 @@ export function ItemFilterRow({
   onSearchQueryChange,
 }: {
   viewMode: "list" | "kanban";
-  statusFilter: TodoStatus[];
-  statusFilters: Array<{ id: TodoStatus; label: string }>;
-  statusIconByStatus?: Partial<Record<TodoStatus, string | undefined>>;
-  statusOptions: TodoStatus[];
-  onStatusFilterChange: (next: TodoStatus[]) => void;
+  statusFilter: ListStatus[];
+  statusFilters: Array<{ id: ListStatus; label: string }>;
+  statusIconByStatus?: Partial<Record<ListStatus, string | undefined>>;
+  statusOptions: ListStatus[];
+  onStatusFilterChange: (next: ListStatus[]) => void;
   searchQuery: string;
   onSearchQueryChange: (next: string) => void;
 }) {
@@ -29,7 +29,7 @@ export function ItemFilterRow({
           type="multiple"
           value={statusFilter}
           onValueChange={(value) => {
-            const next = Array.isArray(value) ? value as TodoStatus[] : [];
+            const next = Array.isArray(value) ? value as ListStatus[] : [];
             onStatusFilterChange(next.length > 0 ? next : statusOptions);
           }}
         >

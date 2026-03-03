@@ -10,15 +10,15 @@ import {
 import { ArrowLeft, Columns3, ListChecks, Plus, Settings } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  type TodoList,
-  type TodoStatus,
-  useCreateTodoList,
-  useDeleteTodoItem,
-  useDeleteTodoList,
-  useSetTodoItemStatus,
-  useTodoLists,
-  useUpdateTodoList,
-  useUpsertTodoItem,
+  type List,
+  type ListStatus,
+  useCreateList,
+  useDeleteListItem,
+  useDeleteList,
+  useSetListItemStatus,
+  useLists,
+  useUpdateList,
+  useUpsertListItem,
 } from "../../api.js";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
@@ -27,12 +27,12 @@ import { KanbanColumn } from "./KanbanColumn.js";
 import { ListItemCard } from "./ListItemCard.js";
 import { ItemDetailView } from "./ItemDetailView.js";
 import { ItemFilterRow } from "./ItemFilterRow.js";
-import { TodoConfigView } from "./TodoConfigView.js";
+import { ListsConfigView } from "./TodoConfigView.js";
 import { DEFAULT_COLUMNS, formatStatusLabel, normalizeListId } from "./helpers.js";
 
-function parseTodoRoute(pathname: string) {
-  const raw = pathname.startsWith("/todos")
-    ? pathname.slice("/todos".length)
+function parseListRoute(pathname: string) {
+  const raw = pathname.startsWith("/lists")
+    ? pathname.slice("/lists".length)
     : pathname;
   const segs = raw.split("/").filter(Boolean).map((s) => decodeURIComponent(s));
 
@@ -53,23 +53,23 @@ function parseTodoRoute(pathname: string) {
   };
 }
 
-export function TodosView() {
+export function ListsView() {
   const location = useLocation();
   const navigate = useNavigate();
-  const routeState = useMemo(() => parseTodoRoute(location.pathname), [location.pathname]);
+  const routeState = useMemo(() => parseListRoute(location.pathname), [location.pathname]);
 
-  const { data: lists, isLoading, error } = useTodoLists();
-  const createList = useCreateTodoList();
-  const deleteList = useDeleteTodoList();
-  const updateList = useUpdateTodoList();
-  const upsertTodoItem = useUpsertTodoItem();
-  const setTodoItemStatus = useSetTodoItemStatus();
-  const deleteTodoItem = useDeleteTodoItem();
+  const { data: lists, isLoading, error } = useLists();
+  const createList = useCreateList();
+  const deleteList = useDeleteList();
+  const updateList = useUpdateList();
+  const upsertListItem = useUpsertListItem();
+  const setListItemStatus = useSetListItemStatus();
+  const deleteListItem = useDeleteListItem();
 
   const [newListName, setNewListName] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<TodoStatus[]>([]);
+  const [statusFilter, setStatusFilter] = useState<ListStatus[]>([]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
@@ -78,24 +78,24 @@ export function TodosView() {
 
     if (routeState.panel === "items") {
       if (!routeState.listId || !lists.some((list) => list.id === routeState.listId)) {
-        navigate(`/todos/${encodeURIComponent(lists[0].id)}`, { replace: true });
+        navigate(`/lists/${encodeURIComponent(lists[0].id)}`, { replace: true });
         return;
       }
       if (routeState.itemId != null) {
         const list = lists.find((l) => l.id === routeState.listId);
         if (!list?.items.some((item) => item.id === routeState.itemId)) {
-          navigate(`/todos/${encodeURIComponent(routeState.listId)}`, { replace: true });
+          navigate(`/lists/${encodeURIComponent(routeState.listId)}`, { replace: true });
         }
       }
       return;
     }
 
     if (routeState.listId && !lists.some((list) => list.id === routeState.listId)) {
-      navigate("/todos/settings", { replace: true });
+      navigate("/lists/settings", { replace: true });
     }
   }, [lists, routeState, navigate]);
 
-  const activeList = useMemo<TodoList | null>(() => {
+  const activeList = useMemo<List | null>(() => {
     if (!lists || !routeState.listId) return null;
     return lists.find((list) => list.id === routeState.listId) ?? null;
   }, [lists, routeState.listId]);
@@ -116,7 +116,7 @@ export function TodosView() {
     [statusOptions],
   );
   const statusIconByStatus = useMemo(
-    () => Object.fromEntries((activeList?.columns ?? []).map((column) => [column.status, column.icon])) as Partial<Record<TodoStatus, string | undefined>>,
+    () => Object.fromEntries((activeList?.columns ?? []).map((column) => [column.status, column.icon])) as Partial<Record<ListStatus, string | undefined>>,
     [activeList?.columns],
   );
 
@@ -124,15 +124,15 @@ export function TodosView() {
     () => activeList?.items.find((item) => item.id === routeState.itemId) ?? null,
     [activeList, routeState.itemId],
   );
-  const backToTodosPath = useMemo(() => {
+  const backToListsPath = useMemo(() => {
     if (routeState.listId) {
-      return `/todos/${encodeURIComponent(routeState.listId)}`;
+      return `/lists/${encodeURIComponent(routeState.listId)}`;
     }
     const firstListId = lists?.[0]?.id;
     if (firstListId) {
-      return `/todos/${encodeURIComponent(firstListId)}`;
+      return `/lists/${encodeURIComponent(firstListId)}`;
     }
-    return "/todos";
+    return "/lists";
   }, [lists, routeState.listId]);
 
   const searchedItems = useMemo(() => {
@@ -172,20 +172,20 @@ export function TodosView() {
 
   const createListDisabled = createList.isPending || newListName.trim().length === 0;
 
-  const getTitleTransitionName = useCallback((itemId: number) => `todo-title-${itemId}`, []);
-  const getCardTransitionName = useCallback((itemId: number) => `todo-card-${itemId}`, []);
-  const getStatusTransitionName = useCallback((itemId: number) => `todo-status-${itemId}`, []);
+  const getTitleTransitionName = useCallback((itemId: number) => `list-title-${itemId}`, []);
+  const getCardTransitionName = useCallback((itemId: number) => `list-card-${itemId}`, []);
+  const getStatusTransitionName = useCallback((itemId: number) => `list-status-${itemId}`, []);
 
-  const addPlaceholderItem = (status?: TodoStatus) => {
+  const addPlaceholderItem = (status?: ListStatus) => {
     if (!activeList) return;
     const fallbackStatus = statusOptions[0];
     if (!fallbackStatus) return;
     const nextStatus = status && statusOptions.includes(status) ? status : fallbackStatus;
     setSearchQuery("");
     const itemId = Math.max((activeList.items ?? []).reduce((max, item) => Math.max(max, item.id), 0) + 1, 1);
-    upsertTodoItem.mutate(
-      { listId: activeList.id, itemId, patch: { title: "New todo", body: "", status: nextStatus } },
-      { onSuccess: () => navigate(`/todos/${encodeURIComponent(activeList.id)}/${itemId}`) },
+    upsertListItem.mutate(
+      { listId: activeList.id, itemId, patch: { title: "New item", body: "", status: nextStatus } },
+      { onSuccess: () => navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`) },
     );
   };
 
@@ -194,16 +194,16 @@ export function TodosView() {
     const { active, over } = event;
     if (!over) return;
     const overId = String(over.id);
-    if (!overId.startsWith("todo-column:")) return;
-    const nextStatus = overId.replace("todo-column:", "") as TodoStatus;
+    if (!overId.startsWith("list-column:")) return;
+    const nextStatus = overId.replace("list-column:", "") as ListStatus;
     if (!statusOptions.includes(nextStatus)) return;
     const activeItemId = active.data.current?.itemId as number | undefined;
-    const activeStatus = active.data.current?.status as TodoStatus | undefined;
+    const activeStatus = active.data.current?.status as ListStatus | undefined;
     if (!activeItemId || !activeStatus || activeStatus === nextStatus) return;
-    setTodoItemStatus.mutate({ listId: activeList.id, itemId: activeItemId, status: nextStatus });
+    setListItemStatus.mutate({ listId: activeList.id, itemId: activeItemId, status: nextStatus });
   };
 
-  const toggleColumnCollapsed = (status: TodoStatus) => {
+  const toggleColumnCollapsed = (status: ListStatus) => {
     if (!activeList) return;
     const nextColumns = activeList.columns.map((column) =>
       column.status === status ? { ...column, collapsed: !column.collapsed } : column,
@@ -220,7 +220,7 @@ export function TodosView() {
     return (
       <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
-        Loading todos...
+        Loading lists...
       </div>
     );
   }
@@ -228,7 +228,7 @@ export function TodosView() {
   if (error) {
     return (
       <div className="py-10 text-sm text-blood-600 font-mono">
-        Failed to load todos.
+        Failed to load lists.
       </div>
     );
   }
@@ -244,17 +244,17 @@ export function TodosView() {
             statusViewTransitionName={getStatusTransitionName(selectedItem.id)}
             statusOptions={statusOptions}
             statusIconByStatus={statusIconByStatus}
-            onBack={() => navigate(`/todos/${encodeURIComponent(activeList.id)}`)}
+            onBack={() => navigate(`/lists/${encodeURIComponent(activeList.id)}`)}
             onSavePatch={(patch) =>
-              upsertTodoItem.mutate({ listId: activeList.id, itemId: selectedItem.id, patch })
+              upsertListItem.mutate({ listId: activeList.id, itemId: selectedItem.id, patch })
             }
             onSetStatus={(status) =>
-              setTodoItemStatus.mutate({ listId: activeList.id, itemId: selectedItem.id, status })
+              setListItemStatus.mutate({ listId: activeList.id, itemId: selectedItem.id, status })
             }
             onDelete={() => {
-              deleteTodoItem.mutate(
+              deleteListItem.mutate(
                 { listId: activeList.id, itemId: selectedItem.id },
-                { onSuccess: () => navigate(`/todos/${encodeURIComponent(activeList.id)}`) },
+                { onSuccess: () => navigate(`/lists/${encodeURIComponent(activeList.id)}`) },
               );
             }}
           />
@@ -263,23 +263,23 @@ export function TodosView() {
             <div className="flex items-center">
               <button
                 type="button"
-                onClick={() => navigate(backToTodosPath)}
+                onClick={() => navigate(backToListsPath)}
                 className="inline-flex items-center gap-1.5 text-sm text-sand-700 hover:text-sand-900 cursor-pointer"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to todos
+                Back to lists
               </button>
             </div>
-            <TodoConfigView
+            <ListsConfigView
               lists={lists ?? []}
               activeListId={routeState.listId}
               expandedListId={routeState.listId}
               onExpandedListChange={(listId) => {
                 if (!listId) {
-                  navigate("/todos/settings");
+                  navigate("/lists/settings");
                   return;
                 }
-                navigate(`/todos/settings/${encodeURIComponent(listId)}`);
+                navigate(`/lists/settings/${encodeURIComponent(listId)}`);
               }}
               onCreateListRequested={() => setCreateModalOpen(true)}
               onSaveList={({ listId, patch }) => {
@@ -289,7 +289,7 @@ export function TodosView() {
                 deleteList.mutate(listId, {
                   onSuccess: () => {
                     if (routeState.listId === listId) {
-                      navigate("/todos/settings");
+                      navigate("/lists/settings");
                     }
                   },
                 });
@@ -305,7 +305,7 @@ export function TodosView() {
                 {(lists ?? []).map((list) => (
                   <button
                     key={list.id}
-                    onClick={() => navigate(`/todos/${encodeURIComponent(list.id)}`)}
+                    onClick={() => navigate(`/lists/${encodeURIComponent(list.id)}`)}
                     className={`px-3 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
                       routeState.listId === list.id
                         ? "bg-sand-50 text-sand-900 shadow-sm"
@@ -338,13 +338,13 @@ export function TodosView() {
                   variant={routeState.panel === "config" ? "default" : "outline"}
                   onClick={() => {
                     if (routeState.listId) {
-                      navigate(`/todos/settings/${encodeURIComponent(routeState.listId)}`);
+                      navigate(`/lists/settings/${encodeURIComponent(routeState.listId)}`);
                     } else {
-                      navigate("/todos/settings");
+                      navigate("/lists/settings");
                     }
                   }}
-                  title="Todo configuration"
-                  aria-label="Open todo configuration"
+                  title="List configuration"
+                  aria-label="Open list configuration"
                 >
                   <Settings className="h-4 w-4" />
                 </Button>
@@ -394,11 +394,11 @@ export function TodosView() {
                           statusIconByStatus={statusIconByStatus}
                           onOpen={() =>
                             startTransition(() =>
-                              navigate(`/todos/${encodeURIComponent(activeList.id)}/${item.id}`),
+                              navigate(`/lists/${encodeURIComponent(activeList.id)}/${item.id}`),
                             )
                           }
                           onStatusSet={(status) =>
-                            setTodoItemStatus.mutate({ listId: activeList.id, itemId: item.id, status })
+                            setListItemStatus.mutate({ listId: activeList.id, itemId: item.id, status })
                           }
                         />
                       ))
@@ -420,7 +420,7 @@ export function TodosView() {
                             onAddItem={(status) => addPlaceholderItem(status)}
                             onOpenItem={(itemId) =>
                               startTransition(() =>
-                                navigate(`/todos/${encodeURIComponent(activeList.id)}/${itemId}`),
+                                navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
                               )
                             }
                             onToggleCollapse={toggleColumnCollapsed}
@@ -440,7 +440,7 @@ export function TodosView() {
                             onAddItem={(status) => addPlaceholderItem(status)}
                             onOpenItem={(itemId) =>
                               startTransition(() =>
-                                navigate(`/todos/${encodeURIComponent(activeList.id)}/${itemId}`),
+                                navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
                               )
                             }
                             onToggleCollapse={toggleColumnCollapsed}
@@ -455,9 +455,9 @@ export function TodosView() {
               </>
             ) : (
               <div className="text-sm text-sand-600 font-mono py-10 text-center rounded-xl border border-sand-300 bg-sand-50">
-                No todo lists yet. Open settings to create one.
+                No lists yet. Open settings to create one.
                 <div className="mt-3">
-                  <Button variant="outline" size="sm" onClick={() => navigate("/todos/settings")}>
+                  <Button variant="outline" size="sm" onClick={() => navigate("/lists/settings")}>
                     Open settings
                   </Button>
                 </div>
@@ -476,7 +476,7 @@ export function TodosView() {
             aria-label="Close create list modal"
           />
           <div className="relative w-full max-w-md rounded-xl border border-blood-300/50 bg-blood-500 p-5 shadow-2xl">
-            <h3 className="text-base font-semibold text-sand-50">Create todo list</h3>
+            <h3 className="text-base font-semibold text-sand-50">Create list</h3>
             <p className="mt-1 text-sm text-blood-100">Give the list a name. ID is auto-generated from it.</p>
             <div className="mt-4">
               <Input
@@ -498,9 +498,9 @@ export function TodosView() {
                         setNewListName("");
                         setCreateModalOpen(false);
                         if (routeState.panel === "config") {
-                          navigate(`/todos/settings/${encodeURIComponent(list.id)}`);
+                          navigate(`/lists/settings/${encodeURIComponent(list.id)}`);
                         } else {
-                          navigate(`/todos/${encodeURIComponent(list.id)}`);
+                          navigate(`/lists/${encodeURIComponent(list.id)}`);
                         }
                       },
                     },
@@ -526,9 +526,9 @@ export function TodosView() {
                         setNewListName("");
                         setCreateModalOpen(false);
                         if (routeState.panel === "config") {
-                          navigate(`/todos/settings/${encodeURIComponent(list.id)}`);
+                          navigate(`/lists/settings/${encodeURIComponent(list.id)}`);
                         } else {
-                          navigate(`/todos/${encodeURIComponent(list.id)}`);
+                          navigate(`/lists/${encodeURIComponent(list.id)}`);
                         }
                       },
                     },

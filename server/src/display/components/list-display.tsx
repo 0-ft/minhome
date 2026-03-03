@@ -2,21 +2,27 @@ import type { CSSProperties, ReactElement } from "react";
 import * as LucideStatic from "lucide-static";
 import ReactMarkdown from "react-markdown";
 import { z } from "zod";
-import type { TodoList } from "../../config/todos.js";
+import type { List } from "../../config/lists.js";
 import { componentFailure, componentSuccess, type DisplayComponentResult } from "./component-result.js";
 
-export const TodoDisplayComponentConfigSchema = z.object({
-  kind: z.literal("todo_display"),
+export const ListDisplayComponentConfigSchema = z.object({
+  kind: z.literal("list_display"),
   list_id: z.string().trim().min(1),
   title: z.string().trim().min(1).optional(),
   max_items: z.number().int().positive().default(8),
   status_filter: z.array(z.string().trim().min(1)).optional(),
 });
 
+/** Legacy alias for list_display (backward compatibility with existing config). */
+export const TodoDisplayComponentConfigSchema = ListDisplayComponentConfigSchema.extend({
+  kind: z.literal("todo_display"),
+});
+
+export type ListDisplayComponentConfig = z.infer<typeof ListDisplayComponentConfigSchema>;
 export type TodoDisplayComponentConfig = z.infer<typeof TodoDisplayComponentConfigSchema>;
 
-export interface TodoListProvider {
-  getTodoList(listId: string): TodoList | undefined;
+export interface ListProvider {
+  getList(listId: string): List | undefined;
 }
 
 function getLucideIconSvgByName(name: string | undefined): string | null {
@@ -78,16 +84,16 @@ function renderInlineMarkdownTitle(title: string): ReactElement {
   }
 }
 
-export function createTodoDisplayElement(
-  config: TodoDisplayComponentConfig,
-  todoProvider: TodoListProvider,
+export function createListDisplayElement(
+  config: ListDisplayComponentConfig | TodoDisplayComponentConfig,
+  listProvider: ListProvider,
 ): DisplayComponentResult {
-  const list = todoProvider.getTodoList(config.list_id);
+  const list = listProvider.getList(config.list_id);
   if (!list) {
     return componentFailure(
       config.kind,
-      "Todo list not found",
-      `No todo list exists with id "${config.list_id}"`,
+      "List not found",
+      `No list exists with id "${config.list_id}"`,
     );
   }
 

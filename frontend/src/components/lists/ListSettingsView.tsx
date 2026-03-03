@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import type { TodoColumn } from "../../api.js";
+import type { ListColumn } from "../../api.js";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { Toggle } from "../ui/toggle.js";
@@ -15,20 +15,18 @@ export function ListSettingsView({
   newColumnStatus,
   onNewColumnStatusChange,
   onBack,
-  onSave,
-  pending,
+  saving,
 }: {
   listName: string;
   onListNameChange: (value: string) => void;
   includeInPrompt: boolean;
   onIncludeInPromptChange: (checked: boolean) => void;
-  columns: TodoColumn[];
-  onColumnsChange: (columns: TodoColumn[]) => void;
+  columns: ListColumn[];
+  onColumnsChange: (columns: ListColumn[]) => void;
   newColumnStatus: string;
   onNewColumnStatusChange: (value: string) => void;
   onBack?: () => void;
-  onSave: () => void;
-  pending: boolean;
+  saving?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-sand-300 bg-sand-50 p-4 space-y-4">
@@ -40,15 +38,12 @@ export function ListSettingsView({
             className="inline-flex items-center gap-1.5 text-sm text-sand-700 hover:text-sand-900 cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to todos
+            Back to lists
           </button>
         ) : <div />}
-        <Button
-          disabled={pending || listName.trim().length === 0 || sanitizeColumns(columns).length === 0}
-          onClick={onSave}
-        >
-          Save settings
-        </Button>
+        {saving && (
+          <span className="text-xs text-sand-500 font-mono">Saving…</span>
+        )}
       </div>
 
       <div>
@@ -68,7 +63,7 @@ export function ListSettingsView({
         <Toggle
           checked={includeInPrompt}
           onCheckedChange={onIncludeInPromptChange}
-          disabled={pending}
+          disabled={saving}
         />
       </div>
 
