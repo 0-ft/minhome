@@ -1,14 +1,13 @@
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { PersistedChatSummary } from "../api.js";
 import { ChatHistoryListContent } from "./chat/ChatHistoryListContent.js";
 
-export function ChatHistoryModal({
+export function RoomFullChatHistoryModal({
   open,
   chats,
   activeChatId,
   onClose,
   onSelect,
-  onDeleteRequested,
   onNewChat,
 }: {
   open: boolean;
@@ -16,8 +15,7 @@ export function ChatHistoryModal({
   activeChatId: string | null;
   onClose: () => void;
   onSelect: (chatId: string) => void;
-  onDeleteRequested: (chatId: string) => void;
-  onNewChat: () => void;
+  onNewChat: () => void | Promise<void>;
 }) {
   if (!open) return null;
 
@@ -25,29 +23,32 @@ export function ChatHistoryModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-black/45 cursor-default"
+        className="absolute inset-0 bg-black/60 backdrop-blur-[2px] cursor-default"
         onClick={onClose}
         aria-label="Close chat history"
       />
-      <div className="relative w-full max-w-xl rounded-xl border border-sand-300 bg-sand-100 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-sand-300 px-4 py-3">
+
+      <div className="relative w-full max-w-xl rounded-xl border border-white/[0.1] bg-[#13100d]/95 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-sand-900">Chat history</h3>
-            <p className="text-[11px] font-mono text-sand-500 mt-0.5">
-              Resume or delete saved chats
+            <h3 className="text-sm font-semibold text-sand-100">Chat history</h3>
+            <p className="text-[11px] font-mono text-sand-500/90 mt-0.5">
+              Resume saved room chats
             </p>
           </div>
+
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded-md bg-teal-300/70 px-2.5 py-1.5 text-xs font-medium text-teal-900 hover:bg-teal-300 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-teal-400/15 border border-teal-400/20 px-2.5 py-1.5 text-xs font-medium text-teal-200 hover:bg-teal-400/25 transition-colors cursor-pointer"
               onClick={onNewChat}
             >
+              <Plus className="h-3.5 w-3.5" />
               New chat
             </button>
             <button
               type="button"
-              className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-sand-500 hover:text-sand-100 hover:bg-white/[0.06] transition-colors cursor-pointer"
               onClick={onClose}
             >
               <X className="h-4 w-4" />
@@ -59,11 +60,9 @@ export function ChatHistoryModal({
           chats={chats}
           activeChatId={activeChatId}
           onSelect={onSelect}
-          onDeleteRequested={onDeleteRequested}
-          variant="regular"
+          variant="roomFull"
         />
       </div>
     </div>
   );
 }
-

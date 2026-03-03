@@ -1,14 +1,13 @@
-import { useChat } from "@ai-sdk/react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Send, X, Loader2, History } from "lucide-react";
-import type { UIMessage } from "ai";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
-import { ToolCallPart, isToolPart } from "./ToolCallDisplay.js";
-import type { ToolPart } from "./ToolCallDisplay.js";
-import { useChats, useChatById, useCreateChat, useDeleteChat } from "../api.js";
+import { useDeleteChat } from "../api.js";
 import { ChatHistoryModal } from "./ChatHistoryModal.js";
 import { ConfirmDialog } from "./ui/ConfirmDialog.js";
+import { usePersistedChatController } from "./chat/usePersistedChatController.js";
+import { buildChatRenderItems } from "./chat/chatRenderItems.js";
+import { ToolCallGroup } from "./chat/ToolCallGroup.js";
 
 function useChatInfo() {
   return useQuery({
@@ -22,25 +21,25 @@ function useChatInfo() {
 }
 
 export function ChatPane({ onClose }: { onClose: () => void }) {
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const bootstrappedRef = useRef(false);
-  const creatingInitialChatRef = useRef(false);
-  const hydratedChatIdRef = useRef<string | null>(null);
-  const hydratedChatUpdatedAtRef = useRef<string | null>(null);
-
-  const { data: chats = [], isFetched: chatsFetched } = useChats();
-  const { data: activeChat } = useChatById(activeChatId);
-  const createChat = useCreateChat();
   const deleteChat = useDeleteChat();
-  const { messages, sendMessage, status, stop, error, setMessages } = useChat({
-    id: activeChatId ?? undefined,
-  });
+  const {
+    activeChatId,
+    chats,
+    createNewChat,
+    selectChat,
+    messages,
+    sendMessage,
+    status,
+    stop,
+    error,
+  } = usePersistedChatController("text");
   const { data: chatInfo } = useChatInfo();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const renderItems = useMemo(() => buildChatRenderItems(messages), [messages]);
 
   const isLoading = status === "submitted" || status === "streaming";
 
@@ -54,54 +53,6 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    if (bootstrappedRef.current) return;
-    if (!chatsFetched) return;
-    if (activeChatId) {
-      bootstrappedRef.current = true;
-      return;
-    }
-    if (chats.length > 0) {
-      setActiveChatId(chats[0].id);
-      hydratedChatIdRef.current = null;
-      bootstrappedRef.current = true;
-      return;
-    }
-    if (creatingInitialChatRef.current) return;
-    creatingInitialChatRef.current = true;
-    bootstrappedRef.current = true;
-    createChat.mutate(
-      { source: "text" },
-      {
-        onSuccess: (created) => {
-          setActiveChatId(created.id);
-          hydratedChatIdRef.current = created.id;
-          hydratedChatUpdatedAtRef.current = created.updatedAt;
-          setMessages((created.messages ?? []) as UIMessage[]);
-          creatingInitialChatRef.current = false;
-        },
-        onError: () => {
-          creatingInitialChatRef.current = false;
-          bootstrappedRef.current = false;
-        },
-      },
-    );
-  }, [activeChatId, chats, chatsFetched, createChat, setMessages]);
-
-  useEffect(() => {
-    if (!activeChat || !activeChatId) return;
-    if (activeChat.id !== activeChatId) return;
-    if (
-      hydratedChatIdRef.current === activeChatId
-      && hydratedChatUpdatedAtRef.current === activeChat.updatedAt
-    ) {
-      return;
-    }
-    setMessages((activeChat.messages ?? []) as UIMessage[]);
-    hydratedChatIdRef.current = activeChatId;
-    hydratedChatUpdatedAtRef.current = activeChat.updatedAt;
-  }, [activeChat, activeChatId, setMessages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,8 +107,17 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+        {renderItems.map((item) => (
+          item.kind === "text" ? (
+            <MessageBubble
+              key={item.id}
+              id={item.id}
+              role={item.role}
+              text={item.text}
+            />
+          ) : (
+            <ToolCallGroup key={item.id} parts={item.tools} variant="regular" />
+          )
         ))}
 
         {isLoading && messages.length > 0 && (
@@ -219,25 +179,13 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
         activeChatId={activeChatId}
         onClose={() => setHistoryOpen(false)}
         onSelect={(chatId) => {
-          hydratedChatIdRef.current = null;
-          hydratedChatUpdatedAtRef.current = null;
-          setActiveChatId(chatId);
+          selectChat(chatId);
           setHistoryOpen(false);
         }}
         onDeleteRequested={(chatId) => setDeleteTargetId(chatId)}
-        onNewChat={() => {
-          createChat.mutate(
-            { source: "text" },
-            {
-              onSuccess: (created) => {
-                hydratedChatIdRef.current = created.id;
-                hydratedChatUpdatedAtRef.current = created.updatedAt;
-                setActiveChatId(created.id);
-                setMessages((created.messages ?? []) as UIMessage[]);
-                setHistoryOpen(false);
-              },
-            },
-          );
+        onNewChat={async () => {
+          await createNewChat();
+          setHistoryOpen(false);
         }}
       />
 
@@ -257,15 +205,9 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
             setDeleteTargetId(null);
             if (activeChatId === deletingId) {
               if (remaining.length > 0) {
-                hydratedChatIdRef.current = null;
-                hydratedChatUpdatedAtRef.current = null;
-                setActiveChatId(remaining[0].id);
+                selectChat(remaining[0].id);
               } else {
-                const created = await createChat.mutateAsync({ source: "text" });
-                hydratedChatIdRef.current = created.id;
-                hydratedChatUpdatedAtRef.current = created.updatedAt;
-                setActiveChatId(created.id);
-                setMessages((created.messages ?? []) as UIMessage[]);
+                await createNewChat();
               }
             }
           } catch {
@@ -279,8 +221,8 @@ export function ChatPane({ onClose }: { onClose: () => void }) {
 
 // ── Message Bubble ──────────────────────────────────────
 
-function MessageBubble({ message }: { message: UIMessage }) {
-  const isUser = message.role === "user";
+function MessageBubble({ id, role, text }: { id: string; role: "user" | "assistant"; text: string }) {
+  const isUser = role === "user";
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -291,28 +233,13 @@ function MessageBubble({ message }: { message: UIMessage }) {
             : "bg-sand-200 text-sand-800 rounded-bl-sm"
         }`}
       >
-        {message.parts.map((part, i) => {
-          if (part.type === "text") {
-            if (isUser) {
-              return (
-                <span key={i} className="whitespace-pre-wrap break-words">
-                  {part.text}
-                </span>
-              );
-            }
-            return (
-              <div key={i} className="prose-chat">
-                <MemoizedMarkdown content={part.text} id={`${message.id}-${i}`} />
-              </div>
-            );
-          }
-
-          if (isToolPart(part)) {
-            return <ToolCallPart key={i} part={part as ToolPart} />;
-          }
-
-          return null;
-        })}
+        {isUser ? (
+          <span className="whitespace-pre-wrap break-words">{text}</span>
+        ) : (
+          <div className="prose-chat">
+            <MemoizedMarkdown content={text} id={`${id}-markdown`} />
+          </div>
+        )}
       </div>
     </div>
   );

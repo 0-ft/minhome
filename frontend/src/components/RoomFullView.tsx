@@ -1,21 +1,21 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
-import { useChat } from "@ai-sdk/react";
-import { Send, X, Home, Loader2, Check, Camera } from "lucide-react";
-import type { UIMessage } from "ai";
+import { Send, X, Home, Loader2, Check, Camera, History, Plus } from "lucide-react";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
-import { ToolCallPart, isToolPart, toolPartName } from "./ToolCallDisplay.js";
-import type { ToolPart } from "./ToolCallDisplay.js";
 import { Scene, useRoomData } from "./RoomView.js";
 import type { GetCameraState } from "./RoomView.js";
 import { useSaveRoomCamera } from "../api.js";
+import { RoomFullChatHistoryModal } from "./RoomFullChatHistoryModal.js";
+import { usePersistedChatController } from "./chat/usePersistedChatController.js";
+import { buildChatRenderItems } from "./chat/chatRenderItems.js";
+import { ToolCallGroup } from "./chat/ToolCallGroup.js";
 
 // ── Floating message ──────────────────────────────────────
 
-function FloatingMessage({ message }: { message: UIMessage }) {
-  const isUser = message.role === "user";
+function FloatingTextMessage({ id, role, text }: { id: string; role: "user" | "assistant"; text: string }) {
+  const isUser = role === "user";
 
   return (
     <div className="animate-float-in mb-5">
@@ -24,57 +24,16 @@ function FloatingMessage({ message }: { message: UIMessage }) {
           className="text-teal-300/90 text-[15px] leading-relaxed"
           style={{ textShadow: "0 1px 16px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.4)" }}
         >
-          {message.parts.map((part, i) =>
-            part.type === "text" ? (
-              <span key={i} className="whitespace-pre-wrap break-words">
-                {part.text}
-              </span>
-            ) : null,
-          )}
+          <span className="whitespace-pre-wrap break-words">{text}</span>
         </p>
       ) : (
         <div
           className="prose-float"
           style={{ textShadow: "0 1px 16px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.4)" }}
         >
-          {message.parts.map((part, i) => {
-            if (part.type === "text") {
-              return (
-                <div key={i}>
-                  <MemoizedMarkdown content={part.text} id={`float-${message.id}-${i}`} />
-                </div>
-              );
-            }
-
-            if (isToolPart(part)) {
-              const tp = part as ToolPart;
-              const done = tp.state === "output-available";
-              const errored = tp.state === "output-error";
-              return (
-                <div key={i} className="transition-opacity duration-300">
-                  <div
-                    className={`flex items-center gap-1.5 text-[12px] py-0.5 font-mono ${
-                      done ? "text-sand-500/30" : errored ? "text-blood-400/70" : "text-sand-400/60"
-                    }`}
-                  >
-                    {done ? (
-                      <Check className="h-3 w-3 text-teal-400/50" />
-                    ) : errored ? (
-                      <X className="h-3 w-3 text-blood-400/70" />
-                    ) : (
-                      <Loader2 className="h-3 w-3 animate-spin text-teal-400/40" />
-                    )}
-                    <span>{toolPartName(tp)}</span>
-                  </div>
-                  {errored && tp.errorText && (
-                    <p className="text-[10px] text-blood-400/50 ml-[18px] truncate max-w-xs">{tp.errorText}</p>
-                  )}
-                </div>
-              );
-            }
-
-            return null;
-          })}
+          <div>
+            <MemoizedMarkdown content={text} id={`float-${id}-markdown`} />
+          </div>
         </div>
       )}
     </div>
@@ -108,10 +67,22 @@ export function RoomFullView() {
   };
 
   // ── Chat ──────────────────────────────────────────────
-  const { messages, sendMessage, status, stop, error } = useChat();
+  const {
+    activeChatId,
+    chats,
+    createNewChat,
+    selectChat,
+    messages,
+    sendMessage,
+    status,
+    stop,
+    error,
+  } = usePersistedChatController("text");
   const [input, setInput] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const renderItems = useMemo(() => buildChatRenderItems(messages), [messages]);
 
   const isLoading = status === "submitted" || status === "streaming";
 
@@ -129,7 +100,7 @@ export function RoomFullView() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || !activeChatId) return;
     sendMessage({ text });
     setInput("");
   };
@@ -176,68 +147,84 @@ export function RoomFullView() {
       )}
 
       {/* Floating UI overlay */}
-      <div className="absolute inset-0 pointer-events-none flex flex-col">
-        {/* Top bar buttons */}
-        <div className="flex justify-end gap-2 px-5 py-5 pointer-events-auto shrink-0">
-          <button
-            onClick={handleSaveCamera}
-            className={`p-2 rounded-lg backdrop-blur-sm border transition-all cursor-pointer ${
-              cameraSaved
-                ? "bg-teal-400/15 border-teal-400/20 text-teal-300"
-                : "bg-white/[0.04] border-white/[0.06] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08]"
-            }`}
-            title="Save camera position"
+      <div className="absolute inset-0 pointer-events-none flex flex-col min-h-0">
+        {/* Messages area with blurred chat controls */}
+        <div className="relative flex-1 min-h-0 max-w-lg pointer-events-auto">
+          <div
+            className="absolute top-0 left-0 right-0 z-10 h-24 pointer-events-none"
+            style={{
+              backdropFilter: "blur(10px)",
+              background: "linear-gradient(to bottom, rgba(13, 11, 9, 0.42), rgba(13, 11, 9, 0.08), transparent)",
+              maskImage: "linear-gradient(to bottom, black 68%, transparent)",
+            }}
           >
-            {cameraSaved ? <Check className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
-          </button>
-          <button
-            onClick={() => navigate("/room")}
-            className="p-2 rounded-lg bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08] transition-all cursor-pointer"
-            title="Back to home"
-          >
-            <Home className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Messages area */}
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto px-10 pb-4 max-w-lg scrollbar-float pointer-events-auto"
-          style={{
-            maskImage:
-              "linear-gradient(to bottom, black, black calc(100% - 24px), transparent)",
-          }}
-        >
-          {messages.length === 0 && (
-            <div className="animate-float-in mt-4">
-              <p
-                className="text-sand-500/30 text-[15px] font-mono"
-                style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}
+            <div className="absolute top-5 left-10 flex items-center gap-2 pointer-events-auto">
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(true)}
+                className="shrink-0 p-2.5 rounded-lg bg-white/[0.04] backdrop-blur-sm border border-white/[0.08] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08] transition-all cursor-pointer"
+                title="Chat history"
               >
-                Ask me anything about your room…
-              </p>
+                <History className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await createNewChat();
+                }}
+                className="shrink-0 p-2.5 rounded-lg bg-teal-400/10 backdrop-blur-sm border border-teal-400/18 text-teal-300/80 hover:bg-teal-400/20 hover:text-teal-200 transition-all cursor-pointer"
+                title="New chat"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
-          )}
+          </div>
 
-          {messages.map((message) => (
-            <FloatingMessage key={message.id} message={message} />
-          ))}
+          <div
+            ref={scrollRef}
+            className="h-full min-h-0 overflow-y-auto px-10 pt-20 pb-4 scrollbar-float"
+            style={{
+              maskImage:
+                "linear-gradient(to bottom, black, black calc(100% - 24px), transparent)",
+            }}
+          >
+            {messages.length === 0 && (
+              <div className="animate-float-in mt-4">
+                <p
+                  className="text-sand-500/30 text-[15px] font-mono"
+                  style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}
+                >
+                  Ask me anything about your room…
+                </p>
+              </div>
+            )}
 
-          {isLoading && messages.length > 0 && (
-            <div className="animate-float-in flex items-center gap-2 text-sm text-sand-500/50 mb-4">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span className="font-mono">thinking…</span>
-            </div>
-          )}
+            {renderItems.map((item) => (
+              item.kind === "text" ? (
+                <FloatingTextMessage key={item.id} id={item.id} role={item.role} text={item.text} />
+              ) : (
+                <div key={item.id} className="animate-float-in mb-5">
+                  <ToolCallGroup parts={item.tools} variant="roomFull" />
+                </div>
+              )
+            ))}
 
-          {error && (
-            <div
-              className="animate-float-in text-sm text-blood-400/70 font-mono mb-4"
-              style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}
-            >
-              {error.message}
-            </div>
-          )}
+            {isLoading && messages.length > 0 && (
+              <div className="animate-float-in flex items-center gap-2 text-sm text-sand-500/50 mb-4">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span className="font-mono">thinking…</span>
+              </div>
+            )}
+
+            {error && (
+              <div
+                className="animate-float-in text-sm text-blood-400/70 font-mono mb-4"
+                style={{ textShadow: "0 1px 8px rgba(0,0,0,0.8)" }}
+              >
+                {error.message}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Floating input */}
@@ -265,7 +252,7 @@ export function RoomFullView() {
             ) : (
               <button
                 type="submit"
-                disabled={!input.trim()}
+                disabled={!input.trim() || !activeChatId}
                 className="shrink-0 p-3 rounded-xl bg-teal-400/10 backdrop-blur-sm border border-teal-400/15 text-teal-300/80 hover:bg-teal-400/20 hover:text-teal-200 transition-all disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                 title="Send"
               >
@@ -275,6 +262,43 @@ export function RoomFullView() {
           </form>
         </div>
       </div>
+
+      {/* Fixed nav buttons (do not affect chat layout) */}
+      <div className="fixed top-5 right-5 flex gap-2 pointer-events-auto z-10">
+        <button
+          onClick={handleSaveCamera}
+          className={`p-2 rounded-lg backdrop-blur-sm border transition-all cursor-pointer ${
+            cameraSaved
+              ? "bg-teal-400/15 border-teal-400/20 text-teal-300"
+              : "bg-white/[0.04] border-white/[0.06] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08]"
+          }`}
+          title="Save camera position"
+        >
+          {cameraSaved ? <Check className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+        </button>
+        <button
+          onClick={() => navigate("/room")}
+          className="p-2 rounded-lg bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08] transition-all cursor-pointer"
+          title="Back to home"
+        >
+          <Home className="h-4 w-4" />
+        </button>
+      </div>
+
+      <RoomFullChatHistoryModal
+        open={historyOpen}
+        chats={chats}
+        activeChatId={activeChatId}
+        onClose={() => setHistoryOpen(false)}
+        onSelect={(chatId) => {
+          selectChat(chatId);
+          setHistoryOpen(false);
+        }}
+        onNewChat={async () => {
+          await createNewChat();
+          setHistoryOpen(false);
+        }}
+      />
     </div>
   );
 }
