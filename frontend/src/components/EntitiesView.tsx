@@ -121,13 +121,13 @@ function EntityCard({ entity, device, onSet, onRename }: {
 
   const handleToggle = () => {
     if (isOn) {
-      onSet({ state: "OFF" });
+      onSet({ [features.stateProperty]: "OFF" });
     } else {
       onSet({
-        state: "ON",
-        ...(features.brightnessProperty && { brightness }),
-        ...(features.colorTempProperty && { color_temp: colorTemp }),
-        ...(features.colorProperty && { color: { hue, saturation } }),
+        [features.stateProperty]: "ON",
+        ...(features.brightnessProperty && { [features.brightnessProperty]: brightness }),
+        ...(features.colorTempProperty && { [features.colorTempProperty]: colorTemp }),
+        ...(features.colorProperty && { [features.colorProperty]: { hue, saturation } }),
       });
     }
   };
@@ -209,7 +209,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
           serverValue={serverBrightness}
           value={brightness}
           onValueChange={setBrightness}
-          onCommit={(val) => onSet({ brightness: val })}
+          onCommit={(val) => onSet({ [features.brightnessProperty]: val })}
           label={<Sun className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-sand-500"}`} />}
         />
       )}
@@ -220,7 +220,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
           serverValue={serverColorTemp}
           value={colorTemp}
           onValueChange={setColorTemp}
-          onCommit={(val) => onSet({ color_temp: val })}
+          onCommit={(val) => onSet({ [features.colorTempProperty]: val })}
           label={<Thermometer className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-sand-500"}`} />}
         />
       )}
@@ -233,7 +233,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
             serverValue={serverHue}
             value={hue}
             onValueChange={setHue}
-            onCommit={(val) => onSet({ color: { hue: val, saturation } })}
+            onCommit={(val) => onSet({ [features.colorProperty]: { hue: val, saturation } })}
             label={<Palette className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-sand-500"}`} />}
             trackBackground={HUE_GRADIENT}
           />
@@ -242,7 +242,7 @@ function EntityCard({ entity, device, onSet, onRename }: {
             serverValue={serverSaturation}
             value={saturation}
             onValueChange={setSaturation}
-            onCommit={(val) => onSet({ color: { hue, saturation: val } })}
+            onCommit={(val) => onSet({ [features.colorProperty]: { hue, saturation: val } })}
             label={
               <div
                 className="h-3.5 w-3.5 rounded-full border border-sand-400/40"

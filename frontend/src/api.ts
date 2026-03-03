@@ -1,9 +1,160 @@
 import { hc } from "hono/client";
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useInfiniteQuery,
+  type QueryKey,
+} from "@tanstack/react-query";
 import type { AppType } from "@minhome/server/app";
 import { useEffect, useRef, useCallback } from "react";
+import type { DeviceData } from "./types.js";
 
 export const api: any = hc<AppType>("/");
+
+type OptimisticPatch = {
+  queryKey: QueryKey;
+  updater: (previous: unknown) => unknown;
+};
+
+type MutationContext = {
+  snapshots: Array<{ queryKey: QueryKey; previous: unknown }>;
+  invalidateQueryKeys: QueryKey[];
+};
+
+function uniqueQueryKeys(keys: QueryKey[]): QueryKey[] {
+  const seen = new Set<string>();
+  const result: QueryKey[] = [];
+  for (const key of keys) {
+    const stable = JSON.stringify(key);
+    if (seen.has(stable)) continue;
+    seen.add(stable);
+    result.push(key);
+  }
+  return result;
+}
+
+function mergeStatePayload(
+  base: Record<string, unknown> | undefined,
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(base ?? {}) };
+  for (const [key, value] of Object.entries(payload)) {
+    const current = next[key];
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      current &&
+      typeof current === "object" &&
+      !Array.isArray(current)
+    ) {
+      next[key] = { ...(current as Record<string, unknown>), ...(value as Record<string, unknown>) };
+      continue;
+    }
+    next[key] = value;
+  }
+  return next;
+}
+
+function updateDevicesCollection(
+  previous: unknown,
+  targetDeviceId: string,
+  updater: (device: DeviceData) => DeviceData,
+): unknown {
+  if (!Array.isArray(previous)) return previous;
+  return (previous as DeviceData[]).map((device) =>
+    device.id === targetDeviceId ? updater(device) : device,
+  );
+}
+
+function updateListsCollection(
+  previous: unknown,
+  listId: string,
+  updater: (list: List) => List,
+): unknown {
+  if (!Array.isArray(previous)) return previous;
+  return (previous as List[]).map((list) => (list.id === listId ? updater(list) : list));
+}
+
+function patchListOptimistically(list: List, patch: {
+  name?: string;
+  include_in_system_prompt?: boolean;
+  view?: "list" | "kanban";
+  columns?: ListColumn[];
+  complete_status_ids?: string[];
+}): List {
+  return {
+    ...list,
+    ...(patch.name !== undefined ? { name: patch.name } : {}),
+    ...(patch.include_in_system_prompt !== undefined
+      ? { includeInSystemPrompt: patch.include_in_system_prompt }
+      : {}),
+    ...(patch.view !== undefined ? { view: patch.view } : {}),
+    ...(patch.columns !== undefined ? { columns: patch.columns } : {}),
+    ...(patch.complete_status_ids !== undefined ? { completeStatusIds: patch.complete_status_ids } : {}),
+  };
+}
+
+function createOptimisticMutation<TData, TVariables>(args: {
+  qc: ReturnType<typeof useQueryClient>;
+  mutationFn: (variables: TVariables) => Promise<TData>;
+  optimistic?: (variables: TVariables) => {
+    patches: OptimisticPatch[];
+    invalidateQueryKeys?: QueryKey[];
+  };
+  invalidateQueryKeys?: QueryKey[] | ((variables: TVariables) => QueryKey[]);
+  onSuccess?: (data: TData, variables: TVariables, context: MutationContext | undefined) => void;
+}) {
+  const { qc, mutationFn, optimistic, invalidateQueryKeys, onSuccess } = args;
+  return useMutation<TData, Error, TVariables, MutationContext>({
+    mutationFn,
+    onMutate: async (variables) => {
+      const optimisticPlan = optimistic?.(variables);
+      const patches = optimisticPlan?.patches ?? [];
+      const invalidateFromOptimistic = optimisticPlan?.invalidateQueryKeys ?? [];
+      const queryKeysToCancel = uniqueQueryKeys([
+        ...patches.map((patch) => patch.queryKey),
+        ...invalidateFromOptimistic,
+      ]);
+
+      await Promise.all(queryKeysToCancel.map((queryKey) => qc.cancelQueries({ queryKey })));
+
+      const snapshots = patches.map((patch) => {
+        const previous = qc.getQueryData(patch.queryKey);
+        qc.setQueryData(patch.queryKey, patch.updater);
+        return { queryKey: patch.queryKey, previous };
+      });
+
+      return {
+        snapshots,
+        invalidateQueryKeys: invalidateFromOptimistic,
+      };
+    },
+    onError: (_error, _variables, context) => {
+      if (!context) return;
+      for (const snapshot of context.snapshots) {
+        qc.setQueryData(snapshot.queryKey, snapshot.previous);
+      }
+    },
+    onSuccess: (data, variables, context) => {
+      onSuccess?.(data, variables, context);
+    },
+    onSettled: (_data, _error, variables, context) => {
+      const configuredInvalidate =
+        typeof invalidateQueryKeys === "function"
+          ? invalidateQueryKeys(variables)
+          : (invalidateQueryKeys ?? []);
+      const queryKeysToInvalidate = uniqueQueryKeys([
+        ...(context?.invalidateQueryKeys ?? []),
+        ...configuredInvalidate,
+      ]);
+      for (const queryKey of queryKeysToInvalidate) {
+        qc.invalidateQueries({ queryKey });
+      }
+    },
+  });
+}
 
 // --- Auth ---
 
@@ -167,30 +318,78 @@ export function useDevice(id: string) {
 
 export function useSetDevice() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async ({ id, payload }: { id: string; payload: Record<string, unknown> }) => {
       const res = await api.api.devices[":id"].set.$post({ param: { id }, json: payload });
       return res.json();
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["devices"] });
-    },
+    optimistic: ({ id, payload }) => ({
+      patches: [
+        {
+          queryKey: ["devices"],
+          updater: (previous) =>
+            updateDevicesCollection(previous, id, (device) => {
+              const nextState = mergeStatePayload(device.state, payload);
+              return {
+                ...device,
+                state: nextState,
+                entities: (device.entities ?? []).map((entity) => ({
+                  ...entity,
+                  state: mergeStatePayload(entity.state, payload),
+                })),
+              };
+            }),
+        },
+      ],
+    }),
+    // Device state is reconciled by websocket events and polling.
+    invalidateQueryKeys: [],
   });
 }
 
 export function useSetEntity() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ deviceId, entityKey, payload }: { deviceId: string; entityKey: string; payload: Record<string, unknown> }) => {
+  return createOptimisticMutation({
+    qc,
+    mutationFn: async ({
+      deviceId,
+      entityKey,
+      payload,
+    }: {
+      deviceId: string;
+      entityKey: string;
+      payload: Record<string, unknown>;
+    }) => {
       const res = await api.api.devices[":id"].entities[":entityKey"].set.$post({
         param: { id: deviceId, entityKey },
         json: payload,
       });
       return res.json();
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["devices"] });
-    },
+    optimistic: ({ deviceId, entityKey, payload }) => ({
+      patches: [
+        {
+          queryKey: ["devices"],
+          updater: (previous) =>
+            updateDevicesCollection(previous, deviceId, (device) => {
+              return {
+                ...device,
+                state: entityKey === "main"
+                  ? mergeStatePayload(device.state, payload)
+                  : device.state,
+                entities: (device.entities ?? []).map((entity) => ({
+                  ...entity,
+                  state: entity.key === entityKey
+                    ? mergeStatePayload(entity.state, payload)
+                    : entity.state,
+                })),
+              };
+            }),
+        },
+      ],
+    }),
+    invalidateQueryKeys: [],
   });
 }
 
@@ -258,27 +457,51 @@ export function useAutomations() {
 
 export function useUpdateAutomation() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
       const res = await api.api.automations[":id"].$put({ param: { id }, json: patch });
       return res.json();
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["automations"] });
-    },
+    optimistic: ({ id, patch }) => ({
+      patches: [
+        {
+          queryKey: ["automations"],
+          updater: (previous) => {
+            if (!Array.isArray(previous)) return previous;
+            return previous.map((automation) =>
+              (automation as { id: string }).id === id
+                ? { ...(automation as Record<string, unknown>), ...patch, id }
+                : automation,
+            );
+          },
+        },
+      ],
+    }),
+    invalidateQueryKeys: [["automations"]],
   });
 }
 
 export function useDeleteAutomation() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async (id: string) => {
       const res = await api.api.automations[":id"].$delete({ param: { id } });
       return res.json();
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["automations"] });
-    },
+    optimistic: (id) => ({
+      patches: [
+        {
+          queryKey: ["automations"],
+          updater: (previous) => {
+            if (!Array.isArray(previous)) return previous;
+            return previous.filter((automation) => (automation as { id: string }).id !== id);
+          },
+        },
+      ],
+    }),
+    invalidateQueryKeys: [["automations"]],
   });
 }
 
@@ -339,7 +562,8 @@ export function useList(listId: string | null) {
 
 export function useCreateList() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async (payload: { id: string; name: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: ListColumn[]; complete_status_ids?: string[] }) => {
       const res = await api.api.lists.$post({
         json: payload,
@@ -348,15 +572,42 @@ export function useCreateList() {
       if (!res.ok) throw new Error(data?.error ?? "Failed to create list");
       return data as List;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lists"] });
+    optimistic: (payload) => {
+      const optimisticList: List = {
+        id: payload.id,
+        name: payload.name,
+        includeInSystemPrompt: payload.include_in_system_prompt ?? false,
+        view: payload.view ?? "list",
+        columns: payload.columns ?? [],
+        items: [],
+        ...(payload.complete_status_ids ? { completeStatusIds: payload.complete_status_ids } : {}),
+      };
+      return {
+        patches: [
+          {
+            queryKey: ["lists"],
+            updater: (previous) => {
+              if (!Array.isArray(previous)) return previous;
+              const existing = (previous as List[]).some((list) => list.id === payload.id);
+              if (existing) return previous;
+              return [...(previous as List[]), optimisticList];
+            },
+          },
+          {
+            queryKey: ["lists", payload.id],
+            updater: () => optimisticList,
+          },
+        ],
+      };
     },
+    invalidateQueryKeys: (payload) => [["lists"], ["lists", payload.id]],
   });
 }
 
 export function useUpdateList() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async ({
       listId,
       patch,
@@ -372,16 +623,30 @@ export function useUpdateList() {
       if (!res.ok) throw new Error(data?.error ?? "Failed to update list");
       return data as { ok: true; list: List };
     },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["lists"] });
-      qc.invalidateQueries({ queryKey: ["lists", vars.listId] });
-    },
+    optimistic: ({ listId, patch }) => ({
+      patches: [
+        {
+          queryKey: ["lists"],
+          updater: (previous) =>
+            updateListsCollection(previous, listId, (list) => patchListOptimistically(list, patch)),
+        },
+        {
+          queryKey: ["lists", listId],
+          updater: (previous) => {
+            if (!previous || typeof previous !== "object") return previous;
+            return patchListOptimistically(previous as List, patch);
+          },
+        },
+      ],
+    }),
+    invalidateQueryKeys: ({ listId }) => [["lists"], ["lists", listId]],
   });
 }
 
 export function useDeleteList() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async (listId: string) => {
       const res = await api.api.lists[":listId"].$delete({
         param: { listId },
@@ -390,15 +655,29 @@ export function useDeleteList() {
       if (!res.ok) throw new Error(data?.error ?? "Failed to delete list");
       return data as { ok: true };
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["lists"] });
-    },
+    optimistic: (listId) => ({
+      patches: [
+        {
+          queryKey: ["lists"],
+          updater: (previous) => {
+            if (!Array.isArray(previous)) return previous;
+            return (previous as List[]).filter((list) => list.id !== listId);
+          },
+        },
+        {
+          queryKey: ["lists", listId],
+          updater: () => undefined,
+        },
+      ],
+    }),
+    invalidateQueryKeys: (listId) => [["lists"], ["lists", listId]],
   });
 }
 
 export function useUpsertListItem() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async ({
       listId,
       itemId,
@@ -422,16 +701,66 @@ export function useUpsertListItem() {
       if (!res.ok) throw new Error(data?.error ?? "Failed to upsert list item");
       return data as { ok: true; item: ListItem };
     },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["lists"] });
-      qc.invalidateQueries({ queryKey: ["lists", vars.listId] });
+    optimistic: ({ listId, itemId, patch }) => {
+      const now = new Date().toISOString();
+      const applyUpsert = (list: List): List => {
+        const existingItem = list.items.find((item) => item.id === itemId);
+        const statusId = patch.status_id
+          ?? existingItem?.statusId
+          ?? list.columns[0]?.id
+          ?? "todo";
+        const nextItem: ListItem = existingItem
+          ? {
+            ...existingItem,
+            ...(patch.title !== undefined ? { title: patch.title } : {}),
+            ...(patch.body !== undefined ? { body: patch.body } : {}),
+            statusId,
+            updatedAt: now,
+          }
+          : {
+            id: itemId,
+            title: patch.title ?? "New item",
+            body: patch.body ?? "",
+            statusId,
+            createdAt: now,
+            updatedAt: now,
+          };
+        return {
+          ...list,
+          ...(patch.list_name !== undefined ? { name: patch.list_name } : {}),
+          ...(patch.include_in_system_prompt !== undefined
+            ? { includeInSystemPrompt: patch.include_in_system_prompt }
+            : {}),
+          items: existingItem
+            ? list.items.map((item) => (item.id === itemId ? nextItem : item))
+            : [...list.items, nextItem],
+        };
+      };
+
+      return {
+        patches: [
+          {
+            queryKey: ["lists"],
+            updater: (previous) => updateListsCollection(previous, listId, applyUpsert),
+          },
+          {
+            queryKey: ["lists", listId],
+            updater: (previous) => {
+              if (!previous || typeof previous !== "object") return previous;
+              return applyUpsert(previous as List);
+            },
+          },
+        ],
+      };
     },
+    invalidateQueryKeys: ({ listId }) => [["lists"], ["lists", listId]],
   });
 }
 
 export function useSetListItemStatus() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async ({
       listId,
       itemId,
@@ -449,16 +778,38 @@ export function useSetListItemStatus() {
       if (!res.ok) throw new Error(data?.error ?? "Failed to set list item status");
       return data as { ok: true; item: ListItem };
     },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["lists"] });
-      qc.invalidateQueries({ queryKey: ["lists", vars.listId] });
+    optimistic: ({ listId, itemId, statusId }) => {
+      const now = new Date().toISOString();
+      const applyStatus = (list: List): List => ({
+        ...list,
+        items: list.items.map((item) =>
+          item.id === itemId ? { ...item, statusId, updatedAt: now } : item,
+        ),
+      });
+      return {
+        patches: [
+          {
+            queryKey: ["lists"],
+            updater: (previous) => updateListsCollection(previous, listId, applyStatus),
+          },
+          {
+            queryKey: ["lists", listId],
+            updater: (previous) => {
+              if (!previous || typeof previous !== "object") return previous;
+              return applyStatus(previous as List);
+            },
+          },
+        ],
+      };
     },
+    invalidateQueryKeys: ({ listId }) => [["lists"], ["lists", listId]],
   });
 }
 
 export function useDeleteListItem() {
   const qc = useQueryClient();
-  return useMutation({
+  return createOptimisticMutation({
+    qc,
     mutationFn: async ({ listId, itemId }: { listId: string; itemId: number }) => {
       const res = await api.api.lists[":listId"].items[":itemId"].$delete({
         param: { listId, itemId: String(itemId) },
@@ -467,10 +818,28 @@ export function useDeleteListItem() {
       if (!res.ok) throw new Error(data?.error ?? "Failed to delete list item");
       return data as { ok: true };
     },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["lists"] });
-      qc.invalidateQueries({ queryKey: ["lists", vars.listId] });
+    optimistic: ({ listId, itemId }) => {
+      const applyDelete = (list: List): List => ({
+        ...list,
+        items: list.items.filter((item) => item.id !== itemId),
+      });
+      return {
+        patches: [
+          {
+            queryKey: ["lists"],
+            updater: (previous) => updateListsCollection(previous, listId, applyDelete),
+          },
+          {
+            queryKey: ["lists", listId],
+            updater: (previous) => {
+              if (!previous || typeof previous !== "object") return previous;
+              return applyDelete(previous as List);
+            },
+          },
+        ],
+      };
     },
+    invalidateQueryKeys: ({ listId }) => [["lists"], ["lists", listId]],
   });
 }
 
