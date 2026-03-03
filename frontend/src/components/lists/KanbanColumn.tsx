@@ -2,7 +2,7 @@ import { Plus, ChevronRight } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { ViewTransition } from "react";
-import type { ListItem, ListStatus } from "../../api.js";
+import type { ListItem } from "../../api.js";
 import { LucideIcon } from "./LucideIcon.js";
 
 function KanbanCard({
@@ -20,7 +20,7 @@ function KanbanCard({
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `list-item:${listId}:${item.id}`,
-    data: { itemId: item.id, status: item.status },
+    data: { itemId: item.id, statusId: item.statusId },
   });
 
   const style = {
@@ -75,7 +75,7 @@ function KanbanCard({
 
 export function KanbanColumn({
   listId,
-  status,
+  statusId,
   label,
   icon,
   collapsed,
@@ -87,20 +87,20 @@ export function KanbanColumn({
   getTitleTransitionName,
 }: {
   listId: string;
-  status: ListStatus;
+  statusId: string;
   label: string;
   icon?: string;
   collapsed: boolean;
   items: ListItem[];
-  onAddItem: (status: ListStatus) => void;
+  onAddItem: (statusId: string) => void;
   onOpenItem: (itemId: number) => void;
-  onToggleCollapse: (status: ListStatus) => void;
+  onToggleCollapse: (statusId: string) => void;
   getCardTransitionName?: (itemId: number) => string;
   getTitleTransitionName?: (itemId: number) => string;
 }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: `list-column:${status}`,
-    data: { status },
+    id: `list-column:${statusId}`,
+    data: { statusId },
   });
 
   if (collapsed) {
@@ -114,7 +114,7 @@ export function KanbanColumn({
         <button
           type="button"
           className="h-full w-full flex items-center justify-center cursor-pointer text-sand-700 hover:text-sand-900"
-          onClick={() => onToggleCollapse(status)}
+          onClick={() => onToggleCollapse(statusId)}
           title={`Expand ${label}`}
         >
           <div className="-rotate-90 whitespace-nowrap inline-flex items-center gap-1.5 text-sm font-semibold">
@@ -138,7 +138,7 @@ export function KanbanColumn({
         <button
           type="button"
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-sand-900 cursor-pointer hover:text-sand-700"
-          onClick={() => onToggleCollapse(status)}
+          onClick={() => onToggleCollapse(statusId)}
         >
           <LucideIcon name={icon} className="h-4 w-4" />
           <span>{label}</span>
@@ -147,7 +147,7 @@ export function KanbanColumn({
           <span className="text-xs font-mono text-sand-600">{items.length}</span>
           <button
             type="button"
-            onClick={() => onAddItem(status)}
+            onClick={() => onAddItem(statusId)}
             className="h-6 w-6 inline-flex items-center justify-center rounded-md bg-sand-200 text-sand-600 hover:bg-sand-300 hover:text-sand-800 transition-colors cursor-pointer"
             title={`Add item to ${label}`}
           >

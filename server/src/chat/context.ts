@@ -47,11 +47,13 @@ export function buildSystemPrompt(
   const promptLists = lists.getPromptLists().map((list) => ({
     id: list.id,
     name: list.name,
+    columnsById: Object.fromEntries(list.columns.map((column) => [column.id, column.name])),
     items: list.items.map((item) => ({
       id: item.id,
       title: item.title,
       body: item.body,
-      status: item.status,
+      statusId: item.statusId,
+      statusName: list.columns.find((column) => column.id === item.statusId)?.name ?? item.statusId,
     })),
   }));
 

@@ -1,16 +1,22 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { z } from "zod";
 
-const DefaultListStatuses = ["backlog", "todo", "done", "cancelled"] as const;
-const DefaultCompleteStatuses = ["done", "cancelled"] as const;
+const DefaultListColumns = [
+  { id: "backlog", name: "Backlog", collapsed: false },
+  { id: "todo", name: "Todo", collapsed: false },
+  { id: "done", name: "Done", collapsed: false },
+  { id: "cancelled", name: "Cancelled", collapsed: false },
+] as const;
+const DefaultCompleteStatusIds = ["done", "cancelled"] as const;
 
-export const ListStatusSchema = z.string().trim().min(1);
-export type ListStatus = z.infer<typeof ListStatusSchema>;
+export const ListStatusIdSchema = z.string().trim().min(1);
+export type ListStatusId = z.infer<typeof ListStatusIdSchema>;
 export const ListViewSchema = z.enum(["list", "kanban"]);
 export type ListView = z.infer<typeof ListViewSchema>;
 
 export const ListColumnSchema = z.object({
-  status: ListStatusSchema,
+  id: ListStatusIdSchema,
+  name: z.string().trim().min(1),
   collapsed: z.boolean().default(false),
   icon: z.string().optional(),
 });
@@ -20,7 +26,7 @@ export const ListItemSchema = z.object({
   id: z.number().int().positive(),
   title: z.string().trim().min(1),
   body: z.string().default(""),
-  status: ListStatusSchema,
+  statusId: ListStatusIdSchema,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -33,7 +39,7 @@ export const ListSchema = z.object({
   view: ListViewSchema.default("list"),
   columns: z.array(ListColumnSchema).min(1),
   items: z.array(ListItemSchema).default([]),
-  completeStatuses: z.array(ListStatusSchema).optional(),
+  completeStatusIds: z.array(ListStatusIdSchema).optional(),
 });
 export type List = z.infer<typeof ListSchema>;
 
@@ -87,8 +93,8 @@ export class ListStore {
     name: string;
     includeInSystemPrompt?: boolean;
     view?: ListView;
-    columns?: Array<{ status: string; collapsed?: boolean; icon?: string }>;
-    completeStatuses?: string[];
+    columns?: Array<{ id: string; name: string; collapsed?: boolean; icon?: string }>;
+    completeStatusIds?: string[];
   }): List {
     this.reload();
     if (this.data.lists.some((existing) => existing.id === list.id)) {
@@ -100,9 +106,9 @@ export class ListStore {
       name: list.name,
       includeInSystemPrompt: list.includeInSystemPrompt ?? false,
       view: list.view ?? "list",
-      columns: list.columns ?? DefaultListStatuses.map((status) => ({ status, collapsed: false })),
+      columns: list.columns ?? DefaultListColumns.map((column) => ({ ...column })),
       items: [],
-      completeStatuses: list.completeStatuses,
+      completeStatusIds: list.completeStatusIds,
     });
     this.data.lists.push(created);
     this.save();
@@ -115,8 +121,8 @@ export class ListStore {
       name?: string;
       includeInSystemPrompt?: boolean;
       view?: ListView;
-      columns?: Array<{ status: string; collapsed?: boolean; icon?: string }>;
-      completeStatuses?: string[];
+      columns?: Array<{ id: string; name: string; collapsed?: boolean; icon?: string }>;
+      completeStatusIds?: string[];
     },
   ): List {
     this.reload();
@@ -134,9 +140,9 @@ export class ListStore {
     if (patch.columns !== undefined) {
       list.columns = this.parseColumnsPatch(patch.columns);
     }
-    if (patch.completeStatuses !== undefined) {
-      list.completeStatuses = patch.completeStatuses.length > 0
-        ? patch.completeStatuses
+    if (patch.completeStatusIds !== undefined) {
+      list.completeStatusIds = patch.completeStatusIds.length > 0
+        ? patch.completeStatusIds
         : undefined;
     }
     this.save();
@@ -171,7 +177,7 @@ export class ListStore {
           name: list.name ?? list.id,
           includeInSystemPrompt: list.includeInSystemPrompt ?? false,
           view: list.view ?? "list",
-          columns: DefaultListStatuses.map((status) => ({ status, collapsed: false })),
+          columns: DefaultListColumns.map((column) => ({ ...column })),
           items: [],
         }),
       );
@@ -186,7 +192,7 @@ export class ListStore {
       id?: number;
       title?: string;
       body?: string;
-      status?: ListStatus;
+      statusId?: ListStatusId;
     },
     listPatch?: Partial<Pick<List, "name" | "includeInSystemPrompt">>,
   ): ListItem {
@@ -202,7 +208,7 @@ export class ListStore {
         id: targetId,
         title: item.title ?? existing.title,
         body: item.body ?? existing.body,
-        status: this.resolveStatus(list, item.status ?? existing.status, `list ${list.id} item ${targetId}`),
+        statusId: this.resolveStatusId(list, item.statusId ?? existing.statusId, `list ${list.id} item ${targetId}`),
         createdAt: existing.createdAt,
         updatedAt: now,
       });
@@ -218,7 +224,7 @@ export class ListStore {
       id: targetId,
       title: item.title,
       body: item.body ?? "",
-      status: this.resolveStatus(list, item.status),
+      statusId: this.resolveStatusId(list, item.statusId),
       createdAt: now,
       updatedAt: now,
     });
@@ -227,13 +233,13 @@ export class ListStore {
     return created;
   }
 
-  setItemStatus(listId: string, itemId: number, status: ListStatus): ListItem {
+  setItemStatus(listId: string, itemId: number, statusId: ListStatusId): ListItem {
     this.reload();
     const list = this.data.lists.find((existing) => existing.id === listId);
     if (!list) throw new Error("List not found");
     const item = list.items.find((existing) => existing.id === itemId);
     if (!item) throw new Error("List item not found");
-    item.status = this.resolveStatus(list, status, `list ${list.id} item ${itemId}`);
+    item.statusId = this.resolveStatusId(list, statusId, `list ${list.id} item ${itemId}`);
     item.updatedAt = new Date().toISOString();
     this.save();
     return item;
@@ -253,18 +259,20 @@ export class ListStore {
   getPromptLists(): Array<{
     id: string;
     name: string;
+    columns: ListColumn[];
     items: ListItem[];
   }> {
     this.reload();
     return this.data.lists
       .filter((list) => list.includeInSystemPrompt)
       .map((list) => {
-        const completeStatuses = list.completeStatuses ?? [...DefaultCompleteStatuses];
-        const completeSet = new Set(completeStatuses);
+        const completeStatusIds = list.completeStatusIds ?? [...DefaultCompleteStatusIds];
+        const completeSet = new Set(completeStatusIds);
         return {
           id: list.id,
           name: list.name,
-          items: list.items.filter((item) => !completeSet.has(item.status)),
+          columns: list.columns,
+          items: list.items.filter((item) => !completeSet.has(item.statusId)),
         };
       })
       .filter((list) => list.items.length > 0);
@@ -290,7 +298,7 @@ export class ListStore {
       name: listPatch?.name ?? listId,
       includeInSystemPrompt: listPatch?.includeInSystemPrompt ?? false,
       view: "list",
-      columns: DefaultListStatuses.map((status) => ({ status, collapsed: false })),
+      columns: DefaultListColumns.map((column) => ({ ...column })),
       items: [],
     });
     this.data.lists.push(created);
@@ -319,11 +327,11 @@ export class ListStore {
         ? listObj.view as ListView
         : "list";
       const columns = this.parseColumnsFromRawList(listObj, id);
-      const statuses = this.getColumnStatuses(columns);
+      const statusIds = this.getColumnStatusIds(columns);
       const rawItems = Array.isArray(listObj.items) ? listObj.items : [];
 
-      const completeStatuses = Array.isArray(listObj.completeStatuses)
-        ? listObj.completeStatuses
+      const completeStatusIds = Array.isArray(listObj.completeStatusIds)
+        ? listObj.completeStatusIds
           .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
           .map((s) => s.trim())
         : undefined;
@@ -350,11 +358,11 @@ export class ListStore {
           ? itemObj.title.trim()
           : (legacyText || `Item ${numericId}`);
         const body = typeof itemObj.body === "string" ? itemObj.body : "";
-        const parsedStatus = ListStatusSchema.safeParse(itemObj.status);
-        if (!parsedStatus.success) {
-          throw new Error(`List "${id}" item ${numericId} is missing a valid "status"`);
+        const parsedStatusId = ListStatusIdSchema.safeParse(itemObj.statusId);
+        if (!parsedStatusId.success) {
+          throw new Error(`List "${id}" item ${numericId} is missing a valid "statusId"`);
         }
-        const status = this.resolveStatusForStatuses(statuses, parsedStatus.data, `list ${id} item ${numericId}`);
+        const statusId = this.resolveStatusIdForList(statusIds, parsedStatusId.data, `list ${id} item ${numericId}`);
 
         const createdAt = typeof itemObj.createdAt === "string" ? itemObj.createdAt : null;
         const updatedAt = typeof itemObj.updatedAt === "string" ? itemObj.updatedAt : null;
@@ -366,7 +374,7 @@ export class ListStore {
           id: numericId,
           title,
           body,
-          status,
+          statusId,
           createdAt,
           updatedAt,
         });
@@ -379,21 +387,21 @@ export class ListStore {
         view,
         columns,
         items,
-        completeStatuses: completeStatuses && completeStatuses.length > 0 ? completeStatuses : undefined,
+        completeStatusIds: completeStatusIds && completeStatusIds.length > 0 ? completeStatusIds : undefined,
       });
     });
 
     return ListsFileSchema.parse({ lists });
   }
 
-  private parseColumnsPatch(columns: Array<{ status: string; collapsed?: boolean; icon?: string }>): ListColumn[] {
+  private parseColumnsPatch(columns: Array<{ id: string; name: string; collapsed?: boolean; icon?: string }>): ListColumn[] {
     const parsed = z.array(ListColumnSchema).min(1).parse(columns);
     const deduped: ListColumn[] = [];
     const seen = new Set<string>();
     for (const column of parsed) {
-      if (seen.has(column.status)) continue;
+      if (seen.has(column.id)) continue;
       deduped.push(column);
-      seen.add(column.status);
+      seen.add(column.id);
     }
     if (deduped.length === 0) {
       throw new Error("List must define at least one column");
@@ -405,27 +413,22 @@ export class ListStore {
     if (Array.isArray(listObj.columns)) {
       return this.parseColumnsPatch(listObj.columns as ListColumn[]);
     }
-    if (Array.isArray(listObj.statuses)) {
-      const parsedLegacy = z.array(z.string().trim().min(1)).min(1).parse(listObj.statuses);
-      const deduped = [...new Set(parsedLegacy)];
-      return deduped.map((status) => ({ status, collapsed: false }));
-    }
     throw new Error(`List "${listId}" is missing required "columns" array`);
   }
 
-  private getColumnStatuses(columns: ListColumn[]): string[] {
-    return columns.map((column) => column.status);
+  private getColumnStatusIds(columns: ListColumn[]): string[] {
+    return columns.map((column) => column.id);
   }
 
-  private resolveStatus(list: List, status: string | undefined, context?: string): string {
-    return this.resolveStatusForStatuses(this.getColumnStatuses(list.columns), status, context);
+  private resolveStatusId(list: List, statusId: string | undefined, context?: string): string {
+    return this.resolveStatusIdForList(this.getColumnStatusIds(list.columns), statusId, context);
   }
 
-  private resolveStatusForStatuses(statuses: string[], status: string | undefined, context?: string): string {
-    if (status === undefined) {
-      return statuses.includes("todo") ? "todo" : statuses[0];
+  private resolveStatusIdForList(statusIds: string[], statusId: string | undefined, context?: string): string {
+    if (statusId === undefined) {
+      return statusIds.includes("todo") ? "todo" : statusIds[0];
     }
-    if (statuses.includes(status)) return status;
-    throw new Error(`Invalid status "${status}"${context ? ` for ${context}` : ""}`);
+    if (statusIds.includes(statusId)) return statusId;
+    throw new Error(`Invalid statusId "${statusId}"${context ? ` for ${context}` : ""}`);
   }
 }

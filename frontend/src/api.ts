@@ -284,19 +284,20 @@ export function useDeleteAutomation() {
 
 // --- Lists ---
 
-export type ListStatus = string;
+export type ListStatusId = string;
 
 export interface ListItem {
   id: number;
   title: string;
   body: string;
-  status: ListStatus;
+  statusId: ListStatusId;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ListColumn {
-  status: ListStatus;
+  id: ListStatusId;
+  name: string;
   collapsed: boolean;
   icon?: string;
 }
@@ -308,7 +309,7 @@ export interface List {
   view: "list" | "kanban";
   columns: ListColumn[];
   items: ListItem[];
-  completeStatuses?: string[];
+  completeStatusIds?: string[];
 }
 
 export function useLists() {
@@ -339,7 +340,7 @@ export function useList(listId: string | null) {
 export function useCreateList() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { id: string; name: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: ListColumn[]; complete_statuses?: string[] }) => {
+    mutationFn: async (payload: { id: string; name: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: ListColumn[]; complete_status_ids?: string[] }) => {
       const res = await api.api.lists.$post({
         json: payload,
       });
@@ -361,7 +362,7 @@ export function useUpdateList() {
       patch,
     }: {
       listId: string;
-      patch: { name?: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: ListColumn[]; complete_statuses?: string[] };
+      patch: { name?: string; include_in_system_prompt?: boolean; view?: "list" | "kanban"; columns?: ListColumn[]; complete_status_ids?: string[] };
     }) => {
       const res = await api.api.lists[":listId"].$patch({
         param: { listId },
@@ -408,7 +409,7 @@ export function useUpsertListItem() {
       patch: {
         title?: string;
         body?: string;
-        status?: ListStatus;
+        status_id?: ListStatusId;
         list_name?: string;
         include_in_system_prompt?: boolean;
       };
@@ -434,15 +435,15 @@ export function useSetListItemStatus() {
     mutationFn: async ({
       listId,
       itemId,
-      status,
+      statusId,
     }: {
       listId: string;
       itemId: number;
-      status: ListStatus;
+      statusId: ListStatusId;
     }) => {
       const res = await api.api.lists[":listId"].items[":itemId"].status.$patch({
         param: { listId, itemId: String(itemId) },
-        json: { status },
+        json: { status_id: statusId },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to set list item status");

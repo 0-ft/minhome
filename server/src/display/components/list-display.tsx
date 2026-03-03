@@ -102,9 +102,9 @@ export function createListDisplayElement(
   const rowGap = 4;
 
   const statusFilter = new Set(config.status_filter ?? []);
-  const statusIconByStatus = new Map(list.columns.map((column) => [column.status, column.icon]));
+  const statusIconByStatus = new Map(list.columns.map((column) => [column.id, column.icon]));
   const sourceItems = statusFilter.size > 0
-    ? list.items.filter((item) => statusFilter.has(item.status))
+    ? list.items.filter((item) => statusFilter.has(item.statusId))
     : list.items;
   const items = sourceItems.slice(0, config.max_items);
 
@@ -167,7 +167,7 @@ export function createListDisplayElement(
       <div style={listStyle}>
         {items.length > 0 ? (
           items.map((item) => {
-            const iconSvg = getLucideIconSvgByName(statusIconByStatus.get(item.status));
+            const iconSvg = getLucideIconSvgByName(statusIconByStatus.get(item.statusId));
             const iconSrc = iconSvg ? svgToDataUri(iconSvg) : null;
             return (
               <div key={item.id} style={rowStyle}>

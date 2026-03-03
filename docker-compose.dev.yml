@@ -26,6 +26,9 @@ services:
       - 5173:5173
     environment:
       - VITE_API_TARGET=http://server:3111
+      - VITE_HMR_HOST=home.local
+      - VITE_HMR_CLIENT_PORT=5173
+      - VITE_HMR_PROTOCOL=ws
     depends_on:
       - server
 

@@ -1,9 +1,22 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import type { ListColumn } from "../../api.js";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { Toggle } from "../ui/toggle.js";
-import { sanitizeColumns } from "./helpers.js";
+
+function normalizeColumnId(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function getNextColumnId(columns: ListColumn[], proposedName: string): string | null {
+  const base = normalizeColumnId(proposedName);
+  if (!base) return null;
+  const used = new Set(columns.map((column) => column.id));
+  if (!used.has(base)) return base;
+  let i = 2;
+  while (used.has(`${base}-${i}`)) i += 1;
+  return `${base}-${i}`;
+}
 
 export function ListSettingsView({
   listName,
@@ -29,7 +42,7 @@ export function ListSettingsView({
   saving?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-sand-300 bg-sand-50 p-4 space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         {onBack ? (
           <button
@@ -73,12 +86,12 @@ export function ListSettingsView({
         </div>
         <div className="space-y-2">
           {columns.map((column, idx) => (
-            <div key={`${column.status}-${idx}`} className="rounded-md border border-sand-300 bg-sand-100/40 p-2 space-y-2">
-              <div className="grid grid-cols-[1fr_140px] gap-2">
+            <div key={idx} className="rounded-md border border-sand-300 bg-sand-100/40 p-2 space-y-2">
+              <div className="grid grid-cols-[1fr_140px_auto] gap-2 items-center">
                 <Input
-                  value={column.status}
+                  value={column.name}
                   onChange={(e) => {
-                    onColumnsChange(columns.map((c, i) => (i === idx ? { ...c, status: e.target.value } : c)));
+                    onColumnsChange(columns.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c)));
                   }}
                   placeholder="Status"
                   className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
@@ -91,27 +104,18 @@ export function ListSettingsView({
                   placeholder="Icon (optional)"
                   className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
                 />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-sand-800">
-                  <span>Collapsed by default</span>
-                  <Toggle
-                    checked={Boolean(column.collapsed)}
-                    onCheckedChange={(checked) => {
-                      onColumnsChange(columns.map((c, i) => (i === idx ? { ...c, collapsed: checked } : c)));
-                    }}
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
+                  type="button"
                   disabled={columns.length <= 1}
                   onClick={() => {
                     onColumnsChange(columns.filter((_, i) => i !== idx));
                   }}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-md text-blood-300 hover:text-blood-500 hover:bg-sand-200 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Remove column"
+                  aria-label="Remove column"
                 >
-                  Remove
-                </Button>
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             </div>
           ))}
@@ -126,7 +130,9 @@ export function ListSettingsView({
               if (e.key !== "Enter") return;
               const next = newColumnStatus.trim();
               if (!next) return;
-              onColumnsChange([...columns, { status: next, collapsed: false }]);
+              const nextId = getNextColumnId(columns, next);
+              if (!nextId) return;
+              onColumnsChange([...columns, { id: nextId, name: next, collapsed: false }]);
               onNewColumnStatusChange("");
             }}
           />
@@ -135,7 +141,9 @@ export function ListSettingsView({
             onClick={() => {
               const next = newColumnStatus.trim();
               if (!next) return;
-              onColumnsChange([...columns, { status: next, collapsed: false }]);
+              const nextId = getNextColumnId(columns, next);
+              if (!nextId) return;
+              onColumnsChange([...columns, { id: nextId, name: next, collapsed: false }]);
               onNewColumnStatusChange("");
             }}
           >

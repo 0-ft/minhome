@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { MqttBridge } from "./mqtt.js";
 import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
-import { ListStatusSchema, type ListStore } from "./config/lists.js";
+import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
 import type { AutomationEngine } from "./automations.js";
 import {
   RoomDimensionsSchema,
@@ -215,7 +215,7 @@ export const toolSchemas = {
       item_id: z.number().int().positive().describe("List item ID"),
       title: z.string().optional().describe("Item title (required when creating a new item)"),
       body: z.string().optional().describe("Optional markdown body text"),
-      status: ListStatusSchema.optional().describe("Item status (must be a valid status on the target list)"),
+      status_id: ListStatusIdSchema.optional().describe("Item status ID (must be a valid column id on the target list)"),
       list_name: z.string().optional().describe("Optional list name (used when creating/updating list metadata)"),
       include_in_system_prompt: z.boolean().optional().describe("Whether this list should be included in the AI system prompt"),
     }),
@@ -225,7 +225,7 @@ export const toolSchemas = {
     parameters: z.object({
       list_id: z.string().describe("List ID"),
       item_id: z.number().int().positive().describe("List item ID"),
-      status: ListStatusSchema.describe("Item status (must be a valid status on the target list)"),
+      status_id: ListStatusIdSchema.describe("Item status ID (must be a valid column id on the target list)"),
     }),
   },
   delete_list_item: {
@@ -412,7 +412,7 @@ export function createTools(): Record<string, ToolDef> {
     upsert_list_item: {
       ...toolSchemas.upsert_list_item,
       execute: async (
-        { list_id, item_id, title, body, status, list_name, include_in_system_prompt },
+        { list_id, item_id, title, body, status_id, list_name, include_in_system_prompt },
         { lists },
       ) => {
         const item = lists.upsertItem(
@@ -421,7 +421,7 @@ export function createTools(): Record<string, ToolDef> {
             id: item_id,
             title,
             body,
-            status,
+            statusId: status_id,
           },
           {
             name: list_name,
@@ -439,8 +439,8 @@ export function createTools(): Record<string, ToolDef> {
 
     set_list_item_status: {
       ...toolSchemas.set_list_item_status,
-      execute: async ({ list_id, item_id, status }, { lists }) => {
-        const item = lists.setItemStatus(list_id, item_id, status);
+      execute: async ({ list_id, item_id, status_id }, { lists }) => {
+        const item = lists.setItemStatus(list_id, item_id, status_id);
         return {
           ok: true,
           item,

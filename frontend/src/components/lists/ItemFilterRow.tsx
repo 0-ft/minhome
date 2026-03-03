@@ -1,4 +1,3 @@
-import type { ListStatus } from "../../api.js";
 import { Search } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.js";
 import { LucideIcon } from "./LucideIcon.js";
@@ -7,18 +6,16 @@ export function ItemFilterRow({
   viewMode,
   statusFilter,
   statusFilters,
-  statusIconByStatus,
   statusOptions,
   onStatusFilterChange,
   searchQuery,
   onSearchQueryChange,
 }: {
   viewMode: "list" | "kanban";
-  statusFilter: ListStatus[];
-  statusFilters: Array<{ id: ListStatus; label: string }>;
-  statusIconByStatus?: Partial<Record<ListStatus, string | undefined>>;
-  statusOptions: ListStatus[];
-  onStatusFilterChange: (next: ListStatus[]) => void;
+  statusFilter: string[];
+  statusFilters: Array<{ id: string; label: string; icon?: string }>;
+  statusOptions: string[];
+  onStatusFilterChange: (next: string[]) => void;
   searchQuery: string;
   onSearchQueryChange: (next: string) => void;
 }) {
@@ -29,14 +26,14 @@ export function ItemFilterRow({
           type="multiple"
           value={statusFilter}
           onValueChange={(value) => {
-            const next = Array.isArray(value) ? value as ListStatus[] : [];
+            const next = Array.isArray(value) ? value as string[] : [];
             onStatusFilterChange(next.length > 0 ? next : statusOptions);
           }}
         >
           {statusFilters.map((f) => (
             <ToggleGroupItem key={f.id} value={f.id} className="px-3 py-1 text-[11px]">
               <span className="inline-flex items-center gap-1.5">
-                <LucideIcon name={statusIconByStatus?.[f.id]} className="h-3 w-3" />
+                <LucideIcon name={f.icon} className="h-3 w-3" />
                 <span>{f.label}</span>
               </span>
             </ToggleGroupItem>

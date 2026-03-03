@@ -11,7 +11,7 @@ import { ArrowLeft, Columns3, ListChecks, Plus, Settings } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   type List,
-  type ListStatus,
+  type ListStatusId,
   useCreateList,
   useDeleteListItem,
   useDeleteList,
@@ -27,8 +27,9 @@ import { KanbanColumn } from "./KanbanColumn.js";
 import { ListItemCard } from "./ListItemCard.js";
 import { ItemDetailView } from "./ItemDetailView.js";
 import { ItemFilterRow } from "./ItemFilterRow.js";
+import type { StatusOption } from "./StatusPicker.js";
 import { ListsConfigView } from "./TodoConfigView.js";
-import { DEFAULT_COLUMNS, formatStatusLabel, normalizeListId } from "./helpers.js";
+import { DEFAULT_COLUMNS, normalizeListId } from "./helpers.js";
 
 function parseListRoute(pathname: string) {
   const raw = pathname.startsWith("/lists")
@@ -69,7 +70,7 @@ export function ListsView() {
   const [newListName, setNewListName] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ListStatus[]>([]);
+  const [statusFilter, setStatusFilter] = useState<ListStatusId[]>([]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
@@ -101,23 +102,27 @@ export function ListsView() {
   }, [lists, routeState.listId]);
   const viewMode = activeList?.view ?? "list";
 
-  const statusOptions = useMemo(() => {
-    return (activeList?.columns ?? []).map((column) => column.status);
+  const statusOptions = useMemo<StatusOption[]>(() => {
+    return (activeList?.columns ?? []).map((column) => ({
+      id: column.id,
+      label: column.name,
+      icon: column.icon,
+    }));
   }, [activeList?.columns]);
-
-  useEffect(() => {
-    const validSelected = statusFilter.filter((status) => statusOptions.includes(status));
-    if (validSelected.length === statusFilter.length && validSelected.length > 0) return;
-    setStatusFilter(statusOptions);
-  }, [statusFilter, statusOptions]);
-
-  const statusFilters = useMemo(
-    () => statusOptions.map((status) => ({ id: status, label: formatStatusLabel(status) })),
+  const statusOptionIds = useMemo(
+    () => statusOptions.map((option) => option.id),
     [statusOptions],
   );
-  const statusIconByStatus = useMemo(
-    () => Object.fromEntries((activeList?.columns ?? []).map((column) => [column.status, column.icon])) as Partial<Record<ListStatus, string | undefined>>,
-    [activeList?.columns],
+
+  useEffect(() => {
+    const validSelected = statusFilter.filter((statusId) => statusOptionIds.includes(statusId));
+    if (validSelected.length === statusFilter.length && validSelected.length > 0) return;
+    setStatusFilter(statusOptionIds);
+  }, [statusFilter, statusOptionIds]);
+
+  const statusFilters = useMemo(
+    () => statusOptions.map((option) => ({ id: option.id, label: option.label, icon: option.icon })),
+    [statusOptions],
   );
 
   const selectedItem = useMemo(
@@ -149,18 +154,18 @@ export function ListsView() {
   }, [activeList, searchQuery]);
 
   const filteredListItems = useMemo(() => {
-    const selected = statusFilter.length > 0 ? statusFilter : statusOptions;
+    const selected = statusFilter.length > 0 ? statusFilter : statusOptionIds;
     return searchedItems
-      .filter((item) => selected.includes(item.status))
+      .filter((item) => selected.includes(item.statusId))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [searchedItems, statusFilter, statusOptions]);
+  }, [searchedItems, statusFilter, statusOptionIds]);
 
   const groupedByColumn = useMemo(() => {
     return (activeList?.columns ?? []).map((column) => ({
       ...column,
-      label: formatStatusLabel(column.status),
+      label: column.name,
       items: searchedItems
-        .filter((item) => item.status === column.status)
+        .filter((item) => item.statusId === column.id)
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
     }));
   }, [activeList?.columns, searchedItems]);
@@ -180,15 +185,15 @@ export function ListsView() {
   const getCardTransitionName = useCallback((itemId: number) => `list-card-${itemId}`, []);
   const getStatusTransitionName = useCallback((itemId: number) => `list-status-${itemId}`, []);
 
-  const addPlaceholderItem = (status?: ListStatus) => {
+  const addPlaceholderItem = (statusId?: ListStatusId) => {
     if (!activeList) return;
-    const fallbackStatus = statusOptions[0];
-    if (!fallbackStatus) return;
-    const nextStatus = status && statusOptions.includes(status) ? status : fallbackStatus;
+    const fallbackStatusId = statusOptionIds[0];
+    if (!fallbackStatusId) return;
+    const nextStatusId = statusId && statusOptionIds.includes(statusId) ? statusId : fallbackStatusId;
     setSearchQuery("");
     const itemId = Math.max((activeList.items ?? []).reduce((max, item) => Math.max(max, item.id), 0) + 1, 1);
     upsertListItem.mutate(
-      { listId: activeList.id, itemId, patch: { title: "New item", body: "", status: nextStatus } },
+      { listId: activeList.id, itemId, patch: { title: "New item", body: "", status_id: nextStatusId } },
       { onSuccess: () => navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`) },
     );
   };
@@ -199,18 +204,18 @@ export function ListsView() {
     if (!over) return;
     const overId = String(over.id);
     if (!overId.startsWith("list-column:")) return;
-    const nextStatus = overId.replace("list-column:", "") as ListStatus;
-    if (!statusOptions.includes(nextStatus)) return;
+    const nextStatusId = overId.replace("list-column:", "") as ListStatusId;
+    if (!statusOptionIds.includes(nextStatusId)) return;
     const activeItemId = active.data.current?.itemId as number | undefined;
-    const activeStatus = active.data.current?.status as ListStatus | undefined;
-    if (!activeItemId || !activeStatus || activeStatus === nextStatus) return;
-    setListItemStatus.mutate({ listId: activeList.id, itemId: activeItemId, status: nextStatus });
+    const activeStatusId = active.data.current?.statusId as ListStatusId | undefined;
+    if (!activeItemId || !activeStatusId || activeStatusId === nextStatusId) return;
+    setListItemStatus.mutate({ listId: activeList.id, itemId: activeItemId, statusId: nextStatusId });
   };
 
-  const toggleColumnCollapsed = (status: ListStatus) => {
+  const toggleColumnCollapsed = (statusId: ListStatusId) => {
     if (!activeList) return;
     const nextColumns = activeList.columns.map((column) =>
-      column.status === status ? { ...column, collapsed: !column.collapsed } : column,
+      column.id === statusId ? { ...column, collapsed: !column.collapsed } : column,
     );
     updateList.mutate({ listId: activeList.id, patch: { columns: nextColumns } });
   };
@@ -219,6 +224,38 @@ export function ListsView() {
     if (!activeList || activeList.view === mode) return;
     updateList.mutate({ listId: activeList.id, patch: { view: mode } });
   };
+
+  const onExpandedListChange = useCallback((listId: string | null) => {
+    if (!listId) {
+      navigate("/lists/settings");
+      return;
+    }
+    navigate(`/lists/settings/${encodeURIComponent(listId)}`);
+  }, [navigate]);
+
+  const onCreateListRequested = useCallback(() => {
+    setCreateModalOpen(true);
+  }, []);
+
+  const onSaveConfigList = useCallback(({
+    listId,
+    patch,
+  }: {
+    listId: string;
+    patch: { name: string; include_in_system_prompt: boolean; columns: List["columns"] };
+  }) => {
+    updateList.mutate({ listId, patch });
+  }, [updateList]);
+
+  const onDeleteConfigList = useCallback((listId: string) => {
+    deleteList.mutate(listId, {
+      onSuccess: () => {
+        if (routeState.listId === listId) {
+          navigate("/lists/settings");
+        }
+      },
+    });
+  }, [deleteList, navigate, routeState.listId]);
 
   if (isLoading) {
     return (
@@ -247,13 +284,12 @@ export function ListsView() {
             titleViewTransitionName={getTitleTransitionName(selectedItem.id)}
             statusViewTransitionName={getStatusTransitionName(selectedItem.id)}
             statusOptions={statusOptions}
-            statusIconByStatus={statusIconByStatus}
             onBack={() => navigate(`/lists/${encodeURIComponent(activeList.id)}`)}
             onSavePatch={(patch) =>
               upsertListItem.mutate({ listId: activeList.id, itemId: selectedItem.id, patch })
             }
-            onSetStatus={(status) =>
-              setListItemStatus.mutate({ listId: activeList.id, itemId: selectedItem.id, status })
+            onSetStatus={(statusId) =>
+              setListItemStatus.mutate({ listId: activeList.id, itemId: selectedItem.id, statusId })
             }
             onDelete={() => {
               deleteListItem.mutate(
@@ -278,26 +314,10 @@ export function ListsView() {
               lists={lists ?? []}
               activeListId={routeState.listId}
               expandedListId={routeState.listId}
-              onExpandedListChange={(listId) => {
-                if (!listId) {
-                  navigate("/lists/settings");
-                  return;
-                }
-                navigate(`/lists/settings/${encodeURIComponent(listId)}`);
-              }}
-              onCreateListRequested={() => setCreateModalOpen(true)}
-              onSaveList={({ listId, patch }) => {
-                updateList.mutate({ listId, patch });
-              }}
-              onDeleteList={(listId) => {
-                deleteList.mutate(listId, {
-                  onSuccess: () => {
-                    if (routeState.listId === listId) {
-                      navigate("/lists/settings");
-                    }
-                  },
-                });
-              }}
+              onExpandedListChange={onExpandedListChange}
+              onCreateListRequested={onCreateListRequested}
+              onSaveList={onSaveConfigList}
+              onDeleteList={onDeleteConfigList}
               savePending={updateList.isPending}
               deletePending={deleteList.isPending}
             />
@@ -363,8 +383,7 @@ export function ListsView() {
                       viewMode={viewMode}
                       statusFilter={statusFilter}
                       statusFilters={statusFilters}
-                      statusIconByStatus={statusIconByStatus}
-                      statusOptions={statusOptions}
+                      statusOptions={statusOptionIds}
                       onStatusFilterChange={setStatusFilter}
                       searchQuery={searchQuery}
                       onSearchQueryChange={setSearchQuery}
@@ -372,7 +391,7 @@ export function ListsView() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => addPlaceholderItem(statusFilter[0] ?? statusOptions[0])}
+                    onClick={() => addPlaceholderItem(statusFilter[0] ?? statusOptionIds[0])}
                     className="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-lg bg-sand-200 text-sand-600 hover:bg-sand-300 hover:text-sand-800 transition-colors cursor-pointer"
                     title="Add item"
                   >
@@ -395,14 +414,13 @@ export function ListsView() {
                           titleViewTransitionName={getTitleTransitionName(item.id)}
                           statusViewTransitionName={getStatusTransitionName(item.id)}
                           statusOptions={statusOptions}
-                          statusIconByStatus={statusIconByStatus}
                           onOpen={() =>
                             startTransition(() =>
                               navigate(`/lists/${encodeURIComponent(activeList.id)}/${item.id}`),
                             )
                           }
-                          onStatusSet={(status) =>
-                            setListItemStatus.mutate({ listId: activeList.id, itemId: item.id, status })
+                          onStatusSet={(statusId) =>
+                            setListItemStatus.mutate({ listId: activeList.id, itemId: item.id, statusId })
                           }
                         />
                       ))
@@ -414,14 +432,14 @@ export function ListsView() {
                       <div className="flex items-start gap-3 w-max min-w-full">
                         {expandedKanbanColumns.map((col) => (
                           <KanbanColumn
-                            key={col.status}
+                            key={col.id}
                             listId={activeList.id}
-                            status={col.status}
+                            statusId={col.id}
                             label={col.label}
                             icon={col.icon}
                             collapsed={false}
                             items={col.items}
-                            onAddItem={(status) => addPlaceholderItem(status)}
+                            onAddItem={(statusId) => addPlaceholderItem(statusId)}
                             onOpenItem={(itemId) =>
                               startTransition(() =>
                                 navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
@@ -434,14 +452,14 @@ export function ListsView() {
                         ))}
                         {collapsedKanbanColumns.map((col) => (
                           <KanbanColumn
-                            key={col.status}
+                            key={col.id}
                             listId={activeList.id}
-                            status={col.status}
+                            statusId={col.id}
                             label={col.label}
                             icon={col.icon}
                             collapsed={true}
                             items={col.items}
-                            onAddItem={(status) => addPlaceholderItem(status)}
+                            onAddItem={(statusId) => addPlaceholderItem(statusId)}
                             onOpenItem={(itemId) =>
                               startTransition(() =>
                                 navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),

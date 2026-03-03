@@ -32,6 +32,7 @@ export function ListsConfigView({
   const [newColumnDraft, setNewColumnDraft] = useState("");
   const draftRef = useRef({ name: "", include: false, columns: [] as ListColumn[] });
   const skipNextSaveRef = useRef(false);
+  const lastSubmittedSignatureRef = useRef<string | null>(null);
   draftRef.current = { name: draftName, include: draftInclude, columns: draftColumns };
 
   useEffect(() => {
@@ -51,16 +52,19 @@ export function ListsConfigView({
 
   useEffect(() => {
     if (!expandedList) return;
+    // Re-seed local draft only when switching which list is being edited.
     skipNextSaveRef.current = true;
+    lastSubmittedSignatureRef.current = null;
     setDraftName(expandedList.name);
     setDraftInclude(expandedList.includeInSystemPrompt);
     setDraftColumns(expandedList.columns);
     setNewColumnDraft("");
-  }, [expandedList?.id, expandedList?.name, expandedList?.includeInSystemPrompt, expandedList?.columns]);
+  }, [expandedList?.id]);
 
-  // Autosave: debounce name (400ms), save include and columns immediately
+  // Autosave: debounce all list setting edits
   useEffect(() => {
     if (!expandedList) return;
+    if (savePending) return;
     if (skipNextSaveRef.current) {
       skipNextSaveRef.current = false;
       return;
@@ -68,36 +72,45 @@ export function ListsConfigView({
     const trimmedName = draftRef.current.name.trim();
     const sanitized = sanitizeColumns(draftRef.current.columns);
     if (trimmedName.length === 0 || sanitized.length === 0) return;
-    const sameAsServer =
-      trimmedName === expandedList.name &&
-      draftRef.current.include === expandedList.includeInSystemPrompt &&
-      JSON.stringify(sanitized) === JSON.stringify(expandedList.columns);
-    if (sameAsServer) return;
-
-    const isNameChange = trimmedName !== expandedList.name;
-    if (isNameChange) {
-      const t = setTimeout(() => {
-        onSaveList({
-          listId: expandedList.id,
-          patch: {
-            name: draftRef.current.name.trim(),
-            include_in_system_prompt: draftRef.current.include,
-            columns: sanitizeColumns(draftRef.current.columns),
-          },
-        });
-      }, 400);
-      return () => clearTimeout(t);
-    }
-
-    onSaveList({
-      listId: expandedList.id,
-      patch: {
-        name: draftRef.current.name.trim(),
-        include_in_system_prompt: draftRef.current.include,
-        columns: sanitizeColumns(draftRef.current.columns),
-      },
+    const draftSignature = JSON.stringify({
+      name: trimmedName,
+      include: draftRef.current.include,
+      columns: sanitized,
     });
-  }, [draftName, draftInclude, draftColumns, expandedList, onSaveList]);
+    const serverSignature = JSON.stringify({
+      name: expandedList.name,
+      include: expandedList.includeInSystemPrompt,
+      columns: sanitizeColumns(expandedList.columns),
+    });
+    if (draftSignature === serverSignature) {
+      lastSubmittedSignatureRef.current = null;
+      return;
+    }
+    if (lastSubmittedSignatureRef.current === draftSignature) return;
+
+    const t = setTimeout(() => {
+      lastSubmittedSignatureRef.current = draftSignature;
+      onSaveList({
+        listId: expandedList.id,
+        patch: {
+          name: trimmedName,
+          include_in_system_prompt: draftRef.current.include,
+          columns: sanitized,
+        },
+      });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [
+    draftName,
+    draftInclude,
+    draftColumns,
+    expandedList?.id,
+    expandedList?.name,
+    expandedList?.includeInSystemPrompt,
+    expandedList?.columns,
+    onSaveList,
+    savePending,
+  ]);
 
   if (lists.length === 0) {
     return (
@@ -122,11 +135,11 @@ export function ListsConfigView({
 
       {lists.map((list) => {
         const isExpanded = expandedListId === list.id;
-        const columnsSummary = list.columns.map((c) => c.status).join(", ");
+        const columnsSummary = list.columns.map((c) => c.name).join(", ");
         return (
           <div
             key={list.id}
-            className={`rounded-xl bg-sand-50 px-5 py-4 transition-all ${isExpanded ? "ring-2 ring-teal-300/50" : ""}`}
+            className={`rounded-xl bg-sand-50 px-5 py-4 ${isExpanded ? "ring-2 ring-teal-300/50" : ""}`}
           >
             <div
               className="flex items-center justify-between cursor-pointer select-none"

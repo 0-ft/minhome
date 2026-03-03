@@ -1,10 +1,10 @@
 import { ViewTransition, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import ReactMarkdown, { MarkdownHooks } from "react-markdown";
-import type { ListItem, ListStatus } from "../../api.js";
+import type { ListItem } from "../../api.js";
 import { Button } from "../ui/button.js";
 import { markdownRehypePlugins } from "../markdownPlugins.js";
-import { StatusPicker } from "./StatusPicker.js";
+import { StatusPicker, type StatusOption } from "./StatusPicker.js";
 
 export function ItemDetailView({
   item,
@@ -12,7 +12,6 @@ export function ItemDetailView({
   titleViewTransitionName,
   statusViewTransitionName,
   statusOptions,
-  statusIconByStatus,
   onBack,
   onSavePatch,
   onSetStatus,
@@ -22,11 +21,10 @@ export function ItemDetailView({
   cardViewTransitionName?: string;
   titleViewTransitionName?: string;
   statusViewTransitionName?: string;
-  statusOptions: ListStatus[];
-  statusIconByStatus?: Partial<Record<ListStatus, string | undefined>>;
+  statusOptions: StatusOption[];
   onBack: () => void;
   onSavePatch: (patch: { title?: string; body?: string }) => void;
-  onSetStatus: (status: ListStatus) => void;
+  onSetStatus: (statusId: string) => void;
   onDelete: () => void;
 }) {
   const [titleDraft, setTitleDraft] = useState(item.title);
@@ -91,10 +89,10 @@ export function ItemDetailView({
               <div className="origin-right scale-110">
                 {statusViewTransitionName ? (
                   <ViewTransition name={statusViewTransitionName} share="list-status-share">
-                    <StatusPicker value={item.status} options={statusOptions} iconByStatus={statusIconByStatus} onChange={onSetStatus} />
+                    <StatusPicker value={item.statusId} options={statusOptions} onChange={onSetStatus} />
                   </ViewTransition>
                 ) : (
-                  <StatusPicker value={item.status} options={statusOptions} iconByStatus={statusIconByStatus} onChange={onSetStatus} />
+                  <StatusPicker value={item.statusId} options={statusOptions} onChange={onSetStatus} />
                 )}
               </div>
               <Button size="icon" variant="ghost" className="h-9 w-9" onClick={onDelete} title="Delete item" aria-label="Delete item">
@@ -155,10 +153,10 @@ export function ItemDetailView({
               <div className="origin-right scale-110">
                 {statusViewTransitionName ? (
                   <ViewTransition name={statusViewTransitionName} share="list-status-share">
-                    <StatusPicker value={item.status} options={statusOptions} iconByStatus={statusIconByStatus} onChange={onSetStatus} />
+                    <StatusPicker value={item.statusId} options={statusOptions} onChange={onSetStatus} />
                   </ViewTransition>
                 ) : (
-                  <StatusPicker value={item.status} options={statusOptions} iconByStatus={statusIconByStatus} onChange={onSetStatus} />
+                  <StatusPicker value={item.statusId} options={statusOptions} onChange={onSetStatus} />
                 )}
               </div>
               <Button size="icon" variant="ghost" className="h-9 w-9" onClick={onDelete} title="Delete item" aria-label="Delete item">

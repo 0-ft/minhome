@@ -5,7 +5,7 @@ import type { MqttBridge } from "./mqtt.js";
 import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, resolveEntityPayload } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
-import { ListStatusSchema, type ListStore } from "./config/lists.js";
+import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
@@ -144,11 +144,12 @@ export function createApp(
         include_in_system_prompt: z.boolean().optional(),
         view: z.enum(["list", "kanban"]).optional(),
         columns: z.array(z.object({
-          status: z.string().trim().min(1),
+          id: z.string().trim().min(1),
+          name: z.string().trim().min(1),
           collapsed: z.boolean().optional(),
           icon: z.string().optional(),
         })).min(1).optional(),
-        complete_statuses: z.array(z.string().trim().min(1)).optional(),
+        complete_status_ids: z.array(z.string().trim().min(1)).optional(),
       })),
       (c) => {
         const body = c.req.valid("json");
@@ -159,11 +160,12 @@ export function createApp(
             includeInSystemPrompt: body.include_in_system_prompt,
             view: body.view,
             columns: body.columns?.map((column) => ({
-              status: column.status,
+              id: column.id,
+              name: column.name,
               collapsed: column.collapsed ?? false,
               icon: column.icon,
             })),
-            completeStatuses: body.complete_statuses,
+            completeStatusIds: body.complete_status_ids,
           });
           return c.json(list, 201);
         } catch (e: unknown) {
@@ -187,11 +189,12 @@ export function createApp(
         include_in_system_prompt: z.boolean().optional(),
         view: z.enum(["list", "kanban"]).optional(),
         columns: z.array(z.object({
-          status: z.string().trim().min(1),
+          id: z.string().trim().min(1),
+          name: z.string().trim().min(1),
           collapsed: z.boolean().optional(),
           icon: z.string().optional(),
         })).min(1).optional(),
-        complete_statuses: z.array(z.string().trim().min(1)).optional(),
+        complete_status_ids: z.array(z.string().trim().min(1)).optional(),
       })),
       (c) => {
         const listId = c.req.param("listId");
@@ -202,11 +205,12 @@ export function createApp(
             includeInSystemPrompt: body.include_in_system_prompt,
             view: body.view,
             columns: body.columns?.map((column) => ({
-              status: column.status,
+              id: column.id,
+              name: column.name,
               collapsed: column.collapsed ?? false,
               icon: column.icon,
             })),
-            completeStatuses: body.complete_statuses,
+            completeStatusIds: body.complete_status_ids,
           });
           return c.json({ ok: true, list });
         } catch (e: unknown) {
@@ -228,7 +232,7 @@ export function createApp(
       zValidator("json", z.object({
         title: z.string().optional(),
         body: z.string().optional(),
-        status: ListStatusSchema.optional(),
+        status_id: ListStatusIdSchema.optional(),
         list_name: z.string().optional(),
         include_in_system_prompt: z.boolean().optional(),
       })),
@@ -246,7 +250,7 @@ export function createApp(
               id: itemId,
               title: body.title,
               body: body.body,
-              status: body.status,
+              statusId: body.status_id,
             },
             {
               name: body.list_name,
@@ -261,16 +265,16 @@ export function createApp(
     )
 
     .patch("/api/lists/:listId/items/:itemId/status",
-      zValidator("json", z.object({ status: ListStatusSchema })),
+      zValidator("json", z.object({ status_id: ListStatusIdSchema })),
       (c) => {
         const listId = c.req.param("listId");
         const itemId = Number.parseInt(c.req.param("itemId"), 10);
         if (!Number.isInteger(itemId) || itemId < 1) {
           return c.json({ error: "Invalid item ID" }, 400);
         }
-        const { status } = c.req.valid("json");
+        const { status_id } = c.req.valid("json");
         try {
-          const item = lists.setItemStatus(listId, itemId, status);
+          const item = lists.setItemStatus(listId, itemId, status_id);
           return c.json({ ok: true, item });
         } catch (e: unknown) {
           const message = (e as Error).message;

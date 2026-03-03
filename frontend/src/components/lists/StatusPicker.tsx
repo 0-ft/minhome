@@ -1,21 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import type { ListStatus } from "../../api.js";
-import { formatStatusLabel, statusPillClass } from "./helpers.js";
+import { statusPillClass } from "./helpers.js";
 import { LucideIcon } from "./LucideIcon.js";
+
+export interface StatusOption {
+  id: string;
+  label: string;
+  icon?: string;
+}
 
 export function StatusPicker({
   value,
   options,
-  iconByStatus,
   onChange,
 }: {
-  value: ListStatus;
-  options: ListStatus[];
-  iconByStatus?: Partial<Record<ListStatus, string | undefined>>;
-  onChange: (status: ListStatus) => void;
+  value: string;
+  options: StatusOption[];
+  onChange: (statusId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const active = options.find((option) => option.id === value);
 
   useEffect(() => {
     if (!open) return;
@@ -37,25 +41,25 @@ export function StatusPicker({
         className={`text-[10px] uppercase font-mono px-2 py-1 rounded cursor-pointer inline-flex items-center gap-1 ${statusPillClass(value)}`}
         onClick={() => setOpen((v) => !v)}
       >
-        <LucideIcon name={iconByStatus?.[value]} className="h-3 w-3" />
-        {formatStatusLabel(value)}
+        <LucideIcon name={active?.icon} className="h-3 w-3" />
+        {active?.label ?? value}
       </button>
       {open && (
         <div className="absolute right-0 mt-1 z-20 min-w-28 rounded-md border border-sand-300 bg-sand-50 shadow-lg p-1">
           {options.map((option) => (
             <button
-              key={option}
+              key={option.id}
               type="button"
               className={`w-full text-left px-2 py-1 rounded text-xs font-mono cursor-pointer inline-flex items-center gap-1.5 ${
-                option === value ? "bg-sand-200 text-sand-900" : "text-sand-700 hover:bg-sand-100"
+                option.id === value ? "bg-sand-200 text-sand-900" : "text-sand-700 hover:bg-sand-100"
               }`}
               onClick={() => {
-                onChange(option);
+                onChange(option.id);
                 setOpen(false);
               }}
             >
-              <LucideIcon name={iconByStatus?.[option]} className="h-3 w-3" />
-              {formatStatusLabel(option)}
+              <LucideIcon name={option.icon} className="h-3 w-3" />
+              {option.label}
             </button>
           ))}
         </div>

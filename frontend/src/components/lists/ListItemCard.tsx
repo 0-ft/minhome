@@ -1,7 +1,7 @@
-import type { ListItem, ListStatus } from "../../api.js";
+import type { ListItem } from "../../api.js";
 import { ViewTransition } from "react";
 import ReactMarkdown from "react-markdown";
-import { StatusPicker } from "./StatusPicker.js";
+import { StatusPicker, type StatusOption } from "./StatusPicker.js";
 
 export function ListItemCard({
   item,
@@ -9,7 +9,6 @@ export function ListItemCard({
   titleViewTransitionName,
   statusViewTransitionName,
   statusOptions,
-  statusIconByStatus,
   onOpen,
   onStatusSet,
 }: {
@@ -17,10 +16,9 @@ export function ListItemCard({
   cardViewTransitionName?: string;
   titleViewTransitionName?: string;
   statusViewTransitionName?: string;
-  statusOptions: ListStatus[];
-  statusIconByStatus?: Partial<Record<ListStatus, string | undefined>>;
+  statusOptions: StatusOption[];
   onOpen: () => void;
-  onStatusSet: (status: ListStatus) => void;
+  onStatusSet: (statusId: string) => void;
 }) {
   const cardBody = (
     <div className="rounded-lg bg-sand-50 border border-sand-300 p-3 h-fit transition-colors duration-200 hover:bg-sand-100/80">
@@ -71,17 +69,15 @@ export function ListItemCard({
         {statusViewTransitionName ? (
           <ViewTransition name={statusViewTransitionName} share="list-status-share">
             <StatusPicker
-              value={item.status}
+              value={item.statusId}
               options={statusOptions}
-              iconByStatus={statusIconByStatus}
               onChange={onStatusSet}
             />
           </ViewTransition>
         ) : (
           <StatusPicker
-            value={item.status}
+            value={item.statusId}
             options={statusOptions}
-            iconByStatus={statusIconByStatus}
             onChange={onStatusSet}
           />
         )}
