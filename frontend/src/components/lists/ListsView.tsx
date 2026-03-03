@@ -150,14 +150,18 @@ export function ListsView() {
 
   const filteredListItems = useMemo(() => {
     const selected = statusFilter.length > 0 ? statusFilter : statusOptions;
-    return searchedItems.filter((item) => selected.includes(item.status));
+    return searchedItems
+      .filter((item) => selected.includes(item.status))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [searchedItems, statusFilter, statusOptions]);
 
   const groupedByColumn = useMemo(() => {
     return (activeList?.columns ?? []).map((column) => ({
       ...column,
       label: formatStatusLabel(column.status),
-      items: searchedItems.filter((item) => item.status === column.status),
+      items: searchedItems
+        .filter((item) => item.status === column.status)
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
     }));
   }, [activeList?.columns, searchedItems]);
 

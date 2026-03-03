@@ -21,6 +21,8 @@ export const ListItemSchema = z.object({
   title: z.string().trim().min(1),
   body: z.string().default(""),
   status: ListStatusSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 export type ListItem = z.infer<typeof ListItemSchema>;
 
@@ -193,6 +195,7 @@ export class ListStore {
     const targetId = item.id ?? this.getNextItemId(list);
     const idx = list.items.findIndex((existing) => existing.id === targetId);
 
+    const now = new Date().toISOString();
     if (idx >= 0) {
       const existing = list.items[idx];
       list.items[idx] = ListItemSchema.parse({
@@ -200,6 +203,8 @@ export class ListStore {
         title: item.title ?? existing.title,
         body: item.body ?? existing.body,
         status: this.resolveStatus(list, item.status ?? existing.status, `list ${list.id} item ${targetId}`),
+        createdAt: existing.createdAt,
+        updatedAt: now,
       });
       this.save();
       return list.items[idx];
@@ -214,6 +219,8 @@ export class ListStore {
       title: item.title,
       body: item.body ?? "",
       status: this.resolveStatus(list, item.status),
+      createdAt: now,
+      updatedAt: now,
     });
     list.items.push(created);
     this.save();
@@ -227,6 +234,7 @@ export class ListStore {
     const item = list.items.find((existing) => existing.id === itemId);
     if (!item) throw new Error("List item not found");
     item.status = this.resolveStatus(list, status, `list ${list.id} item ${itemId}`);
+    item.updatedAt = new Date().toISOString();
     this.save();
     return item;
   }
@@ -348,11 +356,19 @@ export class ListStore {
         }
         const status = this.resolveStatusForStatuses(statuses, parsedStatus.data, `list ${id} item ${numericId}`);
 
+        const createdAt = typeof itemObj.createdAt === "string" ? itemObj.createdAt : null;
+        const updatedAt = typeof itemObj.updatedAt === "string" ? itemObj.updatedAt : null;
+        if (!createdAt || !updatedAt) {
+          throw new Error(`List "${id}" item ${numericId} is missing required "createdAt" and "updatedAt"`);
+        }
+
         return ListItemSchema.parse({
           id: numericId,
           title,
           body,
           status,
+          createdAt,
+          updatedAt,
         });
       });
 

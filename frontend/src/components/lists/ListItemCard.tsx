@@ -23,7 +23,7 @@ export function ListItemCard({
   onStatusSet: (status: ListStatus) => void;
 }) {
   const cardBody = (
-    <div className="rounded-lg bg-sand-50 border border-sand-300 p-3 h-fit">
+    <div className="rounded-lg bg-sand-50 border border-sand-300 p-3 h-fit transition-colors duration-200 hover:bg-sand-100/80">
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"

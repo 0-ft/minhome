@@ -291,6 +291,8 @@ export interface ListItem {
   title: string;
   body: string;
   status: ListStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ListColumn {

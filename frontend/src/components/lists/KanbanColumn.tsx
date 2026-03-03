@@ -25,11 +25,10 @@ function KanbanCard({
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
   };
 
   const cardBody = (
-    <div className="rounded-md bg-sand-50 border border-sand-300 p-2 shadow-sm">
+    <div className={`rounded-md bg-sand-50 border border-sand-300 p-2 transition-colors duration-200 transition-shadow duration-200 ${isDragging ? "shadow-lg" : "shadow-sm"} hover:bg-sand-100`}>
       <button
         type="button"
         className="w-full text-left cursor-pointer hover:text-sand-700"
@@ -108,10 +107,8 @@ export function KanbanColumn({
     return (
       <div
         ref={setNodeRef}
-        className={`h-[320px] w-12 shrink-0 rounded-lg border transition-colors ${
-          isOver
-            ? "border-teal-300/80 bg-teal-50"
-            : "border-sand-300 bg-sand-100/70"
+        className={`h-[320px] w-12 shrink-0 rounded-lg transition-colors ${
+          isOver ? "bg-teal-100" : "bg-sand-200/50"
         }`}
       >
         <button
@@ -133,10 +130,8 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`w-80 shrink-0 rounded-lg border p-3 transition-colors ${
-        isOver
-          ? "border-teal-300/80 bg-teal-50"
-          : "border-sand-300 bg-sand-100/70"
+      className={`w-80 shrink-0 rounded-lg p-3 transition-colors ${
+        isOver ? "bg-teal-100" : "bg-sand-200/50"
       }`}
     >
       <div className="flex items-center justify-between mb-2">
