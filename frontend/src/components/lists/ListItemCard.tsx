@@ -36,7 +36,7 @@ export function ListItemCard({
           <span>{item.id}</span>
         </div>
         {titleViewTransitionName ? (
-          <ViewTransition name={titleViewTransitionName} share="list-title-share">
+          <ViewTransition name={titleViewTransitionName} share={titleViewTransitionName}>
             <EditableText
               value={item.title}
               onSave={onSaveTitle}

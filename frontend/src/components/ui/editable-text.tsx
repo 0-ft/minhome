@@ -14,18 +14,30 @@ export function EditableText({
   textClassName?: string;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [displayValue, setDisplayValue] = useState(value);
+  const [pendingCommittedValue, setPendingCommittedValue] = useState<string | null>(null);
   const editableRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const editable = editableRef.current;
     if (!editable) return;
-    if (!isEditing && editable.textContent !== value) {
-      editable.textContent = value;
+    if (pendingCommittedValue != null) {
+      // While awaiting parent/cache propagation, hold on to committed text to avoid visual snapback.
+      if (value === pendingCommittedValue) {
+        setPendingCommittedValue(null);
+      }
+      return;
+    }
+    if (!isEditing) {
+      setDisplayValue(value);
+      if (editable.textContent !== value) {
+        editable.textContent = value;
+      }
     }
     if (isEditing && (editable.textContent == null || editable.textContent.length === 0)) {
       editable.textContent = value;
     }
-  }, [value, isEditing]);
+  }, [value, isEditing, pendingCommittedValue]);
 
   const getCurrentText = () => {
     const text = editableRef.current?.innerText ?? "";
@@ -36,17 +48,23 @@ export function EditableText({
     const nextValue = getCurrentText();
     const trimmed = nextValue.trim();
     if (trimmed.length === 0 || trimmed === value) {
+      setPendingCommittedValue(null);
+      setDisplayValue(value);
       if (editableRef.current) {
         editableRef.current.textContent = value;
       }
       setIsEditing(false);
       return;
     }
+    setPendingCommittedValue(trimmed);
+    setDisplayValue(trimmed);
     onSave(trimmed);
     setIsEditing(false);
   };
 
   const cancel = () => {
+    setPendingCommittedValue(null);
+    setDisplayValue(value);
     if (editableRef.current) {
       editableRef.current.textContent = value;
     }
@@ -95,7 +113,7 @@ export function EditableText({
         className,
       )}
     >
-      {value}
+      {displayValue}
     </div>
   );
 }

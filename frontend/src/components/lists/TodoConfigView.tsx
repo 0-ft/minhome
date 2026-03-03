@@ -126,13 +126,6 @@ export function ListsConfigView({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button onClick={onCreateListRequested} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Add list
-        </Button>
-      </div>
-
       {lists.map((list) => {
         const isExpanded = expandedListId === list.id;
         const columnsSummary = list.columns.map((c) => c.name).join(", ");

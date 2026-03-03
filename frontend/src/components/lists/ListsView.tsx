@@ -182,9 +182,18 @@ export function ListsView() {
 
   const createListDisabled = createList.isPending || newListName.trim().length === 0;
 
-  const getTitleTransitionName = useCallback((itemId: number) => `list-title-${itemId}`, []);
-  const getCardTransitionName = useCallback((itemId: number) => `list-card-${itemId}`, []);
-  const getStatusTransitionName = useCallback((itemId: number) => `list-status-${itemId}`, []);
+  const getTitleTransitionName = useCallback(
+    (listId: string, itemId: number) => `list-title-${listId}-${itemId}`,
+    [],
+  );
+  const getCardTransitionName = useCallback(
+    (listId: string, itemId: number) => `list-card-${listId}-${itemId}`,
+    [],
+  );
+  const getStatusTransitionName = useCallback(
+    (listId: string, itemId: number) => `list-status-${listId}-${itemId}`,
+    [],
+  );
 
   const addPlaceholderItem = (statusId?: ListStatusId) => {
     if (!activeList) return;
@@ -309,9 +318,9 @@ export function ListsView() {
           <div className="flex-1 min-h-0 overflow-y-auto pr-1">
             <ItemDetailView
               item={selectedItem}
-              cardViewTransitionName={getCardTransitionName(selectedItem.id)}
-              titleViewTransitionName={getTitleTransitionName(selectedItem.id)}
-              statusViewTransitionName={getStatusTransitionName(selectedItem.id)}
+                cardViewTransitionName={getCardTransitionName(activeList.id, selectedItem.id)}
+                titleViewTransitionName={getTitleTransitionName(activeList.id, selectedItem.id)}
+                statusViewTransitionName={getStatusTransitionName(activeList.id, selectedItem.id)}
               statusOptions={statusOptions}
               onBack={() => navigate(`/lists/${encodeURIComponent(activeList.id)}`)}
               onSavePatch={(patch) =>
@@ -330,7 +339,7 @@ export function ListsView() {
           </div>
         ) : routeState.panel === "config" ? (
           <>
-            <div className="flex items-center shrink-0">
+            <div className="flex items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => navigate(backToListsPath)}
@@ -339,6 +348,10 @@ export function ListsView() {
                 <ArrowLeft className="h-4 w-4" />
                 Back to lists
               </button>
+              <Button onClick={onCreateListRequested} className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Add list
+              </Button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto pr-1">
               <ListsConfigView
@@ -357,20 +370,26 @@ export function ListsView() {
         ) : (
           <>
             <div className="flex items-center justify-between gap-3 shrink-0">
-              <div className="flex gap-0.5 bg-sand-200 rounded-lg p-0.5 max-w-full overflow-x-auto">
-                {(lists ?? []).map((list) => (
-                  <button
-                    key={list.id}
-                    onClick={() => navigate(`/lists/${encodeURIComponent(list.id)}`)}
-                    className={`px-3 py-1 rounded-md text-[11px] uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
-                      routeState.listId === list.id
-                        ? "bg-sand-50 text-sand-900 shadow-sm"
-                        : "text-sand-500 hover:text-sand-700 hover:bg-sand-100/60"
-                    }`}
-                  >
-                    {list.name}
-                  </button>
-                ))}
+              <div className="max-w-full overflow-x-auto">
+                <ToggleGroup
+                  type="single"
+                  value={routeState.listId ?? undefined}
+                  onValueChange={(value) => {
+                    if (!value) return;
+                    navigate(`/lists/${encodeURIComponent(value)}`);
+                  }}
+                  className="w-max"
+                >
+                  {(lists ?? []).map((list) => (
+                    <ToggleGroupItem
+                      key={list.id}
+                      value={list.id}
+                      className="px-3 py-1 whitespace-nowrap"
+                    >
+                      {list.name}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
               </div>
               <div className="flex items-center gap-2">
                 <ToggleGroup
@@ -449,11 +468,11 @@ export function ListsView() {
                         <div className="divide-y divide-sand-300 overflow-y-auto min-h-0">
                           {filteredListItems.map((item) => (
                             <ListItemCard
-                              key={item.id}
+                              key={`${activeList.id}:${item.id}`}
                               item={item}
-                              cardViewTransitionName={getCardTransitionName(item.id)}
-                              titleViewTransitionName={getTitleTransitionName(item.id)}
-                              statusViewTransitionName={getStatusTransitionName(item.id)}
+                              cardViewTransitionName={getCardTransitionName(activeList.id, item.id)}
+                              titleViewTransitionName={getTitleTransitionName(activeList.id, item.id)}
+                              statusViewTransitionName={getStatusTransitionName(activeList.id, item.id)}
                               statusOptions={statusOptions}
                               onOpen={() =>
                                 startTransition(() =>
@@ -498,8 +517,10 @@ export function ListsView() {
                               }
                               onSaveItemTitle={saveItemTitle}
                               onToggleCollapse={toggleColumnCollapsed}
-                              getCardTransitionName={getCardTransitionName}
-                              getTitleTransitionName={getTitleTransitionName}
+                              getCardTransitionName={(itemId) => getCardTransitionName(activeList.id, itemId)}
+                              getTitleTransitionName={(itemId) =>
+                                getTitleTransitionName(activeList.id, itemId)
+                              }
                             />
                           ))}
                           {collapsedKanbanColumns.map((col) => (
@@ -519,8 +540,10 @@ export function ListsView() {
                               }
                               onSaveItemTitle={saveItemTitle}
                               onToggleCollapse={toggleColumnCollapsed}
-                              getCardTransitionName={getCardTransitionName}
-                              getTitleTransitionName={getTitleTransitionName}
+                              getCardTransitionName={(itemId) => getCardTransitionName(activeList.id, itemId)}
+                              getTitleTransitionName={(itemId) =>
+                                getTitleTransitionName(activeList.id, itemId)
+                              }
                             />
                           ))}
                         </div>

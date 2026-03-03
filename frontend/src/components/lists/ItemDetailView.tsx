@@ -63,7 +63,7 @@ export function ItemDetailView({
           <div className="flex items-baseline gap-3 min-w-0 flex-1">
             <span className="text-3xl md:text-4xl font-normal text-sand-500">{item.id}</span>
             {titleViewTransitionName ? (
-              <ViewTransition name={titleViewTransitionName} share="list-title-share">
+              <ViewTransition name={titleViewTransitionName} share={titleViewTransitionName}>
                 <EditableText
                   value={item.title}
                   onSave={(nextTitle) => onSavePatch({ title: nextTitle })}

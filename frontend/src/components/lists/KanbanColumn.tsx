@@ -47,7 +47,7 @@ function KanbanCard({
               <LucideIcon name={statusIcon} className="h-3 w-3" />
               <span>{item.id}</span>
             </div>
-            <ViewTransition name={titleViewTransitionName} share="list-title-share">
+            <ViewTransition name={titleViewTransitionName} share={titleViewTransitionName}>
               <EditableText
                 value={item.title}
                 onSave={onSaveTitle}
@@ -178,7 +178,7 @@ export function KanbanColumn({
       <div className="scrollbar-outside space-y-2 min-h-0 flex-1 overflow-y-auto">
         {items.map((item) => (
           <KanbanCard
-            key={item.id}
+            key={`${listId}:${item.id}`}
             listId={listId}
             item={item}
             statusIcon={icon}
