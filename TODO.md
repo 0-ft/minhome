@@ -53,3 +53,5 @@
 - [ ] HTTPS endpoint & e2ee tunnel
 - [ ] Push notifications
 - [ ] Undo action
+- [ ] List in display order to match list view
+- [ ] Remove monospacing

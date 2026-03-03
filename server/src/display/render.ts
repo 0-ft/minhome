@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs";
-import satori from "satori";
-import { Resvg } from "@resvg/resvg-js";
+import { dirname, join } from "path";
+import { createRequire } from "module";
+import { ImageResponse } from "@takumi-rs/image-response";
 import type { ReactElement } from "react";
 import type { CalendarService } from "../calendar/service.js";
 import type { TileComponentConfig } from "./tiles.js";
@@ -12,11 +13,20 @@ import { createPolymarketGraphDisplayElement } from "./components/polymarket-gra
 import { createStringDisplayElement } from "./components/string-display.js";
 import { createListDisplayElement, type ListProvider } from "./components/list-display.js";
 
-const FONT_NAME = "DejaVu Sans";
-const FONT_MONO_NAME = "DejaVu Sans Mono";
+const FONT_NAME = "Inter";
+const FONT_MONO_NAME = "Inter Mono";
+const require = createRequire(import.meta.url);
+const INTER_VARIABLE_PACKAGE_ROOT = dirname(require.resolve("@fontsource-variable/inter/package.json"));
+
+function interFileCandidates(stem: string): string[] {
+  return [
+    join(INTER_VARIABLE_PACKAGE_ROOT, "files", `${stem}.woff2`),
+    join(INTER_VARIABLE_PACKAGE_ROOT, "files", `${stem}.woff`),
+  ];
+}
+
 type FontFaceSpec = {
-  name?: string;
-  weight: 400 | 700;
+  names: string[];
   style: "normal" | "italic";
   candidates: string[];
   required?: boolean;
@@ -24,55 +34,41 @@ type FontFaceSpec = {
 
 const FONT_FACE_SPECS: FontFaceSpec[] = [
   {
-    weight: 400,
+    names: [FONT_NAME, "sans-serif"],
     style: "normal",
     required: true,
-    candidates: [
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-    ],
+    candidates: interFileCandidates("inter-latin-wght-normal"),
   },
   {
-    weight: 700,
-    style: "normal",
-    candidates: [
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-      "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
-    ],
-  },
-  {
-    weight: 400,
+    names: [FONT_NAME, "sans-serif"],
     style: "italic",
-    candidates: [
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
-      "/usr/share/fonts/dejavu/DejaVuSans-Oblique.ttf",
-    ],
+    required: true,
+    candidates: interFileCandidates("inter-latin-wght-italic"),
   },
   {
-    name: FONT_MONO_NAME,
-    weight: 400,
+    names: [FONT_MONO_NAME, "monospace"],
     style: "normal",
-    candidates: [
-      "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-      "/usr/share/fonts/dejavu/DejaVuSansMono.ttf",
-    ],
+    required: true,
+    candidates: interFileCandidates("inter-latin-wght-normal"),
   },
 ];
 
 let cachedFontFaces: Array<{
   name: string;
-  data: Buffer;
-  weight: 400 | 700;
+  data: ArrayBuffer;
   style: "normal" | "italic";
 }> | null = null;
+
+function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+}
 
 function getFontFaces() {
   if (cachedFontFaces) return cachedFontFaces;
 
   const faces: Array<{
     name: string;
-    data: Buffer;
-    weight: 400 | 700;
+    data: ArrayBuffer;
     style: "normal" | "italic";
   }> = [];
 
@@ -80,16 +76,21 @@ function getFontFaces() {
     const candidate = spec.candidates.find((path) => existsSync(path));
     if (!candidate) {
       if (spec.required) {
-        throw new Error(`Unable to find required display font. Tried: ${spec.candidates.join(", ")}`);
+        throw new Error(
+          `Unable to find required display font (${spec.names.join(", ")} ${spec.style}).` +
+          ` Tried: ${spec.candidates.join(", ")}`,
+        );
       }
       continue;
     }
-    faces.push({
-      name: spec.name ?? FONT_NAME,
-      data: readFileSync(candidate),
-      weight: spec.weight,
-      style: spec.style,
-    });
+    const data = bufferToArrayBuffer(readFileSync(candidate));
+    for (const name of spec.names) {
+      faces.push({
+        name,
+        data,
+        style: spec.style,
+      });
+    }
   }
 
   cachedFontFaces = faces;
@@ -101,15 +102,14 @@ export async function renderElementToPngBuffer(
   width: number,
   height: number,
 ): Promise<Buffer> {
-  const svg = await satori(element, {
+  const imageResponse = new ImageResponse(element, {
     width,
     height,
+    format: "png",
     fonts: getFontFaces(),
   });
-
-  const resvg = new Resvg(svg);
-  const pngData = resvg.render().asPng();
-  return Buffer.from(pngData);
+  const rendered = await imageResponse.arrayBuffer();
+  return Buffer.from(rendered);
 }
 
 function renderResultToElement(
@@ -163,7 +163,6 @@ export async function createComponentElement(
       return renderResultToElement(result);
     }
     case "list_display":
-    case "todo_display":
       return renderResultToElement(createListDisplayElement(component, listProvider));
     default: {
       const _exhaustive: never = component;

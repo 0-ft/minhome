@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { ReactElement } from "react";
 import { z } from "zod";
 import {
   componentFailure,
@@ -329,38 +329,15 @@ function renderChart(
   config: PolymarketGraphDisplayComponentConfig,
   series: PolymarketSeries,
 ): ReactElement {
-  const wrapperStyle: CSSProperties = {
-    display: "flex",
-    flex: 1,
-    minWidth: 0,
-    minHeight: 0,
-    flexDirection: "column",
-    color: EINK_FOREGROUND,
-    fontFamily: "DejaVu Sans",
-    backgroundColor: EINK_BACKGROUND,
-    gap: 8,
-  };
-
-  const titleStyle: CSSProperties = {
-    fontSize: 18,
-    fontWeight: 700,
-    lineHeight: 1.15,
-    wordBreak: "break-word",
-  };
-
-  const subtitleStyle: CSSProperties = {
-    fontSize: 12,
-    fontWeight: 600,
-    lineHeight: 1.2,
-  };
-
   const points = series.points;
   if (points.length === 0) {
     return (
-      <div style={wrapperStyle}>
-        <div style={titleStyle}>{series.title}</div>
-        <div style={subtitleStyle}>{series.subtitle}</div>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>No data in selected window</div>
+      <div
+        tw="font-sans flex flex-1 min-w-0 min-h-0 flex-col gap-2 text-black bg-white"
+      >
+        <div tw="text-[18px] font-bold leading-[1.15] break-words">{series.title}</div>
+        <div tw="text-[12px] font-semibold leading-[1.2]">{series.subtitle}</div>
+        <div tw="text-[14px] font-semibold">No data in selected window</div>
       </div>
     );
   }
@@ -395,19 +372,16 @@ function renderChart(
   const chartDataUrl = `data:image/svg+xml,${encodeURIComponent(svgXml)}`;
 
   return (
-    <div style={wrapperStyle}>
-      <div style={titleStyle}>{series.title}</div>
-      <div style={{ ...subtitleStyle, fontWeight: 400 }}>{statsLine}</div>
-      <div style={{ display: "flex", flex: 1, minHeight: 0, minWidth: 0 }}>
+    <div
+      tw="font-sans flex flex-1 min-w-0 min-h-0 flex-col gap-2 text-black bg-white"
+    >
+      <div tw="text-[18px] font-bold leading-[1.15] break-words">{series.title}</div>
+      <div tw="text-[12px] font-normal leading-[1.2]">{statsLine}</div>
+      <div tw="flex flex-1 min-h-0 min-w-0">
         <img
           src={chartDataUrl}
           alt=""
-          style={{
-            display: "block",
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-          }}
+          tw="block w-full h-full object-contain"
         />
       </div>
     </div>

@@ -1,44 +1,14 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { ReactElement } from "react";
 import type { DisplayComponentError } from "./component-result.js";
 
 export function createErrorDisplayElement(
   error: DisplayComponentError,
 ): ReactElement {
-  const wrapperStyle: CSSProperties = {
-    display: "flex",
-    flex: 1,
-    minWidth: 0,
-    minHeight: 0,
-    flexDirection: "column",
-    justifyContent: "center",
-    color: "#000",
-    fontFamily: "DejaVu Sans",
-    textAlign: "left",
-    gap: 6,
-  };
-
-  const headingStyle: CSSProperties = {
-    fontSize: 18,
-    fontWeight: 700,
-    lineHeight: 1.1,
-  };
-
-  const messageStyle: CSSProperties = {
-    fontSize: 14,
-    fontWeight: 500,
-    lineHeight: 1.2,
-  };
-
-  const detailStyle: CSSProperties = {
-    fontSize: 12,
-    lineHeight: 1.2,
-  };
-
   return (
-    <div style={wrapperStyle}>
-      <div style={headingStyle}>Tile error</div>
-      <div style={messageStyle}>{`${error.component}: ${error.message}`}</div>
-      {error.detail ? <div style={detailStyle}>{error.detail.slice(0, 120)}</div> : null}
+    <div tw="font-sans flex flex-1 min-w-0 min-h-0 flex-col justify-center gap-1.5 text-left text-black">
+      <div tw="text-[18px] font-bold leading-[1.1]">Tile error</div>
+      <div tw="text-[14px] font-medium leading-[1.2]">{`${error.component}: ${error.message}`}</div>
+      {error.detail ? <div tw="text-[12px] leading-[1.2]">{error.detail.slice(0, 120)}</div> : null}
     </div>
   );
 }

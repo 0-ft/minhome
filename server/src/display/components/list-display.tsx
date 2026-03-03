@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { ReactElement } from "react";
 import * as LucideStatic from "lucide-static";
 import ReactMarkdown from "react-markdown";
 import { z } from "zod";
@@ -11,15 +11,10 @@ export const ListDisplayComponentConfigSchema = z.object({
   title: z.string().trim().min(1).optional(),
   max_items: z.number().int().positive().default(8),
   status_filter: z.array(z.string().trim().min(1)).optional(),
-});
-
-/** Legacy alias for list_display (backward compatibility with existing config). */
-export const TodoDisplayComponentConfigSchema = ListDisplayComponentConfigSchema.extend({
-  kind: z.literal("todo_display"),
+  item_font_size: z.number().int().positive().default(22),
 });
 
 export type ListDisplayComponentConfig = z.infer<typeof ListDisplayComponentConfigSchema>;
-export type TodoDisplayComponentConfig = z.infer<typeof TodoDisplayComponentConfigSchema>;
 
 export interface ListProvider {
   getList(listId: string): List | undefined;
@@ -55,33 +50,15 @@ function renderInlineMarkdownTitle(title: string): ReactElement {
         unwrapDisallowed
         skipHtml
         components={{
-          p: ({ children }) => <span style={{ whiteSpace: "pre-wrap" }}>{children}</span>,
+          p: ({ children }) => <span tw="whitespace-pre-wrap">{children}</span>,
           em: ({ children }) => (
-            <span
-              style={{
-                transform: "skewX(-12deg)",
-                transformOrigin: "left center",
-                fontStyle: "normal",
-                fontWeight: 400,
-              }}
-            >
+            <span tw="origin-left skew-x-[-12deg] not-italic font-normal">
               {children}
             </span>
           ),
-          strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
+          strong: ({ children }) => <strong tw="font-bold">{children}</strong>,
           code: ({ children }) => (
-            <span
-              style={{
-                fontFamily: "DejaVu Sans Mono",
-                padding: 0,
-                fontSize: "1em",
-                lineHeight: "1.3",
-                verticalAlign: "baseline",
-                color: "inherit",
-                backgroundColor: "transparent",
-                whiteSpace: "pre-wrap",
-              }}
-            >
+            <span tw="font-mono p-0 text-[1em] leading-[1.3] align-baseline text-inherit bg-transparent whitespace-pre-wrap">
               {children}
             </span>
           ),
@@ -96,7 +73,7 @@ function renderInlineMarkdownTitle(title: string): ReactElement {
 }
 
 export function createListDisplayElement(
-  config: ListDisplayComponentConfig | TodoDisplayComponentConfig,
+  config: ListDisplayComponentConfig,
   listProvider: ListProvider,
 ): DisplayComponentResult {
   const list = listProvider.getList(config.list_id);
@@ -109,8 +86,8 @@ export function createListDisplayElement(
   }
 
   const titleFontSize = 18;
-  const itemFontSize = 22;
-  const rowGap = 4;
+  const itemFontSize = config.item_font_size;
+  const markerPx = Math.max(11, Math.round(itemFontSize * 0.72));
 
   const statusFilter = new Set(config.status_filter ?? []);
   const statusIconByStatus = new Map(list.columns.map((column) => [column.id, column.icon]));
@@ -119,85 +96,48 @@ export function createListDisplayElement(
     : list.items;
   const items = sourceItems.slice(0, config.max_items);
 
-  const containerStyle: CSSProperties = {
-    display: "flex",
-    flex: 1,
-    minWidth: 0,
-    minHeight: 0,
-    flexDirection: "column",
-    color: "#000",
-    fontFamily: "DejaVu Sans",
-    overflow: "hidden",
-  };
-
-  const titleStyle: CSSProperties = {
-    fontSize: titleFontSize,
-    fontWeight: 700,
-    lineHeight: 1.2,
-    marginBottom: Math.max(6, Math.round(titleFontSize * 0.35)),
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  };
-
-  const listStyle: CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: rowGap,
-    overflow: "hidden",
-    flex: 1,
-  };
-
-  const rowStyle: CSSProperties = {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 6,
-    fontSize: itemFontSize,
-    lineHeight: 1.3,
-  };
-
-  const rowIconWrapStyle: CSSProperties = {
-    flex: "0 0 auto",
-    width: itemFontSize,
-    height: itemFontSize,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  };
-
-  const rowTitleStyle: CSSProperties = {
-    flex: 1,
-    minWidth: 0,
-    overflowWrap: "break-word",
-    wordBreak: "break-word",
-  };
-
   return componentSuccess(
-    <div style={containerStyle}>
-      <div style={titleStyle}>{config.title ?? list.name}</div>
-      <div style={listStyle}>
+    <div tw="font-sans flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden text-black">
+      <div
+        tw="font-bold leading-[1.2] whitespace-nowrap overflow-hidden text-ellipsis"
+        style={{
+          fontSize: titleFontSize,
+          marginBottom: Math.max(6, Math.round(titleFontSize * 0.35)),
+        }}
+      >
+        {config.title ?? list.name}
+      </div>
+      <div tw="flex flex-1 min-h-0 flex-col overflow-hidden gap-1">
         {items.length > 0 ? (
           items.map((item) => {
             const iconSvg = getLucideIconSvgByName(statusIconByStatus.get(item.statusId));
             const iconSrc = iconSvg ? svgToDataUri(iconSvg) : null;
             return (
-              <div key={item.id} style={rowStyle}>
-                <span style={rowIconWrapStyle}>
+              <div
+                key={item.id}
+                tw="flex flex-row items-start gap-1.5 leading-[1.3] whitespace-normal break-words shrink-0"
+                style={{
+                  fontSize: itemFontSize,
+                }}
+              >
+                <div tw="flex items-center justify-center h-[1.3em] w-[1em] shrink-0">
                   {iconSrc ? (
                     <img
                       src={iconSrc}
-                      width={itemFontSize}
-                      height={itemFontSize}
-                      style={{ display: "block" }}
+                      width={markerPx}
+                      height={markerPx}
+                      style={{ display: "block", width: markerPx, height: markerPx }}
                     />
-                  ) : null}
-                </span>
-                <span style={rowTitleStyle}>{renderInlineMarkdownTitle(item.title)}</span>
+                  ) : (
+                    <span tw="text-[0.9em] leading-none">{"\u2022"}</span>
+                  )}
+                </div>
+                <div tw="flex-1 min-w-0 break-words">{renderInlineMarkdownTitle(item.title)}</div>
               </div>
             );
           })
         ) : (
-          <div style={rowStyle}>No items</div>
+          <div tw="leading-[1.3]" style={{ fontSize: itemFontSize }}>No items</div>
         )}
       </div>
     </div>,

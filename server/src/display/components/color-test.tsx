@@ -1,4 +1,4 @@
-import React, { type CSSProperties } from "react";
+import React from "react";
 import { z } from "zod";
 import { componentSuccess, type DisplayComponentResult } from "./component-result.js";
 
@@ -18,23 +18,10 @@ function greyscaleHex(index: number, total: number): string {
 export function createColorTestElement(config: ColorTestComponentConfig): DisplayComponentResult {
   const colors = config.colors;
 
-  const wrapperStyle: CSSProperties = {
-    display: "flex",
-    flex: 1,
-    minWidth: 0,
-    minHeight: 0,
-    gap: 0,
-  };
-
-  const swatchStyle: CSSProperties = {
-    flex: 1,
-    height: "100%",
-  };
-
   return componentSuccess(
-    <div style={wrapperStyle}>
+    <div tw="flex flex-1 min-w-0 min-h-0 gap-0">
       {Array.from({ length: colors }, (_, i) => (
-        <div key={i} style={{ ...swatchStyle, backgroundColor: greyscaleHex(i, colors) }} />
+        <div key={i} tw="flex-1 h-full" style={{ backgroundColor: greyscaleHex(i, colors) }} />
       ))}
     </div>,
   );

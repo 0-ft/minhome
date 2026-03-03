@@ -74,6 +74,15 @@ type DisplayDimensions = {
   height: number;
 };
 
+type ImageRenderTimings = {
+  build_root_ms: number;
+  build_root_layout_ms: number;
+  build_root_components_ms: number;
+  renderer_ms: number;
+  postprocess_ms: number;
+  total_ms: number;
+};
+
 const DEFAULT_REFRESH_RATE = 300;
 const DEFAULT_ORIENTATION: DisplayDeviceConfig["orientation"] = "landscape";
 const DEFAULT_COLOR_DEPTH: DisplayDeviceConfig["color_depth"] = 1;
@@ -186,27 +195,40 @@ async function buildDisplayRootElement(
   listProvider: ListProvider,
   orientation: DisplayDeviceConfig["orientation"],
   dimensions: DisplayDimensions,
-): Promise<{ rootElement: ReactElement; renderSize: { width: number; height: number } }> {
+): Promise<{
+  rootElement: ReactElement;
+  renderSize: { width: number; height: number };
+  timings: { layoutMs: number; componentsMs: number };
+}> {
   const renderSize = getRenderDimensions(orientation, dimensions);
   const tiles = resolveTilesForImage(device);
   const tilePadding = Math.max(0, Math.round(device?.display.tile_padding ?? 0));
   const tileGutter = Math.max(0, Math.round(device?.display.tile_gutter ?? 0));
-  const tileElements: ReactElement[] = [];
-
-  for (const tile of tiles) {
+  const layoutStart = Date.now();
+  const tileLayouts = tiles.map((tile) => {
     const regionPixels = regionToPixels(tile.region, renderSize.width, renderSize.height);
     const pixelRegion = applyTileGutter(tile.region, regionPixels, tileGutter);
-    const tileElement = await createComponentElement(
-      tile.component,
-      calendarService,
-      listProvider,
-    );
+    return {
+      tile,
+      pixelRegion,
+      key: `${pixelRegion.left}:${pixelRegion.top}:${pixelRegion.width}:${pixelRegion.height}`,
+    };
+  });
+  const layoutMs = Date.now() - layoutStart;
 
-    tileElements.push(
-      createElement(
+  const componentsStart = Date.now();
+  const tileElements = await Promise.all(
+    tileLayouts.map(async ({ tile, pixelRegion, key }) => {
+      const tileElement = await createComponentElement(
+        tile.component,
+        calendarService,
+        listProvider,
+      );
+
+      return createElement(
         "div",
         {
-          key: `${pixelRegion.left}:${pixelRegion.top}:${pixelRegion.width}:${pixelRegion.height}`,
+          key,
           style: {
             display: "flex",
             flexDirection: "column",
@@ -235,13 +257,15 @@ async function buildDisplayRootElement(
           },
           tileElement,
         ),
-      ),
-    );
-  }
+      );
+    }),
+  );
+  const componentsMs = Date.now() - componentsStart;
 
   const rootElement = createElement(
     "div",
     {
+      tw: "font-sans",
       style: {
         width: renderSize.width,
         height: renderSize.height,
@@ -250,13 +274,20 @@ async function buildDisplayRootElement(
         position: "relative",
         backgroundColor: "#909090",
         overflow: "hidden",
-        fontFamily: "DejaVu Sans",
+        fontFamily: "Inter, sans-serif",
       },
     },
     tileElements,
   );
 
-  return { rootElement, renderSize };
+  return {
+    rootElement,
+    renderSize,
+    timings: {
+      layoutMs,
+      componentsMs,
+    },
+  };
 }
 
 async function generateImage(
@@ -266,16 +297,24 @@ async function generateImage(
   orientation: DisplayDeviceConfig["orientation"],
   colorDepth: DisplayDeviceConfig["color_depth"],
   dimensions: DisplayDimensions,
-): Promise<Buffer> {
-  const { rootElement, renderSize } = await buildDisplayRootElement(
+): Promise<{ png: Buffer; timings: ImageRenderTimings }> {
+  const totalStart = Date.now();
+
+  const buildStart = Date.now();
+  const { rootElement, renderSize, timings: buildTimings } = await buildDisplayRootElement(
     device,
     calendarService,
     listProvider,
     orientation,
     dimensions,
   );
-  const rendered = await renderElementToPngBuffer(rootElement, renderSize.width, renderSize.height);
+  const buildRootMs = Date.now() - buildStart;
 
+  const rendererStart = Date.now();
+  const rendered = await renderElementToPngBuffer(rootElement, renderSize.width, renderSize.height);
+  const rendererMs = Date.now() - rendererStart;
+
+  const postprocessStart = Date.now();
   let image = sharp(rendered)
     .grayscale()
     .removeAlpha();
@@ -286,7 +325,20 @@ async function generateImage(
 
   // Quantize after rendering so both 1-bit and 2-bit use the same pipeline.
   const colours = getPaletteColourCount(colorDepth);
-  return image.png({ palette: true, colours, dither: 0 }).toBuffer();
+  const png = await image.png({ palette: true, colours, dither: 0 }).toBuffer();
+  const postprocessMs = Date.now() - postprocessStart;
+
+  return {
+    png,
+    timings: {
+      build_root_ms: buildRootMs,
+      build_root_layout_ms: buildTimings.layoutMs,
+      build_root_components_ms: buildTimings.componentsMs,
+      renderer_ms: rendererMs,
+      postprocess_ms: postprocessMs,
+      total_ms: Date.now() - totalStart,
+    },
+  };
 }
 
 export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
@@ -455,8 +507,7 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
     const orientation = matchedDevice?.display.orientation ?? DEFAULT_ORIENTATION;
     const colorDepth = matchedDevice?.display.color_depth ?? DEFAULT_COLOR_DEPTH;
 
-    const start = Date.now();
-    const png = await generateImage(
+    const { png, timings } = await generateImage(
       matchedDevice,
       calendarService,
       listProvider,
@@ -466,7 +517,11 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
     );
     const paletteColours = getPaletteColourCount(colorDepth);
     console.log(
-      `[display/image] Rendered ${png.length} bytes in ${Date.now() - start}ms` +
+      `[display/image] Rendered ${png.length} bytes` +
+      ` total_ms=${timings.total_ms} build_root_ms=${timings.build_root_ms}` +
+      ` build_root_layout_ms=${timings.build_root_layout_ms}` +
+      ` build_root_components_ms=${timings.build_root_components_ms}` +
+      ` renderer_ms=${timings.renderer_ms} postprocess_ms=${timings.postprocess_ms}` +
       ` mac=${matchedDevice?.display.mac ?? "unknown"} orientation=${orientation}` +
       ` width=${dimensions.width} height=${dimensions.height}` +
       ` color_depth=${colorDepth} colours=${paletteColours}`,
@@ -479,7 +534,12 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
       color_depth: colorDepth,
       colours: paletteColours,
       bytes: png.length,
-      elapsed_ms: Date.now() - start,
+      elapsed_ms: timings.total_ms,
+      build_root_ms: timings.build_root_ms,
+      build_root_layout_ms: timings.build_root_layout_ms,
+      build_root_components_ms: timings.build_root_components_ms,
+      renderer_ms: timings.renderer_ms,
+      postprocess_ms: timings.postprocess_ms,
     });
     return new Response(new Uint8Array(png), {
       headers: {
@@ -529,8 +589,44 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Display HTML Preview</title>
+    <style>
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 100 900;
+        src: url("https://cdn.jsdelivr.net/npm/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+          format("woff2-variations");
+      }
+      @font-face {
+        font-family: "Inter";
+        font-style: italic;
+        font-weight: 100 900;
+        src: url("https://cdn.jsdelivr.net/npm/@fontsource-variable/inter/files/inter-latin-wght-italic.woff2")
+          format("woff2-variations");
+      }
+      @font-face {
+        font-family: "Inter Mono";
+        font-style: normal;
+        font-weight: 100 900;
+        src: url("https://cdn.jsdelivr.net/npm/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+          format("woff2-variations");
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #111;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      [tw~="font-sans"] { font-family: Inter, sans-serif; }
+      [tw~="font-mono"] { font-family: "Inter Mono", monospace; }
+      [tw~="font-normal"] { font-weight: 400; }
+      [tw~="font-medium"] { font-weight: 500; }
+      [tw~="font-semibold"] { font-weight: 600; }
+      [tw~="font-bold"] { font-weight: 700; }
+      [tw~="not-italic"] { font-style: normal; }
+    </style>
   </head>
-  <body style="margin:0;padding:16px;background:#111;color:#eee;font-family:system-ui, sans-serif;">
+  <body>
     <div style="margin-bottom:8px;font-size:12px;">
       Render size: ${renderSize.width}x${renderSize.height} (orientation: ${orientation})
     </div>
