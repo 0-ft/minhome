@@ -250,7 +250,7 @@ export function RoomFullView() {
               onKeyDown={handleKeyDown}
               placeholder="Ask anything…"
               rows={1}
-              className="flex-1 resize-none rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/[0.07] px-4 py-3 text-[15px] text-sand-200 placeholder:text-sand-600/40 focus:outline-none focus:bg-white/[0.06] focus:border-teal-400/10 min-h-[44px] max-h-[120px] transition-all"
+              className="flex-1 resize-none rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/[0.07] px-4 py-3 text-[15px] text-sand-200 placeholder:text-sand-600/40 focus:outline-none focus:bg-white/[0.06] min-h-[44px] max-h-[120px] transition-all"
               style={{ fieldSizing: "content" } as React.CSSProperties}
             />
             {isLoading ? (

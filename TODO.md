@@ -52,3 +52,4 @@
 - [ ] Configurable sysprompt instructions for persona/conciseness
 - [ ] HTTPS endpoint & e2ee tunnel
 - [ ] Push notifications
+- [ ] Undo action

@@ -139,7 +139,7 @@ export function ListsConfigView({
         return (
           <div
             key={list.id}
-            className={`rounded-xl bg-sand-50 px-5 py-4 ${isExpanded ? "ring-2 ring-teal-300/50" : ""}`}
+            className={`rounded-xl border border-sand-300 px-5 py-4 transition-colors ${isExpanded ? "bg-sand-100/70" : "bg-sand-50"}`}
           >
             <div
               className="flex items-center justify-between cursor-pointer select-none"

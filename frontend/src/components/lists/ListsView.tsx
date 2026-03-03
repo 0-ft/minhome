@@ -196,6 +196,11 @@ export function ListsView() {
     );
   };
 
+  const saveItemTitle = (itemId: number, nextTitle: string) => {
+    if (!activeList) return;
+    upsertListItem.mutate({ listId: activeList.id, itemId, patch: { title: nextTitle } });
+  };
+
   const onKanbanDragEnd = (event: DragEndEvent) => {
     if (!activeList) return;
     const { active, over } = event;
@@ -416,24 +421,33 @@ export function ListsView() {
                         No matching items.
                       </div>
                     ) : (
-                      filteredListItems.map((item) => (
-                        <ListItemCard
-                          key={item.id}
-                          item={item}
-                          cardViewTransitionName={getCardTransitionName(item.id)}
-                          titleViewTransitionName={getTitleTransitionName(item.id)}
-                          statusViewTransitionName={getStatusTransitionName(item.id)}
-                          statusOptions={statusOptions}
-                          onOpen={() =>
-                            startTransition(() =>
-                              navigate(`/lists/${encodeURIComponent(activeList.id)}/${item.id}`),
-                            )
-                          }
-                          onStatusSet={(statusId) =>
-                            setListItemStatus.mutate({ listId: activeList.id, itemId: item.id, statusId })
-                          }
-                        />
-                      ))
+                      <div className="rounded-xl border border-sand-300 bg-sand-50 overflow-hidden">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 border-b border-sand-300 bg-sand-100/70 text-[10px] font-mono uppercase tracking-wider text-sand-500">
+                          <span>Issue</span>
+                          <span className="pr-0.5">Status</span>
+                        </div>
+                        <div className="divide-y divide-sand-300">
+                          {filteredListItems.map((item) => (
+                            <ListItemCard
+                              key={item.id}
+                              item={item}
+                              cardViewTransitionName={getCardTransitionName(item.id)}
+                              titleViewTransitionName={getTitleTransitionName(item.id)}
+                              statusViewTransitionName={getStatusTransitionName(item.id)}
+                              statusOptions={statusOptions}
+                              onOpen={() =>
+                                startTransition(() =>
+                                  navigate(`/lists/${encodeURIComponent(activeList.id)}/${item.id}`),
+                                )
+                              }
+                              onSaveTitle={(nextTitle) => saveItemTitle(item.id, nextTitle)}
+                              onStatusSet={(statusId) =>
+                                setListItemStatus.mutate({ listId: activeList.id, itemId: item.id, statusId })
+                              }
+                            />
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -455,6 +469,7 @@ export function ListsView() {
                                 navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
                               )
                             }
+                            onSaveItemTitle={saveItemTitle}
                             onToggleCollapse={toggleColumnCollapsed}
                             getCardTransitionName={getCardTransitionName}
                             getTitleTransitionName={getTitleTransitionName}
@@ -475,6 +490,7 @@ export function ListsView() {
                                 navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
                               )
                             }
+                            onSaveItemTitle={saveItemTitle}
                             onToggleCollapse={toggleColumnCollapsed}
                             getCardTransitionName={getCardTransitionName}
                             getTitleTransitionName={getTitleTransitionName}

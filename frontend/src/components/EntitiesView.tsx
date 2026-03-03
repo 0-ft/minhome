@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useDevices, useSetEntity, useRenameEntity, useRefreshStates } from "../api.js";
 import { Button } from "./ui/button.js";
 import { DebouncedSlider } from "./ui/slider.js";
-import { Input } from "./ui/input.js";
-import { Lightbulb, Plug, Power, Check, Thermometer, Sun, X, Radio, Palette } from "lucide-react";
+import { EditableText } from "./ui/editable-text.js";
+import { Lightbulb, Plug, Power, Thermometer, Sun, Radio, Palette } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
 
 // ── Entities View ────────────────────────────────────────
@@ -100,8 +100,6 @@ function EntityCard({ entity, device, onSet, onRename }: {
   const isOn = state?.[features.stateProperty] === "ON" ||
     // canonical fallback
     state?.state === "ON";
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(entity.name);
 
   const isLight = entity.type === "light";
   const EntityIcon = isSensor ? Radio : isLight ? Lightbulb : Plug;
@@ -149,41 +147,18 @@ function EntityCard({ entity, device, onSet, onRename }: {
         </div>
 
         <div className="flex-1 min-w-0">
-          {editing ? (
-            <form
-              onSubmit={(e) => { e.preventDefault(); onRename(nameInput); setEditing(false); }}
-              className="flex gap-1 items-center"
-            >
-              <Input
-                value={nameInput}
-                onChange={e => setNameInput(e.target.value)}
-                className={`h-6 text-xs w-28 px-1.5 ${isOn ? "bg-sand-300 text-sand-800" : "bg-sand-200 text-sand-800"}`}
-                autoFocus
-                onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }}
-              />
-              <Button type="submit" size="icon" variant="ghost" className="h-6 w-6 text-sand-600">
-                <Check className="h-3 w-3" />
-              </Button>
-              <Button type="button" size="icon" variant="ghost" className="h-6 w-6 text-sand-600" onClick={() => setEditing(false)}>
-                <X className="h-3 w-3" />
-              </Button>
-            </form>
-          ) : (
-            <div
-              className="cursor-pointer"
-              onClick={() => { setEditing(true); setNameInput(entity.name); }}
-              title="Click to rename"
-            >
-                <div className={`text-sm font-semibold truncate transition-colors ${
-                  isOn && !isSensor ? "hover:text-teal-700" : "hover:text-sand-900"
-                }`}>
-                  {entity.name}
-                </div>
-                <div className="text-[10px] font-mono truncate text-sand-500">
-                {device.name}{entity.key !== "main" ? ` · ${entity.key}` : ""}
-              </div>
+          <div>
+            <EditableText
+              value={entity.name}
+              onSave={onRename}
+              textClassName={`text-sm font-semibold transition-colors ${
+                isOn && !isSensor ? "hover:text-teal-700" : "hover:text-sand-900"
+              }`}
+            />
+            <div className="text-[10px] font-mono truncate text-sand-500">
+              {device.name}{entity.key !== "main" ? ` · ${entity.key}` : ""}
             </div>
-          )}
+          </div>
         </div>
 
         {!isSensor && (

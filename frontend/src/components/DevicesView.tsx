@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { DebouncedSlider } from "./ui/slider.js";
-import { Input } from "./ui/input.js";
-import { Lightbulb, Plug, Power, Check, Thermometer, Sun, ChevronRight, X, Radio, Palette } from "lucide-react";
+import { EditableText } from "./ui/editable-text.js";
+import { Lightbulb, Plug, Power, Thermometer, Sun, ChevronRight, Radio, Palette } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
 
 // ── Colour helpers ───────────────────────────────────────
@@ -80,8 +80,6 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
   onRenameEntity: (entityId: string, name: string) => void;
 }) {
   const entities = device.entities ?? [];
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(device.name);
   const [showRaw, setShowRaw] = useState(false);
 
   const isSensor = entities.some(e => e.type === "sensor");
@@ -100,34 +98,13 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
 
             {/* Name */}
             <div className="min-w-0">
-              {editing ? (
-                <form
-                  onSubmit={(e) => { e.preventDefault(); onRename(nameInput); setEditing(false); }}
-                  className="flex gap-1.5 items-center"
-                >
-                  <Input
-                    value={nameInput}
-                    onChange={e => setNameInput(e.target.value)}
-                    className="h-6 text-xs w-28 px-1.5"
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }}
-                  />
-                  <Button type="submit" size="icon" variant="ghost" className="h-6 w-6">
-                    <Check className="h-3 w-3" />
-                  </Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditing(false)}>
-                    <X className="h-3 w-3" />
-                  </Button>
-                </form>
-              ) : (
-                <CardTitle
-                  className="cursor-pointer hover:text-teal-200 transition-colors truncate"
-                  onClick={() => { setEditing(true); setNameInput(device.name); }}
-                  title="Click to rename"
-                >
-                  {device.name}
-                </CardTitle>
-              )}
+              <CardTitle className="hover:text-teal-200 transition-colors">
+                <EditableText
+                  value={device.name}
+                  onSave={onRename}
+                  textClassName="text-sm font-semibold leading-none tracking-tight text-sand-50"
+                />
+              </CardTitle>
               <CardDescription>
                 {device.vendor && device.model ? `${device.vendor} · ${device.model}` : device.id}
               </CardDescription>
@@ -198,8 +175,6 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
   const { features, state } = entity;
   const isSensor = entity.type === "sensor";
   const isOn = state?.[features.stateProperty] === "ON";
-  const [editingEntity, setEditingEntity] = useState(false);
-  const [entityInput, setEntityInput] = useState(entity.name);
 
   // Lift slider values so we can bundle them into the ON command
   const serverBrightness = features.brightnessProperty && typeof state?.[features.brightnessProperty] === "number"
@@ -267,34 +242,14 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
       <div className="flex items-center gap-2.5">
         {/* Entity label (always show for multi-entity, hidden for single-entity) */}
         {showLabel && (
-          editingEntity ? (
-            <form
-              onSubmit={(e) => { e.preventDefault(); onRenameEntity(entity.key, entityInput); setEditingEntity(false); }}
-              className="flex gap-1 items-center"
-            >
-              <Input
-                value={entityInput}
-                onChange={e => setEntityInput(e.target.value)}
-                className={`h-5 text-[10px] w-20 px-1 font-mono ${isOn ? "bg-sand-300 text-sand-800 placeholder:text-sand-500" : ""}`}
-                autoFocus
-                onBlur={() => setEditingEntity(false)}
-                onKeyDown={(e) => { if (e.key === "Escape") setEditingEntity(false); }}
-              />
-              <Button type="submit" size="icon" variant="ghost" className={`h-5 w-5 ${isOn ? "text-sand-600 hover:bg-sand-300" : ""}`}>
-                <Check className="h-2.5 w-2.5" />
-              </Button>
-            </form>
-          ) : (
-            <span
-              className={`text-[10px] font-mono font-medium uppercase tracking-wider min-w-8 cursor-pointer transition-colors ${
-                isOn ? "text-teal-600 hover:text-teal-700" : "text-blood-200 hover:text-sand-50"
-              }`}
-              onClick={() => { setEntityInput(entity.name); setEditingEntity(true); }}
-              title="Click to rename"
-            >
-              {entity.name}
-            </span>
-          )
+          <EditableText
+            value={entity.name}
+            onSave={(nextName) => onRenameEntity(entity.key, nextName)}
+            className="min-w-8"
+            textClassName={`text-[10px] font-mono font-medium uppercase tracking-wider ${
+              isOn ? "text-teal-600 hover:text-teal-700" : "text-blood-200 hover:text-sand-50"
+            }`}
+          />
         )}
 
         {/* Power toggle */}

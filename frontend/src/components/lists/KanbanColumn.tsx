@@ -4,12 +4,14 @@ import { CSS } from "@dnd-kit/utilities";
 import { ViewTransition } from "react";
 import type { ListItem } from "../../api.js";
 import { LucideIcon } from "./LucideIcon.js";
+import { EditableText } from "../ui/editable-text.js";
 
 function KanbanCard({
   listId,
   item,
   statusIcon,
   onOpen,
+  onSaveTitle,
   cardViewTransitionName,
   titleViewTransitionName,
 }: {
@@ -17,6 +19,7 @@ function KanbanCard({
   item: ListItem;
   statusIcon?: string;
   onOpen: () => void;
+  onSaveTitle: (nextTitle: string) => void;
   cardViewTransitionName?: string;
   titleViewTransitionName?: string;
 }) {
@@ -31,8 +34,7 @@ function KanbanCard({
 
   const cardBody = (
     <div className={`rounded-md bg-sand-50 border border-sand-300 p-2 transition-colors duration-200 transition-shadow duration-200 ${isDragging ? "shadow-lg" : "shadow-sm"} hover:bg-sand-100`}>
-      <button
-        type="button"
+      <div
         className="w-full text-left cursor-pointer hover:text-sand-700"
         onClick={(e) => {
           e.stopPropagation();
@@ -44,25 +46,29 @@ function KanbanCard({
             <div className="text-sand-900 min-w-0">
               <div className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-sand-500 mb-1">
                 <LucideIcon name={statusIcon} className="h-3 w-3" />
-                <span>#{item.id}</span>
+                <span>{item.id}</span>
               </div>
-              <div className="text-sm leading-snug font-medium truncate">
-                {item.title}
-              </div>
+              <EditableText
+                value={item.title}
+                onSave={onSaveTitle}
+                textClassName="text-sm leading-snug font-medium text-sand-900"
+              />
             </div>
           </ViewTransition>
         ) : (
           <div className="text-sand-900 min-w-0">
             <div className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-sand-500 mb-1">
               <LucideIcon name={statusIcon} className="h-3 w-3" />
-              <span>#{item.id}</span>
+              <span>{item.id}</span>
             </div>
-            <div className="text-sm leading-snug font-medium truncate">
-              {item.title}
-            </div>
+            <EditableText
+              value={item.title}
+              onSave={onSaveTitle}
+              textClassName="text-sm leading-snug font-medium text-sand-900"
+            />
           </div>
         )}
-      </button>
+      </div>
     </div>
   );
 
@@ -94,6 +100,7 @@ export function KanbanColumn({
   items,
   onAddItem,
   onOpenItem,
+  onSaveItemTitle,
   onToggleCollapse,
   getCardTransitionName,
   getTitleTransitionName,
@@ -106,6 +113,7 @@ export function KanbanColumn({
   items: ListItem[];
   onAddItem: (statusId: string) => void;
   onOpenItem: (itemId: number) => void;
+  onSaveItemTitle: (itemId: number, nextTitle: string) => void;
   onToggleCollapse: (statusId: string) => void;
   getCardTransitionName?: (itemId: number) => string;
   getTitleTransitionName?: (itemId: number) => string;
@@ -175,6 +183,7 @@ export function KanbanColumn({
             item={item}
             statusIcon={icon}
             onOpen={() => onOpenItem(item.id)}
+            onSaveTitle={(nextTitle) => onSaveItemTitle(item.id, nextTitle)}
             cardViewTransitionName={getCardTransitionName?.(item.id)}
             titleViewTransitionName={getTitleTransitionName?.(item.id)}
           />

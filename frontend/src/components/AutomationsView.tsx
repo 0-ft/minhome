@@ -760,7 +760,7 @@ export function AutomationsView() {
         return (
           <div
             key={a.id}
-            className={`rounded-xl bg-sand-50 px-5 py-4 transition-all ${isExpanded ? "ring-2 ring-teal-300/50" : ""}`}
+            className={`rounded-xl border border-sand-300 px-5 py-4 transition-all ${isExpanded ? "bg-sand-100/70" : "bg-sand-50"}`}
           >
             {/* Header row */}
             <div

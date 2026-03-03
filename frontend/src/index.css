@@ -223,34 +223,39 @@ input[type="range"].color-track::-moz-range-track {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* ── Auto-hiding thin scrollbar (floating chat) ── */
-.scrollbar-float {
+/* ── Auto-hiding thin scrollbar (global default) ── */
+* {
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-color: rgba(58,37,32,0.35) transparent;
   transition: scrollbar-color 0.3s;
 }
-.scrollbar-float:hover {
-  scrollbar-color: rgba(255,255,255,0.15) transparent;
+*:hover {
+  scrollbar-color: rgba(58,37,32,0.5) transparent;
 }
-.scrollbar-float::-webkit-scrollbar {
-  width: 5px;
+*::-webkit-scrollbar {
+  width: 7px;
 }
-.scrollbar-float::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
   background: transparent;
 }
-.scrollbar-float::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0);
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(58,37,32,0.35);
   border-radius: 9999px;
   transition: background 0.3s;
 }
-.scrollbar-float:hover::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15);
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(58,37,32,0.5);
 }
-.scrollbar-float::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.25);
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(58,37,32,0.58);
 }
-.scrollbar-float::-webkit-scrollbar-thumb:active {
-  background: rgba(255,255,255,0.35);
+*::-webkit-scrollbar-thumb:active {
+  background: rgba(58,37,32,0.66);
 }
 
 /* ── Floating chat prose (light on dark) ─── */
