@@ -1,114 +1,92 @@
-import ical from "node-ical";
+import type { CalendarsConfig } from "../config/config.js";
+import { GoogleCalendarProvider } from "./google-provider.js";
+import { ICalProvider } from "./ical-provider.js";
 
 export type CalendarEvent = {
   start: Date;
   end: Date;
   summary: string;
   location?: string;
+  description?: string;
   allDay: boolean;
 };
 
-export type CalendarSourceConfig = {
-  source_url: string;
+export type NewCalendarEvent = {
+  start: Date;
+  end: Date;
+  summary: string;
+  location?: string;
+  description?: string;
+  allDay?: boolean;
 };
 
-export interface CalendarSourceProvider {
-  getCalendarSource(calendarId: string): CalendarSourceConfig | undefined;
-  getCalendars(): Record<string, CalendarSourceConfig>;
+export interface CalendarProvider {
+  getEvents(): Promise<CalendarEvent[]>;
+  addEvent?(event: NewCalendarEvent): Promise<CalendarEvent>;
 }
 
-function isDate(value: unknown): value is Date {
-  return value instanceof Date && Number.isFinite(value.getTime());
-}
+export type CalendarServiceOptions = {
+  credentialsBaseDir?: string;
+};
 
-function parseEvent(value: unknown): CalendarEvent | null {
-  if (!value || typeof value !== "object") return null;
-
-  const entry = value as Record<string, unknown>;
-  if (entry.type !== "VEVENT") return null;
-  if (!isDate(entry.start)) return null;
-
-  const start = entry.start;
-  const end = isDate(entry.end) ? entry.end : start;
-  const summary = typeof entry.summary === "string" && entry.summary.trim().length > 0
-    ? entry.summary.trim()
-    : "Untitled event";
-  const location = typeof entry.location === "string" && entry.location.trim().length > 0
-    ? entry.location.trim()
-    : undefined;
-  const allDay = entry.datetype === "date";
-
-  return { start, end, summary, location, allDay };
-}
-
-export class CalendarSource {
-  static listCalendars(sourceProvider: CalendarSourceProvider): Record<string, CalendarSourceConfig> {
-    return sourceProvider.getCalendars();
-  }
-
-  static listCalendarIds(sourceProvider: CalendarSourceProvider): string[] {
-    return Object.keys(this.listCalendars(sourceProvider));
-  }
-
-  static getCalendarSourceConfig(
-    sourceProvider: CalendarSourceProvider,
-    calendarId: string,
-  ): CalendarSourceConfig | undefined {
-    return sourceProvider.getCalendarSource(calendarId);
-  }
-
+export class CalendarService {
   constructor(
-    private readonly calendarIds: string[],
-    private readonly sourceProvider: CalendarSourceProvider,
+    private readonly calendars: CalendarsConfig,
+    private readonly options: CalendarServiceOptions = {},
   ) {}
 
   getIds(): string[] {
-    return [...this.calendarIds];
+    return Object.keys(this.calendars);
   }
 
-  getConfigs(): Record<string, CalendarSourceConfig> {
-    const missingIds: string[] = [];
-    const configs: Record<string, CalendarSourceConfig> = {};
+  getConfigs(): CalendarsConfig {
+    return { ...this.calendars };
+  }
 
-    for (const calendarId of this.calendarIds) {
-      const config = CalendarSource.getCalendarSourceConfig(this.sourceProvider, calendarId);
-      if (!config) {
-        missingIds.push(calendarId);
-        continue;
+  private getConfig(calendarId: string): CalendarsConfig[string] {
+    const config = this.calendars[calendarId];
+    if (!config) {
+      throw new Error(`Calendar "${calendarId}" not configured`);
+    }
+    return config;
+  }
+
+  private createProvider(calendarId: string): CalendarProvider {
+    const config = this.getConfig(calendarId);
+    switch (config.type) {
+      case "ical":
+        return new ICalProvider(calendarId, config);
+      case "google":
+        return new GoogleCalendarProvider(calendarId, config, {
+          credentialsBaseDir: this.options.credentialsBaseDir,
+        });
+      default: {
+        const neverConfig: never = config;
+        throw new Error(`Unsupported calendar source type: ${String(neverConfig)}`);
       }
-      configs[calendarId] = config;
     }
-
-    if (missingIds.length > 0) {
-      throw new Error(`Calendar(s) not configured: ${missingIds.join(", ")}`);
-    }
-
-    return configs;
   }
 
-  async getEvents(): Promise<CalendarEvent[]> {
-    const configs = this.getConfigs();
+  async getEvents(calendarIds: string[]): Promise<CalendarEvent[]> {
     const allEvents: CalendarEvent[] = [];
-
-    for (const [calendarId, source] of Object.entries(configs)) {
-      const response = await fetch(source.source_url, {
-        headers: {
-          Accept: "text/calendar, text/plain, */*",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Calendar "${calendarId}" request failed (${response.status})`);
-      }
-
-      const icsText = await response.text();
-      const parsed = ical.parseICS(icsText);
-      const events = Object.values(parsed)
-        .map(parseEvent)
-        .filter((event): event is CalendarEvent => event !== null);
+    for (const calendarId of calendarIds) {
+      const provider = this.createProvider(calendarId);
+      const events = await provider.getEvents();
       allEvents.push(...events);
     }
-
     return allEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
+  }
+
+  canWrite(calendarId: string): boolean {
+    const provider = this.createProvider(calendarId);
+    return typeof provider.addEvent === "function";
+  }
+
+  async addEvent(calendarId: string, event: NewCalendarEvent): Promise<CalendarEvent> {
+    const provider = this.createProvider(calendarId);
+    if (typeof provider.addEvent !== "function") {
+      throw new Error(`Calendar "${calendarId}" is read-only`);
+    }
+    return provider.addEvent(event);
   }
 }

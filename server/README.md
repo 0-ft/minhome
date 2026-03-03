@@ -97,9 +97,42 @@ Manages `config.json` with a Zod-validated schema. Supports:
 
 - **Device config** — friendly names and entity labels (extensible `{ name: "..." }` objects per entity key)
 - **Room layout** — 3D room dimensions, furniture (primitives and groups), and light placements
+- **Display tiles** — TRMNL/e-ink tile composition, including Polymarket graph tiles
 - **Room mutations** — `patchRoom()` for partial updates, `upsertFurniture()`/`removeFurniture()` for individual furniture items
 
 Reloads from disk on every read so hand-edits are picked up without restart.
+
+Example display tile for a Polymarket graph:
+
+```jsonc
+{
+  "displays": [
+    {
+      "mac": "AA:BB:CC:DD:EE:FF",
+      "token": "replace-with-device-token",
+      "refresh_rate": 300,
+      "orientation": "landscape",
+      "color_depth": 1,
+      "tile_padding": 8,
+      "tile_gutter": 6,
+      "tiles": [
+        {
+          "region": { "x": 0, "y": 0, "w": 1, "h": 1 },
+          "component": {
+            "kind": "polymarket_graph_display",
+            "market_slug": "will-bitcoin-be-above-100k-on-dec-31",
+            "title": "BTC $100k by Dec 31",
+            "lookback_hours": 24,
+            "series": "yes_price",
+            "show_axes": true,
+            "show_last_value": true
+          }
+        }
+      ]
+    }
+  ]
+}
+```
 
 ### Room Schema (`src/config/room.ts`)
 

@@ -21,7 +21,7 @@ COPY frontend/ frontend/
 
 # Build frontend and server (constrain heap for low-memory devices)
 RUN NODE_OPTIONS=--max-old-space-size=2048 pnpm --filter @minhome/frontend build
-RUN pnpm --filter @minhome/server build
+RUN NODE_OPTIONS=--max-old-space-size=2048 pnpm --filter @minhome/server build
 
 # Production stage
 FROM node:22-slim

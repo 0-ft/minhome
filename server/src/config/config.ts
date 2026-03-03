@@ -3,7 +3,6 @@ import { dirname, resolve } from "path";
 import { z } from "zod";
 import { DeviceConfigSchema, EntityConfigSchema, extractEntitiesFromExposes } from "./devices.js";
 import { RoomSchema, type FurnitureItem } from "./room.js";
-import type { CalendarSourceConfig } from "../calendar/service.js";
 import { TileConfigSchema } from "../display/tiles.js";
 
 // Re-export sub-module types for consumers
@@ -26,9 +25,24 @@ export const VoiceConfigSchema = z.object({
 });
 export type VoiceConfig = z.infer<typeof VoiceConfigSchema>;
 
-export const CalendarSourceSchema = z.object({
+export const ICalCalendarSourceSchema = z.object({
+  type: z.literal("ical"),
   source_url: z.string().url(),
 });
+export type ICalCalendarSourceConfig = z.infer<typeof ICalCalendarSourceSchema>;
+
+export const GoogleCalendarSourceSchema = z.object({
+  type: z.literal("google"),
+  calendar_id: z.string().trim().min(1).default("primary"),
+  credentials_file: z.string().trim().min(1),
+});
+export type GoogleCalendarSourceConfig = z.infer<typeof GoogleCalendarSourceSchema>;
+
+export const CalendarSourceSchema = z.discriminatedUnion("type", [
+  ICalCalendarSourceSchema,
+  GoogleCalendarSourceSchema,
+]);
+export type CalendarSourceConfig = z.infer<typeof CalendarSourceSchema>;
 
 export const CalendarsConfigSchema = z.record(z.string(), CalendarSourceSchema).default({});
 export type CalendarsConfig = z.infer<typeof CalendarsConfigSchema>;
@@ -93,6 +107,10 @@ export class ConfigStore {
   get(): Config {
     this.reload();
     return this.data;
+  }
+
+  getConfigDir(): string {
+    return dirname(this.filePath);
   }
 
   getDevice(id: string): z.infer<typeof DeviceConfigSchema> | undefined {
@@ -306,6 +324,24 @@ export class ConfigStore {
       normalized.voice = {
         voice_name: voiceRaw,
       };
+    }
+    const calendarsRaw = normalized.calendars;
+    if (calendarsRaw && typeof calendarsRaw === "object") {
+      const normalizedCalendars: Record<string, unknown> = {};
+      for (const [calendarId, source] of Object.entries(calendarsRaw as Record<string, unknown>)) {
+        if (source && typeof source === "object") {
+          const sourceObject = source as Record<string, unknown>;
+          if (!("type" in sourceObject) && typeof sourceObject.source_url === "string") {
+            normalizedCalendars[calendarId] = {
+              type: "ical",
+              ...sourceObject,
+            };
+            continue;
+          }
+        }
+        normalizedCalendars[calendarId] = source;
+      }
+      normalized.calendars = normalizedCalendars;
     }
     return ConfigSchema.parse(normalized);
   }

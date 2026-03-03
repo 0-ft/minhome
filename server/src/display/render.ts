@@ -2,12 +2,13 @@ import { existsSync, readFileSync } from "fs";
 import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
 import type { ReactElement } from "react";
-import type { CalendarSourceProvider } from "../calendar/service.js";
+import type { CalendarService } from "../calendar/service.js";
 import type { TileComponentConfig } from "./tiles.js";
 import { createCalendarDisplayElement } from "./components/calendar-display.js";
 import { createColorTestElement } from "./components/color-test.js";
 import { type DisplayComponentResult, componentFailure } from "./components/component-result.js";
 import { createErrorDisplayElement } from "./components/error-display.js";
+import { createPolymarketGraphDisplayElement } from "./components/polymarket-graph-display.js";
 import { createStringDisplayElement } from "./components/string-display.js";
 import { createTodoDisplayElement, type TodoListProvider } from "./components/todo-display.js";
 
@@ -127,7 +128,7 @@ function renderResultToElement(
 
 export async function createComponentElement(
   component: TileComponentConfig,
-  calendarSourceProvider: CalendarSourceProvider,
+  calendarService: CalendarService,
   todoListProvider: TodoListProvider,
 ): Promise<ReactElement> {
   switch (component.kind) {
@@ -138,11 +139,24 @@ export async function createComponentElement(
     case "calendar_display": {
       let result: DisplayComponentResult;
       try {
-        result = await createCalendarDisplayElement(component, calendarSourceProvider);
+        result = await createCalendarDisplayElement(component, calendarService);
       } catch (error) {
         result = componentFailure(
           component.kind,
           "Unhandled calendar render failure",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+      return renderResultToElement(result);
+    }
+    case "polymarket_graph_display": {
+      let result: DisplayComponentResult;
+      try {
+        result = await createPolymarketGraphDisplayElement(component);
+      } catch (error) {
+        result = componentFailure(
+          component.kind,
+          "Unhandled polymarket graph render failure",
           error instanceof Error ? error.message : String(error),
         );
       }

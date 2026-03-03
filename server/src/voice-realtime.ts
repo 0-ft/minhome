@@ -87,8 +87,6 @@ export class RealtimeSession {
   private toolCtx: ToolContext;
   private audioCapture: VoiceAudioCapture | null = null;
   private audioCaptureFlushed = false;
-  private lastAudioTime = 0;
-  private audioSilenceTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     sessionId: string,
@@ -166,7 +164,6 @@ export class RealtimeSession {
   /** Feed incoming 24kHz PCM audio from the bridge. */
   feedAudio(pcm24: Buffer): void {
     if (this.closed) return;
-    this.lastAudioTime = Date.now();
     if (!this.connected || !this.rt) {
       // Buffer audio until OpenAI WS is connected — capture happens on flush
       this.pendingAudio.push(pcm24);
@@ -200,10 +197,6 @@ export class RealtimeSession {
     if (this.closed) return;
     this.closed = true;
     console.log(`[realtime] Closing session ${this.sessionId}`);
-    if (this.audioSilenceTimer) {
-      clearInterval(this.audioSilenceTimer);
-      this.audioSilenceTimer = null;
-    }
     this.flushAudioCapture("close");
 
     try { this.audioController?.close(); } catch { /* already closed */ }
@@ -212,16 +205,6 @@ export class RealtimeSession {
   }
 
   // ── Private ──────────────────────────────────────────────
-
-  private startAudioSilenceMonitor(): void {
-    this.audioSilenceTimer = setInterval(() => {
-      if (this.closed || !this.lastAudioTime) return;
-      const silenceMs = Date.now() - this.lastAudioTime;
-      if (silenceMs >= 3000) {
-        console.log(`[realtime] No audio received for ${(silenceMs / 1000).toFixed(1)}s — input may have stopped`);
-      }
-    }, 3000);
-  }
 
   private configureSession(): void {
     if (!this.rt) return;
@@ -267,32 +250,97 @@ export class RealtimeSession {
     });
   }
 
-  private bindEvents(): void {
+  private static readonly MAX_HISTORY_MESSAGES = 50;
+
+  /**
+   * Load persisted chat history and inject it into the Realtime session as
+   * conversation.item.create events, giving the model context from prior turns.
+   */
+  private injectChatHistory(): void {
     if (!this.rt) return;
 
-    // Log ALL events from OpenAI for diagnostics
-    this.rt.on("event", (event: any) => {
-      const type = event?.type ?? "unknown";
-      // Skip high-volume audio delta events
-      if (type === "response.output_audio.delta" || type === "response.output_audio_transcript.delta") return;
-      const preview = JSON.stringify(event).substring(0, 300);
-      console.log(`[realtime:event] ${type} ${preview}`);
+    const chat = this.toolCtx.chats.get(this.chatId);
+    if (!chat || chat.messages.length === 0) {
+      console.log(`[realtime] No chat history to inject for ${this.chatId}`);
+      return;
+    }
+
+    const messages = chat.messages.slice(-RealtimeSession.MAX_HISTORY_MESSAGES);
+    let injected = 0;
+
+    for (const msg of messages) {
+      if (!msg.parts || msg.parts.length === 0) continue;
+
+      for (const part of msg.parts) {
+        if (part.type === "text" && part.text?.trim()) {
+          if (msg.role === "user") {
+            this.rt.send({
+              type: "conversation.item.create",
+              item: {
+                type: "message",
+                role: "user",
+                content: [{ type: "input_text", text: part.text }],
+              } as any,
+            });
+            injected++;
+          } else if (msg.role === "assistant") {
+            this.rt.send({
+              type: "conversation.item.create",
+              item: {
+                type: "message",
+                role: "assistant",
+                content: [{ type: "output_text", text: part.text }],
+              } as any,
+            });
+            injected++;
+          }
+        } else if (part.type?.startsWith("tool-") && msg.role === "assistant") {
+          const toolPart = part as unknown as PersistedToolPart;
+          const toolName = part.type.replace(/^tool-/, "");
+          const callId = toolPart.toolCallId ?? `hist-${randomUUID()}`;
+          this.rt.send({
+            type: "conversation.item.create",
+            item: {
+              type: "function_call",
+              name: toolName,
+              call_id: callId,
+              arguments: JSON.stringify(toolPart.input ?? {}),
+            } as any,
+          });
+          this.rt.send({
+            type: "conversation.item.create",
+            item: {
+              type: "function_call_output",
+              call_id: callId,
+              output: JSON.stringify(toolPart.output ?? {}),
+            } as any,
+          });
+          injected += 2;
+        }
+      }
+    }
+
+    console.log(`[realtime] Injected ${injected} history items from ${messages.length} messages (chat ${this.chatId})`);
+    debugLog.add("voice_history", `Injected ${injected} history items`, {
+      sessionId: this.sessionId,
+      chatId: this.chatId,
+      messageCount: messages.length,
+      itemCount: injected,
     });
+  }
+
+  private bindEvents(): void {
+    if (!this.rt) return;
 
     // Session lifecycle
     this.rt.on("session.created", () => {
       console.log(`[realtime] Session created`);
     });
-    this.rt.on("session.updated", (e: any) => {
-      // Log the turn detection config that OpenAI actually accepted
-      const td = e?.session?.audio?.input?.turn_detection
-        ?? e?.session?.turn_detection
-        ?? "NOT_FOUND";
-      console.log(`[realtime] Session configured — turn_detection: ${JSON.stringify(td)}`);
-      console.log(`[realtime] Ready for audio`);
+    this.rt.on("session.updated", (_e: any) => {
+      console.log(`[realtime] Session configured, ready for audio`);
       this.connected = true;
+      this.injectChatHistory();
       this.flushPendingAudio();
-      this.startAudioSilenceMonitor();
     });
 
     // VAD — speech detection
@@ -332,13 +380,9 @@ export class RealtimeSession {
     this.rt.on("response.output_audio.delta", (e) => {
       this.handleAudioDelta(e.delta);
     });
-    this.rt.on("response.output_audio_transcript.delta", (e) => {
-      // Log streaming transcript
-      if (e.delta) process.stdout.write(e.delta);
-    });
     this.rt.on("response.output_audio_transcript.done", (e) => {
       if (e.transcript) {
-        console.log(`\n[realtime] Response transcript: "${e.transcript}"`);
+        console.log(`[realtime] Response transcript: "${e.transcript}"`);
         debugLog.add("voice_transcript", `Assistant: "${e.transcript}"`, { sessionId: this.sessionId, role: "assistant", transcript: e.transcript });
         const transcript = e.transcript.trim();
         if (transcript) {

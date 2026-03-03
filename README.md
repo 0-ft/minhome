@@ -126,6 +126,14 @@ pnpm up:dev      # docker compose up -d with dev overlay
 
 In dev mode the frontend runs on **http://localhost:5173** (Vite dev server with proxy to the server).
 
+**Hybrid** (hot-reload server + built frontend):
+
+```bash
+pnpm up:hybrid  # docker compose up -d with hybrid overlay
+```
+
+In hybrid mode the server still hot-reloads, but serves `frontend/dist` as static files. Frontend source changes require restarting the hybrid stack to rebuild assets.
+
 Alternatively, run outside Docker:
 
 ```bash
@@ -214,6 +222,7 @@ Stores automation rules. All triggers, conditions, and actions that reference de
 | `frontend` _(dev only)_ | `node:22-slim` | 5173 | Vite dev server with hot-reload |
 
 The dev overlay (`docker-compose.dev.yml`) replaces the built server image with a source-mounted hot-reload setup and adds the frontend dev server.
+The hybrid overlay (`docker-compose.hybrid.yml`) keeps server hot-reload but builds and serves static frontend assets from `frontend/dist`.
 
 ## MCP Integration
 
@@ -266,8 +275,11 @@ Available MCP tools:
 | `pnpm build` | Build server + frontend for production |
 | `pnpm up` | `docker compose up -d` |
 | `pnpm up:dev` | `docker compose up -d` with dev overlay |
+| `pnpm up:hybrid` | `docker compose up -d` with hybrid overlay |
 | `pnpm down` | `docker compose down` |
+| `pnpm down:hybrid` | `docker compose down` with hybrid overlay |
 | `pnpm logs` | `docker compose logs -f` |
+| `pnpm logs:hybrid` | `docker compose logs -f` with hybrid overlay |
 | `pnpm reload` | Restart the server container (dev) |
 
 ## License

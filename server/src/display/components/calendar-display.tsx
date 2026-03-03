@@ -1,9 +1,8 @@
 import type { CSSProperties, ReactElement } from "react";
 import { z } from "zod";
 import {
-  CalendarSource,
+  CalendarService,
   type CalendarEvent,
-  type CalendarSourceProvider,
 } from "../../calendar/service.js";
 import {
   componentFailure,
@@ -486,12 +485,11 @@ function renderGrid(
 
 export async function createCalendarDisplayElement(
   config: CalendarDisplayComponentConfig,
-  calendarSourceProvider: CalendarSourceProvider,
+  calendarService: CalendarService,
 ): Promise<DisplayComponentResult> {
   try {
-    const calendarSource = new CalendarSource(config.calendar_ids, calendarSourceProvider);
     const now = new Date();
-    const sourceEvents = await calendarSource.getEvents();
+    const sourceEvents = await calendarService.getEvents(config.calendar_ids);
     const events = getViewEvents(sourceEvents, config.view, config.max_events, now);
 
     const titleFontSize = 18;

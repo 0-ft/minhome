@@ -21,6 +21,7 @@
     "@resvg/resvg-js": "^2.6.2",
     "ai": "^6.0.77",
     "croner": "^10.0.1",
+    "googleapis": "^171.4.0",
     "hono": "^4.11.8",
     "lucide-static": "^0.564.0",
     "mqtt": "^5.15.0",

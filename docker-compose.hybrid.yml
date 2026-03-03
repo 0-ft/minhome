@@ -1,0 +1,14 @@
+services:
+  # Hybrid mode: hot-reload server from source, but serve built frontend assets.
+  server:
+    image: node:22-slim
+    build: !reset null
+    command: sh -c "apt-get update && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core && rm -rf /var/lib/apt/lists/* && corepack enable && pnpm install && NODE_OPTIONS=--max-old-space-size=2048 pnpm --filter @minhome/frontend build && pnpm --filter @minhome/server dev"
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ./data/server:/data
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=256
+      - DATA_DIR=/data
+      - FONTCONFIG_PATH=/etc/fonts

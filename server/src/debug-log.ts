@@ -24,6 +24,7 @@ export type DebugLogType =
   | "voice_tool_call"
   | "voice_tool_result"
   | "voice_audio"
+  | "voice_history"
   | "voice_error"
   | "mqtt_state_change"
   | "mqtt_message"

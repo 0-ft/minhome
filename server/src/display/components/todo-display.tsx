@@ -38,7 +38,7 @@ function renderInlineMarkdownTitle(title: string): ReactElement {
         unwrapDisallowed
         skipHtml
         components={{
-          p: ({ children }) => <span style={{ whiteSpace: "pre" }}>{children}</span>,
+          p: ({ children }) => <span style={{ whiteSpace: "pre-wrap" }}>{children}</span>,
           em: ({ children }) => (
             <span
               style={{
@@ -62,7 +62,7 @@ function renderInlineMarkdownTitle(title: string): ReactElement {
                 verticalAlign: "baseline",
                 color: "inherit",
                 backgroundColor: "transparent",
-                whiteSpace: "pre",
+                whiteSpace: "pre-wrap",
               }}
             >
               {children}
@@ -133,11 +133,10 @@ export function createTodoDisplayElement(
 
   const rowStyle: CSSProperties = {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 6,
     fontSize: itemFontSize,
     lineHeight: 1.3,
-    overflow: "hidden",
   };
 
   const rowIconWrapStyle: CSSProperties = {
@@ -150,12 +149,10 @@ export function createTodoDisplayElement(
   };
 
   const rowTitleStyle: CSSProperties = {
-    display: "block",
     flex: 1,
     minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    overflowWrap: "break-word",
+    wordBreak: "break-word",
   };
 
   return componentSuccess(
