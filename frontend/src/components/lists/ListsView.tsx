@@ -491,6 +491,37 @@ export function ListsView() {
                   </div>
                 ) : (
                   <div className="flex-1 min-h-0">
+                    <div className="h-full md:hidden overflow-x-auto pb-2 snap-x snap-mandatory">
+                      <div className="flex items-stretch gap-3 min-w-full h-full">
+                        {groupedByColumn.map((col) => (
+                          <div key={col.id} className="min-w-full h-full snap-center">
+                            <KanbanColumn
+                              listId={activeList.id}
+                              statusId={col.id}
+                              label={col.label}
+                              icon={col.icon}
+                              collapsed={col.collapsed}
+                              mobileCarousel={true}
+                              enableDragDrop={false}
+                              items={col.items}
+                              onAddItem={(statusId) => addPlaceholderItem(statusId)}
+                              onOpenItem={(itemId) =>
+                                startTransition(() =>
+                                  navigate(`/lists/${encodeURIComponent(activeList.id)}/${itemId}`),
+                                )
+                              }
+                              onSaveItemTitle={saveItemTitle}
+                              onToggleCollapse={toggleColumnCollapsed}
+                              getCardTransitionName={(itemId) => getCardTransitionName(activeList.id, itemId)}
+                              getTitleTransitionName={(itemId) =>
+                                getTitleTransitionName(activeList.id, itemId)
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     <DndContext
                       sensors={sensors}
                       collisionDetection={pointerWithin}
@@ -498,7 +529,7 @@ export function ListsView() {
                       onDragCancel={() => setDraggedKanbanItem(null)}
                       onDragEnd={onKanbanDragEnd}
                     >
-                      <div className="h-full overflow-x-auto pb-2">
+                      <div className="hidden md:block h-full overflow-x-auto pb-2">
                         <div className="flex items-start gap-3 w-max min-w-full h-full">
                           {expandedKanbanColumns.map((col) => (
                             <KanbanColumn
@@ -548,18 +579,20 @@ export function ListsView() {
                           ))}
                         </div>
                       </div>
-                      <DragOverlay dropAnimation={null}>
-                        {draggedKanbanItem ? (
-                          <div className="w-72 rounded-md bg-sand-50 border border-sand-300 p-2 shadow-lg opacity-95">
-                            <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
-                              <span>{draggedKanbanItem.id}</span>
+                      <div className="hidden md:block">
+                        <DragOverlay dropAnimation={null}>
+                          {draggedKanbanItem ? (
+                            <div className="w-72 rounded-md bg-sand-50 border border-sand-300 p-2 shadow-lg opacity-95">
+                              <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
+                                <span>{draggedKanbanItem.id}</span>
+                              </div>
+                              <div className="text-sm leading-snug font-medium text-sand-900 whitespace-pre-wrap break-words">
+                                {draggedKanbanItem.title}
+                              </div>
                             </div>
-                            <div className="text-sm leading-snug font-medium text-sand-900 whitespace-pre-wrap break-words">
-                              {draggedKanbanItem.title}
-                            </div>
-                          </div>
-                        ) : null}
-                      </DragOverlay>
+                          ) : null}
+                        </DragOverlay>
+                      </div>
                     </DndContext>
                   </div>
                 )}

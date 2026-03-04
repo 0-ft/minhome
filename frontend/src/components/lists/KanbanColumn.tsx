@@ -12,6 +12,7 @@ function KanbanCard({
   statusIcon,
   onOpen,
   onSaveTitle,
+  enableDragDrop,
   cardViewTransitionName,
   titleViewTransitionName,
 }: {
@@ -20,12 +21,14 @@ function KanbanCard({
   statusIcon?: string;
   onOpen: () => void;
   onSaveTitle: (nextTitle: string) => void;
+  enableDragDrop: boolean;
   cardViewTransitionName?: string;
   titleViewTransitionName?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `list-item:${listId}:${item.id}`,
     data: { itemId: item.id, statusId: item.statusId },
+    disabled: !enableDragDrop,
   });
 
   const style = {
@@ -78,9 +81,9 @@ function KanbanCard({
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      className={`cursor-grab active:cursor-grabbing ${isDragging ? "opacity-0" : ""}`}
+      {...(enableDragDrop ? listeners : {})}
+      {...(enableDragDrop ? attributes : {})}
+      className={`${enableDragDrop ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-0" : ""}`}
     >
       {cardViewTransitionName ? (
         <ViewTransition name={cardViewTransitionName} share="list-card-share">
@@ -99,6 +102,8 @@ export function KanbanColumn({
   label,
   icon,
   collapsed,
+  mobileCarousel = false,
+  enableDragDrop = true,
   items,
   onAddItem,
   onOpenItem,
@@ -112,6 +117,8 @@ export function KanbanColumn({
   label: string;
   icon?: string;
   collapsed: boolean;
+  mobileCarousel?: boolean;
+  enableDragDrop?: boolean;
   items: ListItem[];
   onAddItem: (statusId: string) => void;
   onOpenItem: (itemId: number) => void;
@@ -123,9 +130,10 @@ export function KanbanColumn({
   const { setNodeRef, isOver } = useDroppable({
     id: `list-column:${statusId}`,
     data: { statusId },
+    disabled: !enableDragDrop,
   });
 
-  if (collapsed) {
+  if (collapsed && !mobileCarousel) {
     return (
       <div
         ref={setNodeRef}
@@ -152,7 +160,7 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`w-80 h-full min-h-0 shrink-0 rounded-lg p-3 transition-colors flex flex-col ${
+      className={`${mobileCarousel ? "w-full" : "w-80"} h-full min-h-0 shrink-0 rounded-lg p-3 transition-colors flex flex-col ${
         isOver ? "bg-teal-100" : "bg-sand-200/50"
       }`}
     >
@@ -164,6 +172,9 @@ export function KanbanColumn({
         >
           <LucideIcon name={icon} className="h-4 w-4" />
           <span>{label}</span>
+          {mobileCarousel && collapsed ? (
+            <span className="text-[10px] uppercase tracking-wider text-sand-500">(collapsed)</span>
+          ) : null}
         </button>
         <div className="flex items-center gap-2">
           <span className="text-xs text-sand-600">{items.length}</span>
@@ -186,6 +197,7 @@ export function KanbanColumn({
             statusIcon={icon}
             onOpen={() => onOpenItem(item.id)}
             onSaveTitle={(nextTitle) => onSaveItemTitle(item.id, nextTitle)}
+            enableDragDrop={enableDragDrop}
             cardViewTransitionName={getCardTransitionName?.(item.id)}
             titleViewTransitionName={getTitleTransitionName?.(item.id)}
           />
