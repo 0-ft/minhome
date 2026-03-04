@@ -85,7 +85,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
   }, [chatWidth]);
 
   return (
-    <div className="h-screen flex bg-sand-100 md:bg-sand-50">
+    <div className="h-screen flex flex-col md:flex-row bg-sand-100 md:bg-sand-50">
       <DesktopSidebar
         activeTab={activeTab}
         showLogout={showLogout}
@@ -95,8 +95,8 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
         onLogout={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
       />
 
-      <div className="flex-1 min-w-0 flex">
-        <div className="flex-1 min-w-0 overflow-hidden pb-14 md:pb-0">
+      <div className="flex-1 min-w-0 min-h-0 flex">
+        <div className="flex-1 min-w-0 min-h-0 overflow-hidden">
           <main className="h-full overflow-hidden p-0 md:p-4">
             <div className="w-full h-full overflow-hidden md:min-h-[500px] md:rounded-xl md:bg-sand-100 md:border md:border-sand-300">
               <Routes>

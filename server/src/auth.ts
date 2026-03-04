@@ -72,8 +72,13 @@ export function authMiddleware(tokens: TokenStore): MiddlewareHandler {
       return next();
     }
 
-    // Only protect API routes, WebSocket, and display endpoints
-    if (!path.startsWith("/api/") && !path.startsWith("/display/") && path !== "/ws") {
+    // Only protect API routes, selected WebSocket endpoints, and display endpoints
+    if (
+      !path.startsWith("/api/")
+      && !path.startsWith("/display/")
+      && path !== "/ws"
+      && path !== "/ws/voice/browser"
+    ) {
       return next();
     }
 

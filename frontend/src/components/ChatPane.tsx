@@ -6,7 +6,7 @@ import { useDeleteChat } from "../api.js";
 import { ChatHistoryModal } from "./ChatHistoryModal.js";
 import { ConfirmDialog } from "./ui/ConfirmDialog.js";
 import { usePersistedChatController } from "./chat/usePersistedChatController.js";
-import { useBrowserVoiceWebRtc } from "./chat/useBrowserVoiceWebRtc.js";
+import { useBrowserVoiceWs } from "./chat/useBrowserVoiceWs.js";
 import { buildChatRenderItems } from "./chat/chatRenderItems.js";
 import { ToolCallGroup } from "./chat/ToolCallGroup.js";
 
@@ -47,7 +47,7 @@ export function ChatPane({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const renderItems = useMemo(() => buildChatRenderItems(messages), [messages]);
-  const voice = useBrowserVoiceWebRtc(activeChatId);
+  const voice = useBrowserVoiceWs(activeChatId);
 
   const isLoading = status === "submitted" || status === "streaming";
   const isVoiceActive = voice.isActive;
@@ -153,16 +153,25 @@ export function ChatPane({
         className="border-t border-sand-300 px-4 py-3 bg-sand-50"
       >
         <div className="flex gap-2 items-stretch">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message…"
-            rows={1}
-            className="flex-1 resize-none rounded-lg bg-sand-200 px-3 py-2 text-sm text-sand-900 placeholder:text-sand-500 focus:outline-none focus:bg-sand-100 transition-colors min-h-[36px] max-h-[120px]"
-            style={{ fieldSizing: "content" } as React.CSSProperties}
-          />
+          {isVoiceActive ? (
+            <div className="flex-1 rounded-lg bg-sand-200 px-3 py-2 min-h-[36px] inline-flex items-center">
+              <p className="text-xs font-mono text-sand-700 truncate">
+                voice: {voice.status}
+                {voice.error ? ` - ${voice.error}` : ""}
+              </p>
+            </div>
+          ) : (
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message…"
+              rows={1}
+              className="flex-1 resize-none rounded-lg bg-sand-200 px-3 py-2 text-sm text-sand-900 placeholder:text-sand-500 focus:outline-none focus:bg-sand-100 transition-colors min-h-[36px] max-h-[120px]"
+              style={{ fieldSizing: "content" } as React.CSSProperties}
+            />
+          )}
           <button
             type="button"
             onClick={() => {
@@ -173,19 +182,21 @@ export function ChatPane({
               }
             }}
             disabled={!activeChatId || isLoading}
-            className={`shrink-0 px-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center min-h-[36px] ${
+            className={`shrink-0 h-9 w-9 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center ${
               voice.status === "connecting"
                 ? "bg-blood-100 text-blood-600"
+                : voice.status === "responding"
+                  ? "bg-blood-200 text-blood-700"
                 : isVoiceActive
                   ? "bg-blood-400 text-sand-50"
                   : "bg-sand-300 text-sand-700 hover:bg-sand-200"
             }`}
             style={{
               transform:
-                voice.status === "connecting"
-                  ? "scale(1.08)"
+                voice.status === "connecting" || voice.status === "responding"
+                  ? "scale(1.16)"
                   : isVoiceActive
-                    ? "scale(1.14)"
+                    ? "scale(1.24)"
                     : "scale(1)",
               transition: "transform 220ms ease, background-color 220ms ease, color 220ms ease",
             }}
@@ -193,6 +204,12 @@ export function ChatPane({
           >
             {voice.status === "connecting" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : voice.status === "responding" ? (
+              <span className="inline-flex items-center gap-0.5">
+                <span className="h-1 w-1 rounded-full bg-current animate-bounce" />
+                <span className="h-1 w-1 rounded-full bg-current animate-bounce [animation-delay:120ms]" />
+                <span className="h-1 w-1 rounded-full bg-current animate-bounce [animation-delay:240ms]" />
+              </span>
             ) : (
               <Mic className={`h-4 w-4 ${isVoiceActive ? "animate-pulse" : ""}`} />
             )}
@@ -201,7 +218,7 @@ export function ChatPane({
             <button
               type="button"
               onClick={stop}
-              className="shrink-0 px-2 rounded-lg bg-blood-400 text-sand-50 hover:bg-blood-500 transition-colors cursor-pointer inline-flex items-center justify-center min-h-[36px]"
+              className="shrink-0 h-9 w-9 rounded-lg bg-blood-400 text-sand-50 hover:bg-blood-500 transition-colors cursor-pointer inline-flex items-center justify-center"
               title="Stop generating"
             >
               <X className="h-4 w-4" />
@@ -210,7 +227,7 @@ export function ChatPane({
             <button
               type="submit"
               disabled={!input.trim() || !activeChatId}
-              className="shrink-0 px-2 rounded-lg bg-blood-200 text-blood-700 hover:bg-blood-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center min-h-[36px]"
+              className="shrink-0 h-9 w-9 rounded-lg bg-blood-200 text-blood-700 hover:bg-blood-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center"
               title="Send message"
             >
               <Send className="h-4 w-4" />
@@ -218,15 +235,6 @@ export function ChatPane({
           )}
         </div>
       </form>
-
-      {(voice.status !== "idle" || voice.error) && (
-        <div className="border-t border-sand-300 px-4 py-2 bg-sand-100 text-xs font-mono text-sand-600">
-          <p>
-            voice: {voice.status}
-            {voice.error ? ` - ${voice.error}` : ""}
-          </p>
-        </div>
-      )}
 
       <ChatHistoryModal
         open={historyOpen}

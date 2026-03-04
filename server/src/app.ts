@@ -15,7 +15,7 @@ import type { TokenStore } from "./config/tokens.js";
 import { createDisplayRoute } from "./display/display.js";
 import { buildDeviceResponse, type ToolContext, type VoiceDeviceInfo } from "./tools.js";
 import { createVoiceWSHandler, type AudioStreamRegistry, type BridgeRef } from "./voice.js";
-import { createBrowserVoiceWebRtcRoute } from "./voice-browser-webrtc.js";
+import { createBrowserVoiceWSHandler } from "./voice-browser-ws.js";
 import { SharedAudioSource } from "./audio-utils.js";
 import { debugLog, type DebugLogType } from "./debug-log.js";
 
@@ -60,7 +60,6 @@ export function createApp(
 
   // --- AI Chat ---
   app.route("/", createChatRoute(toolCtx));
-  app.route("/", createBrowserVoiceWebRtcRoute(toolCtx));
 
   app
 
@@ -447,6 +446,11 @@ export function createApp(
     // --- Voice Bridge WebSocket ---
     .get("/ws/voice", upgradeWebSocket(
       createVoiceWSHandler({ audioStreams, toolCtx, bridgeRef })
+    ))
+
+    // --- Browser voice WebSocket ---
+    .get("/ws/voice/browser", upgradeWebSocket(
+      createBrowserVoiceWSHandler({ toolCtx })
     ))
 
     // --- Audio streaming for voice responses ---
