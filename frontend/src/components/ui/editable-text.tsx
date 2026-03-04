@@ -5,11 +5,13 @@ import { cn } from "../../lib/utils.js";
 export function EditableText({
   value,
   onSave,
+  fullWidth = true,
   className,
   textClassName,
 }: {
   value: string;
   onSave: (nextValue: string) => void;
+  fullWidth?: boolean;
   className?: string;
   textClassName?: string;
 }) {
@@ -107,7 +109,8 @@ export function EditableText({
         }
       }}
       className={cn(
-        "w-full bg-transparent border-0 p-0 m-0 focus:outline-none cursor-text",
+        fullWidth ? "w-full" : "w-fit max-w-full",
+        "bg-transparent border-0 p-0 m-0 focus:outline-none cursor-text",
         "whitespace-pre-wrap break-words",
         textClassName,
         className,

@@ -43,27 +43,29 @@ function KanbanCard({
       >
         {titleViewTransitionName ? (
           <div className="text-sand-900 min-w-0">
-            <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
+            <div className="inline-flex items-center gap-1.5 text-[10px] leading-none uppercase tracking-wider text-sand-500 mb-1">
               <LucideIcon name={statusIcon} className="h-3 w-3" />
-              <span>{item.id}</span>
+              <span className="leading-none">{item.id}</span>
             </div>
             <ViewTransition name={titleViewTransitionName} share={titleViewTransitionName}>
               <EditableText
                 value={item.title}
                 onSave={onSaveTitle}
+                fullWidth={false}
                 textClassName="text-sm leading-snug font-medium text-sand-900"
               />
             </ViewTransition>
           </div>
         ) : (
           <div className="text-sand-900 min-w-0">
-            <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
+            <div className="inline-flex items-center gap-1.5 text-[10px] leading-none uppercase tracking-wider text-sand-500 mb-1">
               <LucideIcon name={statusIcon} className="h-3 w-3" />
-              <span>{item.id}</span>
+              <span className="leading-none">{item.id}</span>
             </div>
             <EditableText
               value={item.title}
               onSave={onSaveTitle}
+              fullWidth={false}
               textClassName="text-sm leading-snug font-medium text-sand-900"
             />
           </div>

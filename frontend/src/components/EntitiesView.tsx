@@ -59,7 +59,7 @@ export function EntitiesView() {
   }
 
   return (
-    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
       {allEntities.map(({ entity, device }) => (
         <EntityCard
           key={`${device.id}:${entity.key}`}

@@ -144,43 +144,7 @@ pnpm dev:frontend # frontend only
 
 ### Tunnel deployment with origin HTTPS
 
-The tunnel overlay (`docker-compose.tunnel.yml`) runs:
-
-- `caddy` as the local HTTPS terminator
-- `cloudflared` as an outbound-only tunnel connector
-
-Traffic flow is:
-
-`Cloudflare Edge -> cloudflared -> https://caddy:443 -> server:3111`
-
-Setup:
-
-1. Add these values to `.env`:
-
-```env
-TUNNEL_HOSTNAME=home.example.com
-TUNNEL_ID=ad874a13-abcd-469b-90f4-6079e2417632
-TUNNEL_CREDENTIALS_FILE=./infra/tunnel/cloudflared/credentials.json
-CF_DNS_API_TOKEN=...
-```
-
-2. Add the named tunnel credentials JSON at the path configured in `TUNNEL_CREDENTIALS_FILE` (default shown above).
-3. The tunnel config is generated at container start from `infra/tunnel/cloudflared/config.template.yml` using `TUNNEL_HOSTNAME` and `TUNNEL_ID`.
-4. Ensure your tunnel has a DNS route for that hostname (for example via `cloudflared tunnel route dns <tunnel-name> <hostname>`).
-5. Start with tunnel overlay:
-
-```bash
-make up-tunnel BUILD=1
-```
-
-6. Check logs:
-
-```bash
-make logs-tunnel
-```
-
-The `CF_DNS_API_TOKEN` should be scoped with least privilege (Zone DNS edit only for the relevant zone).
-The tunnel credentials JSON should be treated as a secret and kept out of git.
+See [`infra/tunnel/README.md`](infra/tunnel/README.md) for full setup, including fresh named tunnel creation, credential handling, DNS routing, and verification.
 
 ### 5. Pair Zigbee devices
 

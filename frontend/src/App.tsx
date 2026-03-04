@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, type ComponentType } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useLocation, useNavigate, Routes, Route, Navigate, Link } from "react-router-dom";
 import { useRealtimeUpdates, useAuthCheck, useLogout } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
@@ -10,28 +10,10 @@ import { ListsView } from "./components/lists/ListsView.js";
 import { DebugView } from "./components/DebugView.js";
 import { ChatPane } from "./components/ChatPane.js";
 import { LoginPage } from "./components/LoginPage.js";
-import {
-  Boxes,
-  LampDesk,
-  ListChecks,
-  MessageSquare,
-  Bot,
-  LogOut,
-  Plug,
-} from "lucide-react";
-import { Logo } from "./components/Logo.js";
-
-const DESKTOP_TABS = ["entities", "devices", "automations", "room", "lists"] as const;
-const MOBILE_TABS = [...DESKTOP_TABS, "chat"] as const;
-type Tab = (typeof MOBILE_TABS)[number];
-const TAB_META: Record<Tab, { label: string; Icon: ComponentType<{ className?: string }> }> = {
-  entities: { label: "Entities", Icon: Boxes },
-  devices: { label: "Devices", Icon: Plug },
-  automations: { label: "Automations", Icon: Bot },
-  room: { label: "Room", Icon: LampDesk },
-  lists: { label: "Lists", Icon: ListChecks },
-  chat: { label: "Chat", Icon: MessageSquare },
-};
+import { AppTopHeader } from "./components/navigation/AppTopHeader.js";
+import { DesktopSidebar } from "./components/navigation/DesktopSidebar.js";
+import { MobileTabBar } from "./components/navigation/MobileTabBar.js";
+import { getActiveTab } from "./components/navigation/appTabs.js";
 
 const MIN_CHAT_WIDTH = 300;
 const MAX_CHAT_WIDTH = 700;
@@ -68,7 +50,7 @@ function AuthenticatedApp({ showLogout }: { showLogout: boolean }) {
 function MainLayout({ showLogout }: { showLogout: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const tab = (MOBILE_TABS.find((t) => location.pathname === `/${t}` || location.pathname.startsWith(`/${t}/`)) ?? "entities") as Tab;
+  const activeTab = getActiveTab(location.pathname);
   const logout = useLogout();
   const [chatOpen, setChatOpen] = useState(
     () => window.matchMedia("(min-width: 768px)").matches,
@@ -104,56 +86,14 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
 
   return (
     <div className="h-screen flex bg-sand-100 md:bg-sand-50">
-      <aside className="hidden md:flex w-56 shrink-0 border-r border-sand-300 bg-blood-300/80 backdrop-blur-lg p-4 flex-col gap-4">
-        <div className="px-1">
-          <Logo />
-        </div>
-        <nav className="flex flex-col gap-1 bg-blood-400/60 rounded-lg p-1">
-          {DESKTOP_TABS.map((t) => {
-            const { Icon, label } = TAB_META[t];
-            return (
-              <button
-                key={t}
-                onClick={() => navigate(`/${t}`)}
-                className={`w-full text-left px-3 py-2 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                  tab === t
-                    ? "bg-sand-50/90 text-blood-600"
-                    : "text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
-                }`}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{label}</span>
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-        <div className="mt-auto flex items-center gap-2">
-          <button
-            onClick={() => setChatOpen(!chatOpen)}
-            className={`h-9 w-9 inline-flex items-center justify-center rounded-lg transition-all cursor-pointer ${
-              chatOpen
-                ? "bg-teal-400 text-teal-900"
-                : "bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80"
-            }`}
-            title={chatOpen ? "Close AI chat" : "Open AI chat"}
-            aria-label={chatOpen ? "Close AI chat" : "Open AI chat"}
-          >
-            <MessageSquare className="h-4 w-4" />
-          </button>
-          {showLogout && (
-            <button
-              onClick={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
-              title="Sign out"
-              aria-label="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </aside>
+      <DesktopSidebar
+        activeTab={activeTab}
+        showLogout={showLogout}
+        chatOpen={chatOpen}
+        onNavigate={(tab) => navigate(`/${tab}`)}
+        onToggleChat={() => setChatOpen(!chatOpen)}
+        onLogout={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+      />
 
       <div className="flex-1 min-w-0 flex">
         <div className="flex-1 min-w-0 overflow-hidden pb-14 md:pb-0">
@@ -192,29 +132,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
         )}
       </div>
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-sand-300 bg-sand-100/95 backdrop-blur px-2 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1">
-        <div className="grid grid-cols-6 gap-1">
-          {MOBILE_TABS.map((t) => {
-            const { Icon, label } = TAB_META[t];
-            return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => navigate(`/${t}`)}
-                className={`h-10 rounded-md inline-flex items-center justify-center transition-colors cursor-pointer ${
-                  tab === t
-                    ? "bg-blood-100 text-blood-700"
-                    : "text-sand-600 hover:bg-sand-200"
-                }`}
-                title={label}
-                aria-label={label}
-              >
-                <Icon className="h-4 w-4" />
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <MobileTabBar activeTab={activeTab} onNavigate={(tab) => navigate(`/${tab}`)} />
     </div>
   );
 }
@@ -225,38 +143,11 @@ function DebugLayout({ showLogout }: { showLogout: boolean }) {
 
   return (
     <div className="h-screen flex flex-col bg-sand-100">
-      {/* Header */}
-      <header className="shrink-0 bg-blood-300/80 backdrop-blur-lg">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-end justify-between">
-          <Logo />
-
-          <div className="flex items-center gap-2">
-            <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
-              {DESKTOP_TABS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => navigate(`/${t}`)}
-                  className="px-3.5 py-1.5 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
-                >
-                  {t}
-                </button>
-              ))}
-            </nav>
-
-            {showLogout && (
-              <button
-                onClick={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
-                className="p-2 rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
-                title="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Content */}
+      <AppTopHeader
+        showLogout={showLogout}
+        onNavigate={(tab) => navigate(`/${tab}`)}
+        onLogout={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+      />
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <DebugView />
@@ -284,35 +175,11 @@ function NotFoundPage({ showLogout }: { showLogout: boolean }) {
 
   return (
     <div className="h-screen flex flex-col bg-sand-100">
-      <header className="shrink-0 bg-blood-300/80 backdrop-blur-lg">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-end justify-between">
-          <Logo />
-
-          <div className="flex items-center gap-2">
-            <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
-              {DESKTOP_TABS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => navigate(`/${t}`)}
-                  className="px-3.5 py-1.5 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
-                >
-                  {t}
-                </button>
-              ))}
-            </nav>
-
-            {showLogout && (
-              <button
-                onClick={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
-                className="p-2 rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
-                title="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+      <AppTopHeader
+        showLogout={showLogout}
+        onNavigate={(tab) => navigate(`/${tab}`)}
+        onLogout={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+      />
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-6 py-8">

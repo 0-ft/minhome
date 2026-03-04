@@ -1,5 +1,6 @@
 node_modules/
 dist/
+frontend/dev-dist/
 *.tsbuildinfo
 .venv/
 __pycache__/
@@ -12,4 +13,5 @@ data/z2m/
 data/server/debug.jsonl
 voice-recordings/
 data/
-infra/tunnel/cloudflared/credentials.json
+infra/tunnel/cert.pem
+infra/tunnel/cloudflared/*.json
