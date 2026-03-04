@@ -1,4 +1,4 @@
-import { MOBILE_TABS, TAB_META, type Tab } from "./appTabs.js";
+import { VISIBLE_MOBILE_TABS, TAB_META, type Tab } from "./appTabs.js";
 
 export function MobileTabBar({
   activeTab,
@@ -9,8 +9,8 @@ export function MobileTabBar({
 }) {
   return (
     <nav className="md:hidden shrink-0 border-t border-sand-300 bg-sand-100/95 backdrop-blur px-2 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1">
-      <div className="grid grid-cols-6 gap-1">
-        {MOBILE_TABS.map((tab) => {
+      <div className="grid grid-cols-5 gap-1">
+        {VISIBLE_MOBILE_TABS.map((tab) => {
           const { Icon, label } = TAB_META[tab];
           return (
             <button

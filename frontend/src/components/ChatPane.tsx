@@ -58,11 +58,10 @@ export function ChatPane({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  // Focus input on mount
+  // Focus once on mount; do not refocus after voice sessions.
   useEffect(() => {
-    if (isVoiceActive) return;
     inputRef.current?.focus();
-  }, [isVoiceActive]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

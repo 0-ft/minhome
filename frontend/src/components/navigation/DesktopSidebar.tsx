@@ -1,6 +1,6 @@
 import { LogOut, MessageSquare } from "lucide-react";
 import { Logo } from "../Logo.js";
-import { DESKTOP_TABS, TAB_META, type DesktopTab, type Tab } from "./appTabs.js";
+import { VISIBLE_DESKTOP_TABS, TAB_META, type DesktopTab, type Tab } from "./appTabs.js";
 
 export function DesktopSidebar({
   activeTab,
@@ -24,7 +24,7 @@ export function DesktopSidebar({
       </div>
 
       <nav className="flex flex-col gap-1 bg-blood-400/60 rounded-lg p-1">
-        {DESKTOP_TABS.map((tab) => {
+        {VISIBLE_DESKTOP_TABS.map((tab) => {
           const { Icon, label } = TAB_META[tab];
           return (
             <button

@@ -6,6 +6,8 @@ export const MOBILE_TABS = [...DESKTOP_TABS, "chat"] as const;
 
 export type DesktopTab = (typeof DESKTOP_TABS)[number];
 export type Tab = (typeof MOBILE_TABS)[number];
+export const VISIBLE_DESKTOP_TABS: readonly DesktopTab[] = DESKTOP_TABS.filter((tab) => tab !== "devices");
+export const VISIBLE_MOBILE_TABS: readonly Tab[] = MOBILE_TABS.filter((tab) => tab !== "devices");
 
 export const TAB_META: Record<Tab, { label: string; Icon: ComponentType<{ className?: string }> }> = {
   entities: { label: "Entities", Icon: Boxes },

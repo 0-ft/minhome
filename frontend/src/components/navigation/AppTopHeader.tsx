@@ -1,6 +1,6 @@
 import { LogOut } from "lucide-react";
 import { Logo } from "../Logo.js";
-import { DESKTOP_TABS, type DesktopTab } from "./appTabs.js";
+import { VISIBLE_DESKTOP_TABS, type DesktopTab } from "./appTabs.js";
 
 export function AppTopHeader({
   showLogout,
@@ -18,7 +18,7 @@ export function AppTopHeader({
 
         <div className="flex items-center gap-2">
           <nav className="flex gap-0.5 bg-blood-400/60 rounded-lg p-0.5">
-            {DESKTOP_TABS.map((tab) => (
+            {VISIBLE_DESKTOP_TABS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => onNavigate(tab)}
