@@ -90,7 +90,9 @@ export function createBrowserVoiceWSHandler(opts: { toolCtx: ToolContext }) {
             }));
           },
           onOutputAudioChunk: (pcm24: Buffer) => {
-            ws.send(pcm24);
+            const bytes = new Uint8Array(pcm24.byteLength);
+            bytes.set(pcm24);
+            ws.send(bytes.buffer);
           },
           onUserTranscript: (text: string) => {
             ws.send(JSON.stringify({ type: "user_transcript", text }));
