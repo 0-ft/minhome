@@ -148,7 +148,7 @@ export function ChatPane({
         onSubmit={handleSubmit}
         className="border-t border-sand-300 px-4 py-3 bg-sand-50"
       >
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-2 items-stretch">
           <textarea
             ref={inputRef}
             value={input}
@@ -163,7 +163,7 @@ export function ChatPane({
             <button
               type="button"
               onClick={stop}
-              className="shrink-0 p-2 rounded-lg bg-blood-400 text-sand-50 hover:bg-blood-500 transition-colors cursor-pointer"
+              className="shrink-0 px-2 rounded-lg bg-blood-400 text-sand-50 hover:bg-blood-500 transition-colors cursor-pointer inline-flex items-center justify-center min-h-[36px]"
               title="Stop generating"
             >
               <X className="h-4 w-4" />
@@ -172,7 +172,7 @@ export function ChatPane({
             <button
               type="submit"
               disabled={!input.trim() || !activeChatId}
-              className="shrink-0 p-2 rounded-lg bg-teal-400 text-teal-900 hover:bg-teal-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="shrink-0 px-2 rounded-lg bg-blood-200 text-blood-700 hover:bg-blood-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center min-h-[36px]"
               title="Send message"
             >
               <Send className="h-4 w-4" />

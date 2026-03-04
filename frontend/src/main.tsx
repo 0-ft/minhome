@@ -10,10 +10,31 @@ import "@fontsource/space-mono/400.css";
 import "@fontsource/space-mono/700.css";
 import "./index.css";
 
+async function refreshDevPwaState() {
+  if (!import.meta.env.DEV || !("serviceWorker" in navigator)) return;
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.update()));
+
+    if ("caches" in window) {
+      const cacheKeys = await caches.keys();
+      await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+    }
+  } catch (error) {
+    console.warn("[pwa] Dev refresh failed", error);
+  }
+}
+
+void refreshDevPwaState();
+
 registerSW({
   immediate: true,
   onNeedRefresh() {
     window.location.reload();
+  },
+  onRegisteredSW(_swUrl, registration) {
+    if (!import.meta.env.DEV) return;
+    void registration?.update();
   },
 });
 
