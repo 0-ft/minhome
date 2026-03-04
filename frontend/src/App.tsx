@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useLocation, useNavigate, Routes, Route, Navigate, Link } from "react-router-dom";
-import { useRealtimeUpdates, useAuthCheck, useLogout } from "./api.js";
+import { useRealtimeUpdates, useAuthCheck, useLogout, useConfig } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
 import { EntitiesView } from "./components/EntitiesView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
@@ -14,6 +14,7 @@ import { AppTopHeader } from "./components/navigation/AppTopHeader.js";
 import { DesktopSidebar } from "./components/navigation/DesktopSidebar.js";
 import { MobileTabBar } from "./components/navigation/MobileTabBar.js";
 import { getActiveTab } from "./components/navigation/appTabs.js";
+import { useBrowserVoiceWs } from "./components/chat/useBrowserVoiceWs.js";
 
 const MIN_CHAT_WIDTH = 300;
 const MAX_CHAT_WIDTH = 700;
@@ -52,6 +53,9 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
   const navigate = useNavigate();
   const activeTab = getActiveTab(location.pathname);
   const logout = useLogout();
+  const { data: config } = useConfig();
+  const configuredVoiceChatId = String(config?.voice?.chat_id ?? "").trim() || null;
+  const mobileVoice = useBrowserVoiceWs(configuredVoiceChatId);
   const [chatOpen, setChatOpen] = useState(
     () => window.matchMedia("(min-width: 768px)").matches,
   );
@@ -132,7 +136,15 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
         )}
       </div>
 
-      <MobileTabBar activeTab={activeTab} onNavigate={(tab) => navigate(`/${tab}`)} />
+      <MobileTabBar
+        activeTab={activeTab}
+        onNavigate={(tab) => navigate(`/${tab}`)}
+        chatVoiceStatus={mobileVoice.status}
+        chatVoiceIsActive={mobileVoice.isActive}
+        chatVoiceCanStart={Boolean(configuredVoiceChatId)}
+        onChatVoiceStart={mobileVoice.start}
+        onChatVoiceStop={mobileVoice.stop}
+      />
     </div>
   );
 }
