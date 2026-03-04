@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Send, X, Loader2, History } from "lucide-react";
+import { Send, X, Loader2, History, Mic } from "lucide-react";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
 import { useDeleteChat } from "../api.js";
 import { ChatHistoryModal } from "./ChatHistoryModal.js";
 import { ConfirmDialog } from "./ui/ConfirmDialog.js";
 import { usePersistedChatController } from "./chat/usePersistedChatController.js";
+import { useBrowserVoiceWebRtc } from "./chat/useBrowserVoiceWebRtc.js";
 import { buildChatRenderItems } from "./chat/chatRenderItems.js";
 import { ToolCallGroup } from "./chat/ToolCallGroup.js";
 
@@ -46,8 +47,10 @@ export function ChatPane({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const renderItems = useMemo(() => buildChatRenderItems(messages), [messages]);
+  const voice = useBrowserVoiceWebRtc(activeChatId);
 
   const isLoading = status === "submitted" || status === "streaming";
+  const isVoiceActive = voice.isActive;
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -57,13 +60,14 @@ export function ChatPane({
 
   // Focus input on mount
   useEffect(() => {
+    if (isVoiceActive) return;
     inputRef.current?.focus();
-  }, []);
+  }, [isVoiceActive]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || isLoading || !activeChatId) return;
+    if (!text || isLoading || !activeChatId || isVoiceActive) return;
     sendMessage({ text });
     setInput("");
   };
@@ -159,6 +163,40 @@ export function ChatPane({
             className="flex-1 resize-none rounded-lg bg-sand-200 px-3 py-2 text-sm text-sand-900 placeholder:text-sand-500 focus:outline-none focus:bg-sand-100 transition-colors min-h-[36px] max-h-[120px]"
             style={{ fieldSizing: "content" } as React.CSSProperties}
           />
+          <button
+            type="button"
+            onClick={() => {
+              if (isVoiceActive) {
+                void voice.stop();
+              } else {
+                void voice.start();
+              }
+            }}
+            disabled={!activeChatId || isLoading}
+            className={`shrink-0 px-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center min-h-[36px] ${
+              voice.status === "connecting"
+                ? "bg-blood-100 text-blood-600"
+                : isVoiceActive
+                  ? "bg-blood-400 text-sand-50"
+                  : "bg-sand-300 text-sand-700 hover:bg-sand-200"
+            }`}
+            style={{
+              transform:
+                voice.status === "connecting"
+                  ? "scale(1.08)"
+                  : isVoiceActive
+                    ? "scale(1.14)"
+                    : "scale(1)",
+              transition: "transform 220ms ease, background-color 220ms ease, color 220ms ease",
+            }}
+            title={isVoiceActive ? "Stop voice session" : "Start voice"}
+          >
+            {voice.status === "connecting" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Mic className={`h-4 w-4 ${isVoiceActive ? "animate-pulse" : ""}`} />
+            )}
+          </button>
           {isLoading ? (
             <button
               type="button"
@@ -180,6 +218,15 @@ export function ChatPane({
           )}
         </div>
       </form>
+
+      {(voice.status !== "idle" || voice.error) && (
+        <div className="border-t border-sand-300 px-4 py-2 bg-sand-100 text-xs font-mono text-sand-600">
+          <p>
+            voice: {voice.status}
+            {voice.error ? ` - ${voice.error}` : ""}
+          </p>
+        </div>
+      )}
 
       <ChatHistoryModal
         open={historyOpen}

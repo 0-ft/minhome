@@ -409,4 +409,5 @@ input[type="range"].color-track::-moz-range-track {
   ::view-transition-new(.list-status-share) {
     animation-duration: 1ms;
   }
+
 }

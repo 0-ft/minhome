@@ -9,6 +9,7 @@ const hmrClientPort = process.env.VITE_HMR_CLIENT_PORT
   ? parseInt(process.env.VITE_HMR_CLIENT_PORT, 10)
   : undefined;
 const hmrProtocol = process.env.VITE_HMR_PROTOCOL as "ws" | "wss" | undefined;
+const hmrPath = process.env.VITE_HMR_PATH;
 
 export default defineConfig({
   plugins: [
@@ -79,11 +80,12 @@ export default defineConfig({
     port: 5173,
     allowedHosts: true,
     hmr:
-      hmrHost || hmrClientPort || hmrProtocol
+      hmrHost || hmrClientPort || hmrProtocol || hmrPath
         ? {
             host: hmrHost,
             clientPort: hmrClientPort,
             protocol: hmrProtocol,
+            path: hmrPath,
           }
         : undefined,
     proxy: {

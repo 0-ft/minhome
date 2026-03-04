@@ -162,7 +162,7 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
                 },
               };
 
-              const session = new RealtimeSession(sessionId, chatId, deviceId, callbacks, opts.toolCtx);
+              const session = new RealtimeSession(sessionId, chatId, "voice", deviceId, callbacks, opts.toolCtx);
               sessions.set(deviceId, session);
 
               // Register the audio stream for HTTP serving

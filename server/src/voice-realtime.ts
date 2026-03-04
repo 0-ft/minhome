@@ -67,6 +67,11 @@ export interface RealtimeCallbacks {
   onVoiceDone: () => void;
   /** Error occurred — code is a short identifier for the device (e.g. "rate-limit") */
   onError: (err: Error, code?: string) => void;
+  /** Optional tap for raw 24kHz output PCM chunks (for browser playback transport). */
+  onOutputAudioChunk?: (pcm24: Buffer) => void;
+  /** Optional transcript taps for live browser UI/debug usage. */
+  onUserTranscript?: (text: string) => void;
+  onAssistantTranscript?: (text: string) => void;
 }
 
 // ── RealtimeSession ──────────────────────────────────────────
@@ -74,6 +79,7 @@ export interface RealtimeCallbacks {
 export class RealtimeSession {
   readonly sessionId: string;
   readonly chatId: string;
+  readonly chatSource: "text" | "voice";
   readonly deviceId: string;
   readonly audioStream: ReadableStream<Uint8Array>;
 
@@ -82,6 +88,7 @@ export class RealtimeSession {
   private headerSent = false;
   private closed = false;
   private connected = false;
+  private socketOpened = false;
   private pendingAudio: Buffer[] = [];
   private callbacks: RealtimeCallbacks;
   private toolCtx: ToolContext;
@@ -91,12 +98,14 @@ export class RealtimeSession {
   constructor(
     sessionId: string,
     chatId: string,
+    chatSource: "text" | "voice",
     deviceId: string,
     callbacks: RealtimeCallbacks,
     toolCtx: ToolContext,
   ) {
     this.sessionId = sessionId;
     this.chatId = chatId;
+    this.chatSource = chatSource;
     this.deviceId = deviceId;
     this.callbacks = callbacks;
     this.toolCtx = toolCtx;
@@ -143,12 +152,18 @@ export class RealtimeSession {
       { model },
       { apiKey, baseURL: "https://api.openai.com/v1" },
     );
+    // Guard against unhandled SDK error emissions during early cancellation
+    // before bindEvents() installs the full runtime handler.
+    this.rt.on("error", (_err) => {
+      if (this.closed) return;
+    });
 
     // Wait for connection
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error("Realtime WS connection timeout")), 10_000);
       this.rt!.socket.addEventListener("open", () => {
         clearTimeout(timeout);
+        this.socketOpened = true;
         resolve();
       });
       this.rt!.socket.addEventListener("error", (e) => {
@@ -156,6 +171,16 @@ export class RealtimeSession {
         reject(new Error(`Realtime WS error: ${e}`));
       });
     });
+
+    if (this.closed) {
+      // Session was cancelled while the realtime socket was connecting.
+      // Avoid closing pre-open sockets here; when open did occur, close cleanly.
+      if (this.rt && this.socketOpened) {
+        try { this.rt.close(); } catch { /* ignore */ }
+      }
+      this.rt = null;
+      return;
+    }
 
     this.configureSession();
     this.bindEvents();
@@ -200,7 +225,11 @@ export class RealtimeSession {
     this.flushAudioCapture("close");
 
     try { this.audioController?.close(); } catch { /* already closed */ }
-    try { this.rt?.close(); } catch { /* ignore */ }
+    // OpenAI realtime SDK can throw when closing before websocket open.
+    // Treat early user disconnect as cancellation and skip pre-open close.
+    if (this.rt && this.connected) {
+      try { this.rt.close(); } catch { /* ignore */ }
+    }
     this.rt = null;
   }
 
@@ -364,6 +393,7 @@ export class RealtimeSession {
       debugLog.add("voice_transcript", `User: "${e.transcript}"`, { sessionId: this.sessionId, role: "user", transcript: e.transcript });
       const transcript = typeof e.transcript === "string" ? e.transcript.trim() : "";
       if (transcript) {
+        this.callbacks.onUserTranscript?.(transcript);
         this.appendChatMessage({
           role: "user",
           parts: [{ type: "text", text: transcript }],
@@ -391,6 +421,7 @@ export class RealtimeSession {
         debugLog.add("voice_transcript", `Assistant: "${e.transcript}"`, { sessionId: this.sessionId, role: "assistant", transcript: e.transcript });
         const transcript = e.transcript.trim();
         if (transcript) {
+          this.callbacks.onAssistantTranscript?.(transcript);
           this.appendChatMessage({
             role: "assistant",
             parts: [{ type: "text", text: transcript }],
@@ -425,6 +456,7 @@ export class RealtimeSession {
     if (this.closed || !this.audioController) return;
 
     const pcm24 = Buffer.from(base64Delta, "base64");
+    this.callbacks.onOutputAudioChunk?.(pcm24);
     const pcm48 = resample24to48(pcm24);
 
     try {
@@ -552,7 +584,7 @@ export class RealtimeSession {
   private appendChatMessage(message: Pick<UIMessage, "role" | "parts">): void {
     this.toolCtx.chats.appendMessage({
       id: this.chatId,
-      source: "voice",
+      source: this.chatSource,
       message: {
         id: `msg-${randomUUID()}`,
         role: message.role,

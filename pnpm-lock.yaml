@@ -162,6 +162,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.26.0
         version: 1.26.0(zod@4.3.6)
+      '@roamhq/wrtc':
+        specifier: ^0.9.1
+        version: 0.9.1
       '@takumi-rs/image-response':
         specifier: ^0.70.3
         version: 0.70.3
@@ -1212,6 +1215,34 @@ packages:
         optional: true
       react-native:
         optional: true
+
+  '@roamhq/wrtc-darwin-arm64@0.9.1':
+    resolution: {integrity: sha512-+g0+nLeZrsAeuzD663y9wbkRns8s/u5nMt/swiUa0G0mQaIRc7zSe77gRGd3E4lMgQ2VyUMV607SCM1OjVdmyg==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@roamhq/wrtc-darwin-x64@0.9.1':
+    resolution: {integrity: sha512-W24zSe9s6c9Tu1owP8RHg7xqW/JRMl6TRAf8pLWGgXuIeI79jVx1A9MvKTlwLM4AAZmWY0rMHYOzJg6aTb+qkQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@roamhq/wrtc-linux-arm64@0.9.1':
+    resolution: {integrity: sha512-PeXkYGNcojjXvpHbI+R/YIUUkTWVrFaS5iQD55iGYbGBcBzU23wzpK0x/TvCQ0Ok4gimK985tgHKimbsVrs2Yw==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@roamhq/wrtc-linux-x64@0.9.1':
+    resolution: {integrity: sha512-LuhzPdMM3i8vs/ifdj1F1pjpX2OhJSCWdh03UQXjRHoX+Fi1oJXiZRwKoVKu1BbsKCYfJ8m9jZB1ZU4Lhi8yHw==}
+    cpu: [x64]
+    os: [linux]
+
+  '@roamhq/wrtc-win32-x64@0.9.1':
+    resolution: {integrity: sha512-xyxqCpHxp71MY/3LaFTj3WDvOnu8GaDht1M0LAIGamwkQUg45X/zkzbfeIS7g8f/ZvItAjFa6cUkSUuhK3/rGg==}
+    cpu: [x64]
+    os: [win32]
+
+  '@roamhq/wrtc@0.9.1':
+    resolution: {integrity: sha512-WQH9DaN3kGv9+wxeRtxkSykmVQWl44VTX9XsMLmR5jtcsGxin+72U9uGlDjME0gwNNBHDKY3CgUGYI8ZYg8Jdw==}
 
   '@rolldown/pluginutils@1.0.0-rc.2':
     resolution: {integrity: sha512-izyXV/v+cHiRfozX62W9htOAvwMo4/bXKDrQ+vom1L1qRuexPock/7VZDAhnpHCLNejd3NJ6hiab+tO0D44Rgw==}
@@ -2367,6 +2398,11 @@ packages:
 
   devlop@1.1.0:
     resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
+
+  domexception@4.0.0:
+    resolution: {integrity: sha512-A2is4PLG+eeSfoTMA95/s4pvAoSo2mKtiM5jlHkAVewmiO8ISFTFKZjH7UAM1Atli/OT/7JHOrJRJiMKUZKYBw==}
+    engines: {node: '>=12'}
+    deprecated: Use your platform's native DOMException instead
 
   dompurify@3.3.1:
     resolution: {integrity: sha512-qkdCKzLNtrgPFP1Vo+98FRzJnBRGe4ffyCea9IwHB1fyxPOeNTHpLKYGd4Uk9xvNoH0ZoOjwZxNptyMwqrId1Q==}
@@ -4181,6 +4217,10 @@ packages:
   webidl-conversions@4.0.2:
     resolution: {integrity: sha512-YQ+BmxuTgd6UXZW3+ICGfyqRyHXVlD5GtQr5+qjiNW7bF0cqrzX500HVXPBOvgXb5YnzDd+h0zqyv61KUD7+Sg==}
 
+  webidl-conversions@7.0.0:
+    resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
+    engines: {node: '>=12'}
+
   whatwg-url@7.1.0:
     resolution: {integrity: sha512-WUu7Rg1DroM7oQvGWfOiAK21n74Gg+T4elXEQYkOhtyLeWiJFoOGLXPKI/9gzIie9CtwVLm8wtw6YJdKyxSjeg==}
 
@@ -5412,6 +5452,30 @@ snapshots:
       - '@types/react'
       - immer
 
+  '@roamhq/wrtc-darwin-arm64@0.9.1':
+    optional: true
+
+  '@roamhq/wrtc-darwin-x64@0.9.1':
+    optional: true
+
+  '@roamhq/wrtc-linux-arm64@0.9.1':
+    optional: true
+
+  '@roamhq/wrtc-linux-x64@0.9.1':
+    optional: true
+
+  '@roamhq/wrtc-win32-x64@0.9.1':
+    optional: true
+
+  '@roamhq/wrtc@0.9.1':
+    optionalDependencies:
+      '@roamhq/wrtc-darwin-arm64': 0.9.1
+      '@roamhq/wrtc-darwin-x64': 0.9.1
+      '@roamhq/wrtc-linux-arm64': 0.9.1
+      '@roamhq/wrtc-linux-x64': 0.9.1
+      '@roamhq/wrtc-win32-x64': 0.9.1
+      domexception: 4.0.0
+
   '@rolldown/pluginutils@1.0.0-rc.2': {}
 
   '@rollup/plugin-babel@5.3.1(@babel/core@7.29.0)(rollup@2.80.0)':
@@ -6476,6 +6540,11 @@ snapshots:
   devlop@1.1.0:
     dependencies:
       dequal: 2.0.3
+
+  domexception@4.0.0:
+    dependencies:
+      webidl-conversions: 7.0.0
+    optional: true
 
   dompurify@3.3.1:
     optionalDependencies:
@@ -8711,6 +8780,9 @@ snapshots:
   webgl-sdf-generator@1.1.1: {}
 
   webidl-conversions@4.0.2: {}
+
+  webidl-conversions@7.0.0:
+    optional: true
 
   whatwg-url@7.1.0:
     dependencies:
