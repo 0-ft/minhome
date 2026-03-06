@@ -1,4 +1,4 @@
-.PHONY: up up-tunnel up-dev up-dev-tunnel up-hybrid up-hybrid-tunnel down down-tunnel down-dev down-dev-tunnel down-hybrid down-hybrid-tunnel logs logs-tunnel logs-dev logs-dev-tunnel logs-hybrid logs-hybrid-tunnel reload reload-bridge logs-bridge
+.PHONY: up up-tunnel up-dev up-dev-tunnel up-hybrid up-hybrid-tunnel down down-tunnel down-dev down-dev-tunnel down-hybrid down-hybrid-tunnel logs logs-tunnel logs-dev logs-dev-tunnel logs-hybrid logs-hybrid-tunnel reload reload-bridge logs-bridge tunnel-setup
 
 up:
 	docker compose up -d $(if $(BUILD),--build)
@@ -63,4 +63,6 @@ reload-bridge:
 logs-bridge:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f voice-bridge
 
+tunnel-setup:
+	bash infra/tunnel/setup.sh
 

@@ -29,7 +29,7 @@ services:
         exec cloudflared --no-autoupdate tunnel --config /tmp/config.yml run
     volumes:
       - ./infra/tunnel/cloudflared/config.template.yml:/etc/cloudflared/config.template.yml:ro
-      - ${TUNNEL_CREDENTIALS_FILE}:/etc/cloudflared/credentials.json:ro
+      - ./data/tunnel/credentials.json:/etc/cloudflared/credentials.json:ro
     environment:
       - TUNNEL_HOSTNAME=${TUNNEL_HOSTNAME}
       - TUNNEL_ID=${TUNNEL_ID}

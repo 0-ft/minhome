@@ -144,7 +144,20 @@ pnpm dev:frontend # frontend only
 
 ### Tunnel deployment with origin HTTPS
 
-See [`infra/tunnel/README.md`](infra/tunnel/README.md) for full setup, including fresh named tunnel creation, credential handling, DNS routing, and verification.
+Run the interactive setup script once (requires Docker):
+
+```bash
+make tunnel-setup
+```
+
+Then start the tunnel stack:
+
+```bash
+make up-tunnel BUILD=1       # production
+make up-dev-tunnel BUILD=1   # development (with Vite HMR over wss)
+```
+
+See [`infra/tunnel/README.md`](infra/tunnel/README.md) for full details, manual steps, and troubleshooting.
 
 ### 5. Pair Zigbee devices
 
@@ -216,8 +229,7 @@ Stores automation rules. All triggers, conditions, and actions that reference de
 | `AI_MODEL` | `gpt-4o` | Model identifier |
 | `MINHOME_URL` | `http://localhost:3111` | Server URL (used by CLI and MCP server) |
 | `TUNNEL_HOSTNAME` | _(none)_ | Public hostname Caddy should obtain a certificate for |
-| `TUNNEL_ID` | _(none)_ | Named Cloudflare tunnel UUID for locally-managed tunnel mode |
-| `TUNNEL_CREDENTIALS_FILE` | _(none)_ | Host path to named tunnel credentials JSON mounted into `cloudflared` |
+| `TUNNEL_ID` | _(none)_ | Named Cloudflare tunnel UUID |
 | `CF_DNS_API_TOKEN` | _(none)_ | Cloudflare API token used by Caddy for DNS-01 challenges |
 
 ## Docker Compose Services

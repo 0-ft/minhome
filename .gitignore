@@ -13,5 +13,3 @@ data/z2m/
 data/server/debug.jsonl
 voice-recordings/
 data/
-infra/tunnel/cert.pem
-infra/tunnel/cloudflared/*.json
