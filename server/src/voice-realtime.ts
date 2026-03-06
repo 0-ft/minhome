@@ -94,6 +94,13 @@ export class RealtimeSession {
   private toolCtx: ToolContext;
   private audioCapture: VoiceAudioCapture | null = null;
   private audioCaptureFlushed = false;
+  private configReadyTimer: ReturnType<typeof setTimeout> | null = null;
+  private speechStoppedTimer: ReturnType<typeof setTimeout> | null = null;
+  private responseInFlight = false;
+
+  private static readonly OPEN_TIMEOUT_MS = 10_000;
+  private static readonly CONFIG_READY_TIMEOUT_MS = 15_000;
+  private static readonly SPEECH_STOP_TIMEOUT_MS = 60_000;
 
   constructor(
     sessionId: string,
@@ -152,15 +159,15 @@ export class RealtimeSession {
       { model },
       { apiKey, baseURL: "https://api.openai.com/v1" },
     );
-    // Guard against unhandled SDK error emissions during early cancellation
-    // before bindEvents() installs the full runtime handler.
-    this.rt.on("error", (_err) => {
-      if (this.closed) return;
-    });
+    // Bind runtime handlers immediately so early setup errors are surfaced.
+    this.bindEvents();
 
     // Wait for connection
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Realtime WS connection timeout")), 10_000);
+      const timeout = setTimeout(
+        () => reject(new Error("Realtime WS connection timeout")),
+        RealtimeSession.OPEN_TIMEOUT_MS,
+      );
       this.rt!.socket.addEventListener("open", () => {
         clearTimeout(timeout);
         this.socketOpened = true;
@@ -183,7 +190,6 @@ export class RealtimeSession {
     }
 
     this.configureSession();
-    this.bindEvents();
   }
 
   /** Feed incoming 24kHz PCM audio from the bridge. */
@@ -222,6 +228,7 @@ export class RealtimeSession {
     if (this.closed) return;
     this.closed = true;
     console.log(`[realtime] Closing session ${this.sessionId}`);
+    this.clearTimers();
     this.flushAudioCapture("close");
 
     try { this.audioController?.close(); } catch { /* already closed */ }
@@ -282,6 +289,14 @@ export class RealtimeSession {
         tool_choice: "auto",
       },
     });
+    this.configReadyTimer = setTimeout(() => {
+      if (this.closed || this.connected) return;
+      this.callbacks.onError(
+        new Error("Realtime session setup timed out before ready state"),
+        "session-config-timeout",
+      );
+      this.close();
+    }, RealtimeSession.CONFIG_READY_TIMEOUT_MS);
   }
 
   private static readonly MAX_HISTORY_MESSAGES = 50;
@@ -372,6 +387,7 @@ export class RealtimeSession {
     });
     this.rt.on("session.updated", (_e: any) => {
       console.log(`[realtime] Session configured, ready for audio`);
+      this.clearConfigReadyTimer();
       this.connected = true;
       this.injectChatHistory();
       this.flushPendingAudio();
@@ -380,9 +396,20 @@ export class RealtimeSession {
     // VAD — speech detection
     this.rt.on("input_audio_buffer.speech_started", (e) => {
       console.log(`[realtime] Speech started at ${e.audio_start_ms}ms`);
+      this.responseInFlight = true;
+      this.clearSpeechStoppedTimer();
+      this.speechStoppedTimer = setTimeout(() => {
+        if (this.closed || !this.responseInFlight) return;
+        this.callbacks.onError(
+          new Error("Speech did not reach end-of-turn; no speech_stopped event received"),
+          "speech-stop-timeout",
+        );
+        this.close();
+      }, RealtimeSession.SPEECH_STOP_TIMEOUT_MS);
     });
     this.rt.on("input_audio_buffer.speech_stopped", (e) => {
       console.log(`[realtime] Speech stopped at ${e.audio_end_ms}ms`);
+      this.clearSpeechStoppedTimer();
       debugLog.add("voice_speech", `Speech stopped at ${e.audio_end_ms}ms`, { sessionId: this.sessionId, audioEndMs: e.audio_end_ms });
       this.callbacks.onSpeechStopped();
     });
@@ -432,6 +459,8 @@ export class RealtimeSession {
 
     // Response completion (tool calls or final)
     this.rt.on("response.done", (e) => {
+      this.responseInFlight = false;
+      this.clearSpeechStoppedTimer();
       this.handleResponseDone(e);
     });
 
@@ -439,13 +468,14 @@ export class RealtimeSession {
     this.rt.on("error", (err) => {
       console.error("[realtime] Error:", err.message);
       debugLog.add("voice_error", `Voice error: ${err.message}`, { sessionId: this.sessionId, error: err.message });
-      const code = (err as any).error?.code ?? "realtime-error";
+      const code = normalizeRealtimeErrorCode((err as any).error?.code, err.message);
       this.callbacks.onError(new Error(err.message), code);
       this.close();
     });
 
     this.rt.socket.addEventListener("close", () => {
       console.log(`[realtime] WebSocket closed`);
+      this.clearTimers();
       if (!this.closed) {
         this.finalize();
       }
@@ -481,7 +511,7 @@ export class RealtimeSession {
     // Check for failed response (rate limit, quota, etc.)
     if (response.status === "failed") {
       const detail = response.status_details?.error;
-      const errCode = detail?.code ?? "unknown";
+      const errCode = normalizeRealtimeErrorCode(detail?.code, detail?.message);
       const errMsg = detail?.message ?? "Response failed";
       const errType = detail?.type ?? "unknown";
       console.error(`[realtime] Response FAILED (${errCode}): ${errMsg}`);
@@ -570,6 +600,7 @@ export class RealtimeSession {
 
   private finalize(): void {
     if (this.closed) return;
+    this.clearTimers();
 
     // Close the audio stream
     try { this.audioController?.close(); } catch { /* already closed */ }
@@ -579,6 +610,23 @@ export class RealtimeSession {
     debugLog.add("voice_session_end", `Voice session ended: ${this.sessionId}`, { sessionId: this.sessionId });
     this.callbacks.onVoiceDone();
     this.close();
+  }
+
+  private clearTimers(): void {
+    this.clearConfigReadyTimer();
+    this.clearSpeechStoppedTimer();
+  }
+
+  private clearConfigReadyTimer(): void {
+    if (!this.configReadyTimer) return;
+    clearTimeout(this.configReadyTimer);
+    this.configReadyTimer = null;
+  }
+
+  private clearSpeechStoppedTimer(): void {
+    if (!this.speechStoppedTimer) return;
+    clearTimeout(this.speechStoppedTimer);
+    this.speechStoppedTimer = null;
   }
 
   private appendChatMessage(message: Pick<UIMessage, "role" | "parts">): void {
@@ -650,4 +698,16 @@ function extractToolError(output: unknown): string | undefined {
   if (!output || typeof output !== "object") return undefined;
   const candidate = (output as { error?: unknown }).error;
   return typeof candidate === "string" ? candidate : undefined;
+}
+
+function normalizeRealtimeErrorCode(code: unknown, message: unknown): string {
+  if (typeof code === "string" && code.trim().length > 0) return code;
+  const msg = typeof message === "string" ? message.toLowerCase() : "";
+  if (msg.includes("insufficient_quota") || msg.includes("exceeded your current quota")) {
+    return "insufficient_quota";
+  }
+  if (msg.includes("rate limit") || msg.includes("rate_limit_exceeded")) {
+    return "rate_limit_exceeded";
+  }
+  return "realtime-error";
 }

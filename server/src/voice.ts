@@ -172,6 +172,12 @@ export function createVoiceWSHandler(opts: VoiceWSOptions) {
               session.open().catch((err) => {
                 console.error(`[voice] Failed to open Realtime session (device=${deviceId}):`, err);
                 bridgeWs?.send(JSON.stringify({
+                  type: "voice_error",
+                  device_id: deviceId,
+                  code: "realtime-open-failed",
+                  message: err instanceof Error ? err.message : String(err),
+                }));
+                bridgeWs?.send(JSON.stringify({
                   type: "voice_done",
                   device_id: deviceId,
                   conversation_id: sessionId,

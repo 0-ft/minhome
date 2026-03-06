@@ -50,9 +50,20 @@
 - [ ] Voice bridge to support announcement queue
 - [x] Proper chat steps processing
 - [ ] Configurable sysprompt instructions for persona/conciseness
-- [ ] HTTPS endpoint & e2ee tunnel
+- [x] HTTPS endpoint & e2ee tunnel
 - [ ] Push notifications
 - [ ] Undo action
-- [ ] List in display order to match list view
-- [ ] Remove monospacing
+- [x] List in display order to match list view
+- [x] Remove monospacing
 - [ ] Choose model in chat
+- [ ] auto generation of templates for all config files
+- [ ] better sliders/buttons especially for mobile
+- [ ] AI tools for scene saving/loading ?
+- [ ] production docker-compose from gh image and RPI image builder, config script for tunnel etc
+- [ ] proper auth
+- [ ] refactor bridge as uv dep-script ?
+- [ ] various list states (kanban vs list, which list active, collapsedness) should be browser local rather than config
+- [ ] shadcn-ify
+- [ ] cleanup
+- [ ] speak quicker
+- [ ] announcement tools blocking? general tool calls maybe should be blocking (in automations)?
