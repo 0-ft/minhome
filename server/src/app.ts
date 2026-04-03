@@ -51,7 +51,7 @@ export function createApp(
 
   const toolCtx: ToolContext = { bridge, config, chats, lists, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
 
-  // --- Auth (no-ops when AUTH_PASSWORD is unset) ---
+  // --- Auth (no-ops when AUTH_PASSWORD_HASH is unset) ---
   app.route("/", authRoutes());
   app.use("*", authMiddleware(tokens));
 

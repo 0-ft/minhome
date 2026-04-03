@@ -47,7 +47,7 @@ services:
       - AI_VOICE_MODEL=${AI_VOICE_MODEL:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_REALTIME_MODEL=${OPENAI_REALTIME_MODEL:-gpt-realtime}
-      - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - AUTH_PASSWORD_HASH=${AUTH_PASSWORD_HASH:-}
       - AUTH_SECRET=${AUTH_SECRET:-}
     depends_on:
       - mqtt

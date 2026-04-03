@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { sign, verify } from "hono/jwt";
-import { timingSafeEqual, randomBytes } from "crypto";
+import { compare } from "bcryptjs";
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import type { TokenStore } from "./config/tokens.js";
@@ -10,12 +11,12 @@ import type { TokenStore } from "./config/tokens.js";
 const COOKIE_NAME = "minhome_session";
 const TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days in seconds
 
-const AUTH_PASSWORD = process.env.AUTH_PASSWORD || "";
+const AUTH_PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH || "";
 const AUTH_SECRET =
   process.env.AUTH_SECRET || randomBytes(32).toString("hex");
 
-/** Whether auth is enabled (password is configured) */
-export const authEnabled = AUTH_PASSWORD.length > 0;
+/** Whether auth is enabled (password hash is configured) */
+export const authEnabled = AUTH_PASSWORD_HASH.length > 0;
 
 // ── Token helpers ────────────────────────────────────────
 
@@ -32,11 +33,8 @@ async function verifySessionToken(token: string): Promise<boolean> {
   }
 }
 
-function passwordMatches(input: string): boolean {
-  const a = Buffer.from(input);
-  const b = Buffer.from(AUTH_PASSWORD);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+async function passwordMatches(input: string): Promise<boolean> {
+  return compare(input, AUTH_PASSWORD_HASH);
 }
 
 export async function isSessionAuthenticated(cookieValue: string | undefined): Promise<boolean> {
@@ -108,7 +106,7 @@ export function authRoutes() {
       }
 
       const { password } = c.req.valid("json");
-      if (!passwordMatches(password)) {
+      if (!await passwordMatches(password)) {
         return c.json({ error: "Invalid password" }, 401);
       }
 
