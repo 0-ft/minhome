@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="widget_idle">#FF1E293B</color>
-    <color name="widget_active">#FF1B5E20</color>
+    <color name="voice_idle_bg">#FFE7D7C1</color>
+    <color name="voice_idle_fg">#FF8D7368</color>
+    <color name="voice_connecting_bg">#FFF9DBD8</color>
+    <color name="voice_connecting_fg">#FF8C1C13</color>
+    <color name="voice_listening_bg">#FFBF4342</color>
+    <color name="voice_listening_fg">#FFFEFCF9</color>
+    <color name="voice_responding_bg">#FFF0B0AC</color>
+    <color name="voice_responding_fg">#FF6E150F</color>
 </resources>

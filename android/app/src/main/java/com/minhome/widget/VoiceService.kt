@@ -30,8 +30,7 @@ class VoiceService : Service() {
             if (isRunning) {
                 context.stopService(Intent(context, VoiceService::class.java))
             } else {
-                val intent = Intent(context, VoiceService::class.java)
-                context.startForegroundService(intent)
+                context.startForegroundService(Intent(context, VoiceService::class.java))
             }
         }
     }
@@ -55,9 +54,9 @@ class VoiceService : Service() {
             return START_NOT_STICKY
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
+        startForeground(NOTIFICATION_ID, buildNotification("Connecting…"))
         isRunning = true
-        scope.launch { VoiceWidget.setActive(applicationContext, true) }
+        setWidgetStatus("connecting")
 
         val prefs = Prefs(this)
         if (!prefs.isLoggedIn) {
@@ -83,9 +82,14 @@ class VoiceService : Service() {
         isRunning = false
         val ctx = applicationContext
         scope.launch {
-            VoiceWidget.setActive(ctx, false)
+            VoiceWidget.setStatus(ctx, "idle")
         }.invokeOnCompletion { scope.cancel() }
         super.onDestroy()
+    }
+
+    private fun setWidgetStatus(status: String) {
+        val ctx = applicationContext
+        scope.launch { VoiceWidget.setStatus(ctx, status) }
     }
 
     private fun connectWebSocket(prefs: Prefs) {
@@ -110,11 +114,13 @@ class VoiceService : Service() {
                     when (msg.optString("type")) {
                         "voice_ready" -> {
                             Log.d(TAG, "Voice ready, starting mic")
-                            updateNotification("Listening...")
+                            updateNotification("Listening…")
+                            setWidgetStatus("listening")
                             startMicCapture()
                         }
                         "speech_stopped" -> {
-                            updateNotification("Responding...")
+                            updateNotification("Working…")
+                            setWidgetStatus("responding")
                         }
                         "voice_done" -> {
                             Log.d(TAG, "Voice done")

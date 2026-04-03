@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/voice_idle_bg">
-    <ImageView
-        android:id="@+id/widget_icon"
+    android:background="@color/voice_responding_bg"
+    android:gravity="center">
+    <ProgressBar
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="center"
-        android:src="@drawable/ic_mic"
-        android:tint="@color/voice_idle_fg"
-        android:contentDescription="@string/voice_widget_description" />
+        android:indeterminate="true"
+        android:indeterminateDrawable="@drawable/animated_dots"
+        style="?android:attr/progressBarStyle" />
 </FrameLayout>
