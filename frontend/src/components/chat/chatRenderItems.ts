@@ -13,6 +13,11 @@ export type ChatRenderItem
     kind: "toolGroup";
     id: string;
     tools: ToolPart[];
+  }
+  | {
+    kind: "extraInstructions";
+    id: string;
+    text: string;
   };
 
 export function buildChatRenderItems(messages: UIMessage[]): ChatRenderItem[] {
@@ -34,6 +39,14 @@ export function buildChatRenderItems(messages: UIMessage[]): ChatRenderItem[] {
   for (const message of messages) {
     if (message.role === "user") {
       flushTools();
+      const extra = (message as any).extraInstructions;
+      if (typeof extra === "string" && extra.trim()) {
+        items.push({
+          kind: "extraInstructions",
+          id: `${message.id}-extra`,
+          text: extra,
+        });
+      }
       const text = message.parts
         .filter((part) => part.type === "text")
         .map((part) => part.text)

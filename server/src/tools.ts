@@ -415,6 +415,7 @@ export function createTools(): Record<string, ToolDef> {
         { list_id, item_id, title, body, status_id, list_name, include_in_system_prompt },
         { lists },
       ) => {
+        const existing = lists.getList(list_id)?.items.find((i) => i.id === item_id);
         const item = lists.upsertItem(
           list_id,
           {
@@ -431,7 +432,7 @@ export function createTools(): Record<string, ToolDef> {
 
         return {
           ok: true,
-          list: lists.getList(list_id),
+          action: existing ? "updated" : "created",
           item,
         };
       },

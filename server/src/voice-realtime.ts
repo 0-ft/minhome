@@ -441,9 +441,15 @@ export class RealtimeSession {
       const transcript = typeof e.transcript === "string" ? e.transcript.trim() : "";
       if (transcript) {
         this.callbacks.onUserTranscript?.(transcript);
+        const extra: Record<string, unknown> = {};
+        if (this.extraInstructions) {
+          extra.extraInstructions = this.extraInstructions;
+          this.extraInstructions = null;
+        }
         this.appendChatMessage({
           role: "user",
           parts: [{ type: "text", text: transcript }],
+          ...extra,
         });
       }
     });
@@ -652,14 +658,16 @@ export class RealtimeSession {
     this.speechStoppedTimer = null;
   }
 
-  private appendChatMessage(message: Pick<UIMessage, "role" | "parts">): void {
+  private appendChatMessage(message: Pick<UIMessage, "role" | "parts"> & Record<string, unknown>): void {
+    const { role, parts, ...rest } = message;
     this.toolCtx.chats.appendMessage({
       id: this.chatId,
       source: this.chatSource,
       message: {
         id: `msg-${randomUUID()}`,
-        role: message.role,
-        parts: message.parts,
+        role,
+        parts,
+        ...rest,
       } as UIMessage,
     });
   }

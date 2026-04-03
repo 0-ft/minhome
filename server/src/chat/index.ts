@@ -87,7 +87,7 @@ export function createChatRoute(ctx: ToolContext) {
       ? chats.ensure({ id: requestedChatId, source: "text", title })
       : chats.create({ source: "text", title });
     const chatId = resolvedChat.id;
-    const messages = migrateToolPartTypes(body.messages);
+    const messages = body.messages;
     const rawTools = buildAiTools(ctx);
     const validatedMessages = await validateUIMessages({
       messages,
@@ -186,28 +186,4 @@ function extractFirstUserText(messages: UIMessage[]): string | undefined {
 function tryParse(s: unknown): unknown {
   if (typeof s !== "string") return s;
   try { return JSON.parse(s); } catch { return s; }
-}
-
-/**
- * Migrate legacy `tool-<name>` part types to `data-tool-<name>` so they pass
- * the AI SDK's validateUIMessages schema (which requires custom types to start
- * with "data-").
- */
-function migrateToolPartTypes(messages: UIMessage[]): UIMessage[] {
-  let changed = false;
-  const migrated = messages.map((msg) => {
-    if (msg.role !== "assistant" || !msg.parts) return msg;
-    let partsChanged = false;
-    const parts = msg.parts.map((part) => {
-      if (part.type.startsWith("tool-") && !part.type.startsWith("tool-invocation")) {
-        partsChanged = true;
-        return { ...part, type: `data-${part.type}` };
-      }
-      return part;
-    });
-    if (!partsChanged) return msg;
-    changed = true;
-    return { ...msg, parts };
-  });
-  return changed ? migrated as UIMessage[] : messages;
 }

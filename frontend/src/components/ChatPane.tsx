@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Send, X, Loader2, History, Mic } from "lucide-react";
+import { Send, X, Loader2, History, Mic, Info } from "lucide-react";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
 import { useDeleteChat } from "../api.js";
 import { ChatHistoryModal } from "./ChatHistoryModal.js";
@@ -141,6 +141,8 @@ export function ChatPane({
               role={item.role}
               text={item.text}
             />
+          ) : item.kind === "extraInstructions" ? (
+            <ExtraInstructionsBanner key={item.id} text={item.text} />
           ) : (
             <ToolCallGroup key={item.id} parts={item.tools} variant="regular" />
           )
@@ -299,6 +301,21 @@ export function ChatPane({
           }
         }}
       />
+    </div>
+  );
+}
+
+// ── Extra Instructions Banner ────────────────────────────
+
+function ExtraInstructionsBanner({ text }: { text: string }) {
+  return (
+    <div className="flex justify-end">
+      <div className="inline-flex items-start gap-1.5 rounded-md bg-sand-200/70 border border-sand-300/60 px-2.5 py-1.5 max-w-[85%]">
+        <Info className="h-3 w-3 text-sand-500 mt-0.5 shrink-0" />
+        <p className="text-[11px] leading-snug text-sand-600 italic break-words">
+          {text}
+        </p>
+      </div>
     </div>
   );
 }
