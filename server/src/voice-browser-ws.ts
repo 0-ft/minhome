@@ -108,6 +108,9 @@ export function createBrowserVoiceWSHandler(opts: { toolCtx: ToolContext }) {
         };
 
         const chatSource = opts.toolCtx.chats.get(chatId)?.source ?? "voice";
+        const extraInstructions = typeof msg.extra_instructions === "string"
+          ? msg.extra_instructions.trim() || undefined
+          : undefined;
         session = new RealtimeSession(
           sessionId,
           chatId,
@@ -115,6 +118,7 @@ export function createBrowserVoiceWSHandler(opts: { toolCtx: ToolContext }) {
           deviceId,
           callbacks,
           opts.toolCtx,
+          extraInstructions,
         );
 
         // Browser can start sending audio immediately; RealtimeSession will buffer

@@ -104,6 +104,8 @@ export class RealtimeSession {
   private static readonly CONFIG_READY_TIMEOUT_MS = 15_000;
   private static readonly SPEECH_STOP_TIMEOUT_MS = 60_000;
 
+  private extraInstructions: string | null;
+
   constructor(
     sessionId: string,
     chatId: string,
@@ -111,6 +113,7 @@ export class RealtimeSession {
     deviceId: string,
     callbacks: RealtimeCallbacks,
     toolCtx: ToolContext,
+    extraInstructions?: string,
   ) {
     this.sessionId = sessionId;
     this.chatId = chatId;
@@ -118,6 +121,7 @@ export class RealtimeSession {
     this.deviceId = deviceId;
     this.callbacks = callbacks;
     this.toolCtx = toolCtx;
+    this.extraInstructions = extraInstructions ?? null;
     if (this.toolCtx.config.getVoiceDebugCaptureEnabled()) {
       this.audioCapture = new VoiceAudioCapture({
         captureDir: this.toolCtx.config.getVoiceDebugCaptureDir(),
@@ -380,6 +384,19 @@ export class RealtimeSession {
     });
   }
 
+  private injectExtraInstructions(): void {
+    if (!this.rt || !this.extraInstructions) return;
+    this.rt.send({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: this.extraInstructions }],
+      } as any,
+    });
+    console.log(`[realtime] Injected extra instructions for session ${this.sessionId}`);
+  }
+
   private bindEvents(): void {
     if (!this.rt) return;
 
@@ -392,6 +409,7 @@ export class RealtimeSession {
       this.clearConfigReadyTimer();
       this.connected = true;
       this.injectChatHistory();
+      this.injectExtraInstructions();
       this.flushPendingAudio();
     });
 
