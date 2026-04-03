@@ -1,14 +1,11 @@
 package com.minhome.widget
 
 import android.app.*
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.*
 import android.os.IBinder
 import android.util.Log
-import android.widget.RemoteViews
 import kotlinx.coroutines.*
 import okhttp3.*
 import okio.ByteString
@@ -60,7 +57,7 @@ class VoiceService : Service() {
 
         startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
         isRunning = true
-        pushWidgetState(true)
+        scope.launch { VoiceWidget.setActive(applicationContext, true) }
 
         val prefs = Prefs(this)
         if (!prefs.isLoggedIn) {
@@ -83,9 +80,11 @@ class VoiceService : Service() {
         audioTrack?.stop()
         audioTrack?.release()
         audioTrack = null
-        scope.cancel()
         isRunning = false
-        pushWidgetState(false)
+        val ctx = applicationContext
+        scope.launch {
+            VoiceWidget.setActive(ctx, false)
+        }.invokeOnCompletion { scope.cancel() }
         super.onDestroy()
     }
 
@@ -229,36 +228,6 @@ class VoiceService : Service() {
             delay(200)
             waited += 200
             if (track.playbackHeadPosition == head) break
-        }
-    }
-
-    /** Push RemoteViews directly for instant widget visual update (bypasses Glance async). */
-    private fun pushWidgetState(active: Boolean) {
-        try {
-            val manager = AppWidgetManager.getInstance(this)
-            val ids = manager.getAppWidgetIds(
-                ComponentName(this, VoiceWidgetReceiver::class.java)
-            )
-            if (ids.isEmpty()) return
-
-            val views = RemoteViews(packageName, R.layout.voice_widget_preview)
-            views.setInt(
-                R.id.widget_root, "setBackgroundColor",
-                if (active) 0xFF1B5E20.toInt() else 0xFF1E293B.toInt()
-            )
-            views.setImageViewResource(
-                R.id.widget_icon,
-                if (active) R.drawable.ic_mic_active else R.drawable.ic_mic
-            )
-            val toggleIntent = Intent(this, VoiceWidgetReceiver::class.java)
-                .setAction(ACTION_TOGGLE_VOICE)
-            views.setOnClickPendingIntent(
-                R.id.widget_root,
-                PendingIntent.getBroadcast(this, 0, toggleIntent, PendingIntent.FLAG_IMMUTABLE)
-            )
-            ids.forEach { manager.updateAppWidget(it, views) }
-        } catch (e: Exception) {
-            Log.e(TAG, "Widget update failed", e)
         }
     }
 
