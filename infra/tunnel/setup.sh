@@ -81,7 +81,8 @@ else
   echo "  (The browser tab should open automatically; if not, copy the URL printed below.)"
   echo ""
   docker run --rm \
-    -v "${DATA_DIR}:/home/nonroot/.cloudflared" \
+    --user 0:0 \
+    -v "${DATA_DIR}:/root/.cloudflared" \
     cloudflare/cloudflared:latest \
     tunnel login
   ok "cert.pem written to data/tunnel/"
@@ -99,9 +100,47 @@ if [[ -n "${TUNNEL_ID}" && -f "${DATA_DIR}/credentials.json" ]]; then
 else
   ask "Tunnel name (e.g. minhome)" TUNNEL_NAME
   echo ""
+
+  # Check if a tunnel with this name already exists
+  LIST_OUT="$(
+    docker run --rm \
+      --user 0:0 \
+      -v "${DATA_DIR}:/etc/cloudflared" \
+      cloudflare/cloudflared:latest \
+      tunnel --origincert /etc/cloudflared/cert.pem list -o json -name "${TUNNEL_NAME}" 2>/dev/null
+  )" || true
+  EXISTING_ID="$(echo "${LIST_OUT}" \
+    | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
+    | head -1
+  )" || true
+
+  if [[ -n "${EXISTING_ID}" ]]; then
+    echo "  Tunnel '${TUNNEL_NAME}' already exists (ID: ${EXISTING_ID})."
+    printf "  Delete it and recreate? [y/N]: "
+    read -r CONFIRM
+    if [[ "${CONFIRM}" =~ ^[Yy]$ ]]; then
+      info "Cleaning up connections…"
+      docker run --rm \
+        --user 0:0 \
+        -v "${DATA_DIR}:/etc/cloudflared" \
+        cloudflare/cloudflared:latest \
+        tunnel --origincert /etc/cloudflared/cert.pem cleanup "${EXISTING_ID}" 2>&1 || true
+      info "Deleting tunnel…"
+      docker run --rm \
+        --user 0:0 \
+        -v "${DATA_DIR}:/etc/cloudflared" \
+        cloudflare/cloudflared:latest \
+        tunnel --origincert /etc/cloudflared/cert.pem delete "${EXISTING_ID}" 2>&1
+      rm -f "${DATA_DIR}/credentials.json"
+      ok "Deleted tunnel ${EXISTING_ID}"
+    else
+      echo "  Aborted."
+      exit 1
+    fi
+  fi
+
   echo "  Creating tunnel '${TUNNEL_NAME}'…"
 
-  # Run create; output goes to a tmp file so we can parse the tunnel ID
   TMP_OUT="$(mktemp)"
   docker run --rm \
     --user 0:0 \
@@ -154,14 +193,52 @@ echo "─── [4/4] Routing DNS ───────────────�
 echo ""
 echo "  Pointing ${TUNNEL_HOSTNAME} → tunnel ${TUNNEL_ID}…"
 
-# Re-read TUNNEL_NAME for the route command; cloudflared accepts tunnel ID directly
-docker run --rm \
-  --user 0:0 \
-  -v "${DATA_DIR}:/etc/cloudflared" \
-  cloudflare/cloudflared:latest \
-  tunnel --origincert /etc/cloudflared/cert.pem route dns "${TUNNEL_ID}" "${TUNNEL_HOSTNAME}"
+EXPECTED_CNAME="${TUNNEL_ID}.cfargotunnel.com"
+ZONE_NAME="$(echo "${TUNNEL_HOSTNAME}" | awk -F. '{print $(NF-1)"."$NF}')"
 
-ok "DNS CNAME created"
+# Look up the zone ID
+ZONE_ID="$(curl -sf \
+  -H "Authorization: Bearer ${CF_DNS_API_TOKEN}" \
+  "https://api.cloudflare.com/client/v4/zones?name=${ZONE_NAME}" \
+  | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" || true
+
+if [[ -n "${ZONE_ID}" ]]; then
+  # Check for an existing DNS record
+  EXISTING_RECORD="$(curl -sf \
+    -H "Authorization: Bearer ${CF_DNS_API_TOKEN}" \
+    "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?name=${TUNNEL_HOSTNAME}")" || true
+
+  RECORD_ID="$(echo "${EXISTING_RECORD}" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" || true
+  RECORD_CONTENT="$(echo "${EXISTING_RECORD}" | grep -o '"content":"[^"]*"' | head -1 | cut -d'"' -f4)" || true
+
+  if [[ -n "${RECORD_ID}" && "${RECORD_CONTENT}" != "${EXPECTED_CNAME}" ]]; then
+    echo "  Existing DNS record found: ${TUNNEL_HOSTNAME} → ${RECORD_CONTENT}"
+    echo "  Expected: ${EXPECTED_CNAME}"
+    printf "  Delete and replace? [y/N]: "
+    read -r CONFIRM
+    if [[ "${CONFIRM}" =~ ^[Yy]$ ]]; then
+      curl -sf -X DELETE \
+        -H "Authorization: Bearer ${CF_DNS_API_TOKEN}" \
+        "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORD_ID}" > /dev/null
+      ok "Deleted stale DNS record"
+    else
+      echo "  Aborted."
+      exit 1
+    fi
+  elif [[ -n "${RECORD_ID}" && "${RECORD_CONTENT}" == "${EXPECTED_CNAME}" ]]; then
+    ok "DNS already points to this tunnel – skipping"
+    SKIP_DNS_ROUTE=1
+  fi
+fi
+
+if [[ -z "${SKIP_DNS_ROUTE:-}" ]]; then
+  docker run --rm \
+    --user 0:0 \
+    -v "${DATA_DIR}:/etc/cloudflared" \
+    cloudflare/cloudflared:latest \
+    tunnel --origincert /etc/cloudflared/cert.pem route dns "${TUNNEL_ID}" "${TUNNEL_HOSTNAME}"
+  ok "DNS CNAME created"
+fi
 
 # ─── done ─────────────────────────────────────────────────────────────────────
 

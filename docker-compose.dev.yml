@@ -9,7 +9,7 @@ services:
       - .:/app
       - ./data/server:/data
     environment:
-      - NODE_OPTIONS=--max-old-space-size=256
+      - NODE_OPTIONS=--max-old-space-size=1024
       - DATA_DIR=/data
       - VITE_DEV_URL=http://frontend:5173
       - FONTCONFIG_PATH=/etc/fonts

@@ -26,12 +26,15 @@ type ToolInput = Record<string, unknown>;
 
 /** Check whether a message part represents a tool call (static or dynamic). */
 export function isToolPart(part: { type: string }): boolean {
-  return part.type === "dynamic-tool" || part.type.startsWith("tool-");
+  return part.type === "dynamic-tool"
+    || part.type.startsWith("data-tool-")
+    || part.type.startsWith("tool-");
 }
 
 /** Extract the tool name from either a static or dynamic tool part. */
 export function toolPartName(part: ToolPart): string {
   if (part.type === "dynamic-tool") return part.toolName ?? "unknown";
+  if (part.type.startsWith("data-tool-")) return part.type.slice(10);
   if (part.type.startsWith("tool-")) return part.type.slice(5);
   return "unknown";
 }

@@ -410,6 +410,7 @@ export function createApp(
 
     // --- WebSocket ---
     .get("/ws", upgradeWebSocket(() => {
+      let cleanup: (() => void) | undefined;
       return {
         onOpen(_evt, ws) {
           const onStateChange = (data: unknown) => ws.send(JSON.stringify({ type: "state_change", data }));
@@ -426,20 +427,18 @@ export function createApp(
           lists.onChanged(onListsChange);
           chats.onChanged(onChatsChange);
 
-          // Store cleanup refs on the ws object
-          (ws as unknown as Record<string, unknown>).__cleanup = () => {
+          cleanup = () => {
             bridge.off("state_change", onStateChange);
             bridge.off("devices", onDevices);
             bridge.off("config_change", onConfigChange);
             automations.offChanged(onAutomationsChange);
             lists.offChanged(onListsChange);
             chats.offChanged(onChatsChange);
+            cleanup = undefined;
           };
         },
-        onClose(_evt, ws) {
-          const cleanup = (ws as unknown as Record<string, unknown>).__cleanup as (() => void) | undefined;
-          cleanup?.();
-        },
+        onClose() { cleanup?.(); },
+        onError() { cleanup?.(); },
       };
     }))
 
@@ -507,20 +506,20 @@ export function createApp(
 
     // --- Debug log WebSocket ---
     .get("/ws/debug", upgradeWebSocket(() => {
+      let cleanup: (() => void) | undefined;
       return {
         onOpen(_evt, ws) {
           const onEntry = (entry: unknown) => {
             ws.send(JSON.stringify({ type: "debug_entry", data: entry }));
           };
           debugLog.on("entry", onEntry);
-          (ws as unknown as Record<string, unknown>).__debugCleanup = () => {
+          cleanup = () => {
             debugLog.off("entry", onEntry);
+            cleanup = undefined;
           };
         },
-        onClose(_evt, ws) {
-          const cleanup = (ws as unknown as Record<string, unknown>).__debugCleanup as (() => void) | undefined;
-          cleanup?.();
-        },
+        onClose() { cleanup?.(); },
+        onError() { cleanup?.(); },
       };
     }));
 

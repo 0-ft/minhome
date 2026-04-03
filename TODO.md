@@ -67,3 +67,4 @@
 - [ ] cleanup
 - [ ] speak quicker
 - [ ] announcement tools blocking? general tool calls maybe should be blocking (in automations)?
+- [ ] Device link quality indicator

@@ -407,6 +407,39 @@ class BridgeManager:
                 self._ws = None
             return self._ws
 
+    async def _on_server_disconnect(self) -> None:
+        """Handle server WS connection loss: stop discovery and disconnect all devices."""
+        if self._browser:
+            try:
+                await self._browser.async_cancel()
+            except Exception:
+                pass
+            self._browser = None
+
+        if not self._devices:
+            return
+        log.info(
+            "Disconnecting all devices (%d) — server connection lost",
+            len(self._devices),
+        )
+        for handler in list(self._devices.values()):
+            try:
+                await handler.stop()
+            except Exception as exc:
+                log.warning("Error stopping device %s: %s", handler.device_id, exc)
+        self._devices.clear()
+        self._active_streamer = None
+
+    async def _restart_discovery(self) -> None:
+        """Recreate the mDNS browser so existing devices are re-discovered."""
+        if self.zeroconf:
+            self._browser = AsyncServiceBrowser(
+                self.zeroconf.zeroconf,
+                "_esphomelib._tcp.local.",
+                handlers=[self._on_service_state_change],
+            )
+            log.info("Restarted device discovery after server reconnect")
+
     async def _send_devices_list(self) -> None:
         """Send the list of currently connected devices to the server."""
         devices = []
@@ -435,6 +468,7 @@ class BridgeManager:
                 if ws is None:
                     await asyncio.sleep(3)
                     continue
+                await self._restart_discovery()
             try:
                 raw = await ws.recv()
                 if isinstance(raw, str):
@@ -462,6 +496,7 @@ class BridgeManager:
             except Exception as exc:
                 log.warning("WS reader error: %s — will reconnect", exc)
                 self._ws = None
+                await self._on_server_disconnect()
                 await asyncio.sleep(3)
 
     async def ws_send_json(self, msg: dict) -> None:
@@ -547,6 +582,9 @@ class BridgeManager:
                 await probe_client.disconnect()
 
             if has_voice:
+                if self._ws is None:
+                    log.info("Skipping device %s — no server connection", short_name)
+                    return
                 handler = DeviceHandler(host, short_name, self)
                 self._devices[short_name] = handler
                 await handler.start()

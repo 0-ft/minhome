@@ -22,7 +22,7 @@ import { createStreamingWavHeader, resample24to48 } from "./audio-utils.js";
 import { VoiceAudioCapture } from "./voice-audio-capture.js";
 
 interface PersistedToolPart {
-  type: `tool-${string}`;
+  type: `data-tool-${string}`;
   toolCallId: string;
   state: "output-available" | "output-error";
   input?: unknown;
@@ -343,9 +343,9 @@ export class RealtimeSession {
             });
             injected++;
           }
-        } else if (part.type?.startsWith("tool-") && msg.role === "assistant") {
+        } else if ((part.type?.startsWith("data-tool-") || part.type?.startsWith("tool-")) && msg.role === "assistant") {
           const toolPart = part as unknown as PersistedToolPart;
-          const toolName = part.type.replace(/^tool-/, "");
+          const toolName = part.type.replace(/^(data-tool-|tool-)/, "");
           const callId = toolPart.toolCallId ?? `hist-${randomUUID()}`;
           this.rt.send({
             type: "conversation.item.create",
@@ -685,7 +685,7 @@ function buildToolPart(args: {
   errorText?: string;
 }): PersistedToolPart {
   return {
-    type: `tool-${args.toolName}`,
+    type: `data-tool-${args.toolName}`,
     toolCallId: args.toolCallId,
     state: args.errorText ? "output-error" : "output-available",
     input: args.input,

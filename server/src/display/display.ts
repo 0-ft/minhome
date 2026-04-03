@@ -516,6 +516,8 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
       dimensions,
     );
     const paletteColours = getPaletteColourCount(colorDepth);
+    const mem = process.memoryUsage();
+    const mb = (b: number) => (b / 1024 / 1024).toFixed(1);
     console.log(
       `[display/image] Rendered ${png.length} bytes` +
       ` total_ms=${timings.total_ms} build_root_ms=${timings.build_root_ms}` +
@@ -524,7 +526,8 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
       ` renderer_ms=${timings.renderer_ms} postprocess_ms=${timings.postprocess_ms}` +
       ` mac=${matchedDevice?.display.mac ?? "unknown"} orientation=${orientation}` +
       ` width=${dimensions.width} height=${dimensions.height}` +
-      ` color_depth=${colorDepth} colours=${paletteColours}`,
+      ` color_depth=${colorDepth} colours=${paletteColours}` +
+      ` heap=${mb(mem.heapUsed)}/${mb(mem.heapTotal)}MB rss=${mb(mem.rss)}MB ext=${mb(mem.external)}MB ab=${mb(mem.arrayBuffers)}MB`,
     );
     debugLog.add("display_image", "Display image rendered", {
       mac: matchedDevice?.display.mac ?? "unknown",

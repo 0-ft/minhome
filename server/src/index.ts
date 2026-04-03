@@ -11,7 +11,8 @@ import { createTools } from "./tools.js";
 import { createMcpRoute } from "./mcp.js";
 import { debugLog } from "./debug-log.js";
 import { resolve } from "path";
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, appendFileSync } from "fs";
+import { getHeapStatistics } from "v8";
 
 const PORT = parseInt(process.env.PORT ?? "3111", 10);
 const MQTT_URL = process.env.MQTT_URL ?? "mqtt://localhost:1883";
@@ -158,6 +159,54 @@ if (process.env.OPENAI_API_KEY) {
 }
 
 console.log("[server] MCP endpoint available at /mcp");
+
+// Log V8 heap limit at startup — critical for diagnosing OOM
+const heapStats = getHeapStatistics();
+const heapLimitMB = (heapStats.heap_size_limit / 1024 / 1024).toFixed(0);
+console.log(`[server] V8 heap limit: ${heapLimitMB}MB (max-old-space-size=${process.env.NODE_OPTIONS ?? "default"})`);
+
+// Periodic memory monitor — writes to a file on the host volume so it survives container restarts.
+const MEMORY_LOG_INTERVAL_MS = 5 * 60 * 1000;
+const MEMORY_LOG_MAX_BYTES = 2 * 1024 * 1024;
+const memoryLogPath = resolve(DATA_DIR, "memory.log");
+
+function logMemory() {
+  const mem = process.memoryUsage();
+  const mb = (b: number) => (b / 1024 / 1024).toFixed(1);
+  const uptimeH = (process.uptime() / 3600).toFixed(2);
+  const listeners = [
+    `state_change=${bridge.listenerCount("state_change")}`,
+    `devices=${bridge.listenerCount("devices")}`,
+    `config_change=${bridge.listenerCount("config_change")}`,
+  ].join(" ");
+  const maps = [
+    `mqtt_devices=${bridge.devices.size}`,
+    `mqtt_states=${bridge.states.size}`,
+    `audio_streams=${toolCtx.audioStreams.size}`,
+    `audio_sources=${toolCtx.audioSources.size}`,
+  ].join(" ");
+  const line =
+    `${new Date().toISOString()} uptime=${uptimeH}h` +
+    ` heap=${mb(mem.heapUsed)}/${mb(mem.heapTotal)}MB` +
+    ` rss=${mb(mem.rss)}MB ext=${mb(mem.external)}MB ab=${mb(mem.arrayBuffers)}MB` +
+    ` listeners: ${listeners}` +
+    ` maps: ${maps}\n`;
+  console.log(`[memory] ${line.trimEnd()}`);
+  try {
+    appendFileSync(memoryLogPath, line);
+    // Rotate: if the log exceeds max size, keep only the last half
+    const stat = existsSync(memoryLogPath) ? readFileSync(memoryLogPath, "utf-8") : "";
+    if (stat.length > MEMORY_LOG_MAX_BYTES) {
+      const lines = stat.trimEnd().split("\n");
+      writeFileSync(memoryLogPath, lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n");
+    }
+  } catch (err) {
+    console.error("[memory] Failed to write memory log:", err);
+  }
+}
+
+logMemory();
+setInterval(logMemory, MEMORY_LOG_INTERVAL_MS);
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
