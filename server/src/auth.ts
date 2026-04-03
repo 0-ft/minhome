@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { createHmac, timingSafeEqual, randomBytes } from "crypto";
+import { sign, verify } from "hono/jwt";
+import { timingSafeEqual, randomBytes } from "crypto";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import type { TokenStore } from "./config/tokens.js";
@@ -18,44 +19,29 @@ export const authEnabled = AUTH_PASSWORD.length > 0;
 
 // ── Token helpers ────────────────────────────────────────
 
-function signToken(secret: string): string {
-  const expires = Math.floor(Date.now() / 1000) + TOKEN_TTL;
-  const payload = String(expires);
-  const sig = createHmac("sha256", secret).update(payload).digest("hex");
-  return `${payload}.${sig}`;
+async function createSessionToken(): Promise<string> {
+  return sign({ exp: Math.floor(Date.now() / 1000) + TOKEN_TTL }, AUTH_SECRET, "HS256");
 }
 
-function verifyToken(token: string, secret: string): boolean {
-  const dot = token.indexOf(".");
-  if (dot === -1) return false;
-  const payload = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
-  const expected = createHmac("sha256", secret).update(payload).digest("hex");
-
-  // Timing-safe comparison of signatures
-  if (sig.length !== expected.length) return false;
-  const sigMatch = timingSafeEqual(
-    Buffer.from(sig, "hex"),
-    Buffer.from(expected, "hex"),
-  );
-  if (!sigMatch) return false;
-
-  // Check expiry
-  const expires = parseInt(payload, 10);
-  return expires > Math.floor(Date.now() / 1000);
+async function verifySessionToken(token: string): Promise<boolean> {
+  try {
+    await verify(token, AUTH_SECRET, "HS256");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function passwordMatches(input: string): boolean {
-  // Timing-safe comparison to prevent timing attacks
   const a = Buffer.from(input);
   const b = Buffer.from(AUTH_PASSWORD);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
 
-export function isSessionAuthenticated(cookieValue: string | undefined): boolean {
+export async function isSessionAuthenticated(cookieValue: string | undefined): Promise<boolean> {
   if (!authEnabled) return true;
-  return !!cookieValue && verifyToken(cookieValue, AUTH_SECRET);
+  return !!cookieValue && verifySessionToken(cookieValue);
 }
 
 // ── Middleware ────────────────────────────────────────────
@@ -93,7 +79,7 @@ export function authMiddleware(tokens: TokenStore): MiddlewareHandler {
 
     // Check session cookie
     const cookieToken = getCookie(c, COOKIE_NAME);
-    if (cookieToken && verifyToken(cookieToken, AUTH_SECRET)) return next();
+    if (cookieToken && await verifySessionToken(cookieToken)) return next();
 
     return c.json({ error: "Unauthorized" }, 401);
   };
@@ -104,19 +90,19 @@ export function authMiddleware(tokens: TokenStore): MiddlewareHandler {
 export function authRoutes() {
   const auth = new Hono();
 
-  auth.get("/api/auth/check", (c) => {
+  auth.get("/api/auth/check", async (c) => {
     if (!authEnabled) {
       return c.json({ required: false, authenticated: true });
     }
     const token = getCookie(c, COOKIE_NAME);
-    const authenticated = !!token && verifyToken(token, AUTH_SECRET);
+    const authenticated = !!token && await verifySessionToken(token);
     return c.json({ required: true, authenticated });
   });
 
   auth.post(
     "/api/auth/login",
     zValidator("json", z.object({ password: z.string() })),
-    (c) => {
+    async (c) => {
       if (!authEnabled) {
         return c.json({ ok: true });
       }
@@ -126,7 +112,7 @@ export function authRoutes() {
         return c.json({ error: "Invalid password" }, 401);
       }
 
-      const token = signToken(AUTH_SECRET);
+      const token = await createSessionToken();
       const isSecure =
         c.req.header("x-forwarded-proto") === "https" ||
         c.req.url.startsWith("https");

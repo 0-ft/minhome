@@ -106,7 +106,7 @@ if (viteDevUrl) {
   console.log(`[server] Dev frontend proxy -> ${viteDevUrl}`);
 
   app.get("/login", async (c) => {
-    if (isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+    if (await isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
       return c.redirect("/");
     }
     try {
@@ -125,7 +125,7 @@ if (viteDevUrl) {
       const reqUrl = new URL(c.req.url);
       const isSpaNavigation = isSpaNavigationRequest(c.req.raw);
 
-      if (isSpaNavigation && authEnabled && !isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+      if (isSpaNavigation && authEnabled && !await isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
         const returnTo = c.req.path === "/" ? "" : `?redirect=${encodeURIComponent(c.req.path)}`;
         return c.redirect(`/login${returnTo}`);
       }
@@ -158,7 +158,7 @@ if (viteDevUrl) {
 
   // 1. Login page HTML at /login
   app.get("/login", async (c, next) => {
-    if (isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+    if (await isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
       return c.redirect("/");
     }
     return serveLoginIndex(c, next);
@@ -174,7 +174,7 @@ if (viteDevUrl) {
     if (shouldBypassFrontend(c.req.path)) return next();
     if (c.req.path.startsWith("/login")) return next();
 
-    if (authEnabled && !isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+    if (authEnabled && !await isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
       if (!isSpaNavigationRequest(c.req.raw)) {
         return c.json({ error: "Unauthorized" }, 401);
       }
@@ -188,7 +188,7 @@ if (viteDevUrl) {
   app.get("*", async (c, next) => {
     if (shouldBypassFrontend(c.req.path)) return next();
 
-    if (authEnabled && !isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+    if (authEnabled && !await isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
       const returnTo = c.req.path === "/" ? "" : `?redirect=${encodeURIComponent(c.req.path)}`;
       return c.redirect(`/login${returnTo}`);
     }
