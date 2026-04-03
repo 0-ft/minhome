@@ -56,6 +56,17 @@ class ListWidgetReceiver : AppWidgetProvider() {
             for (id in ids) updateWidget(context, id)
         }
 
+        fun refreshFromData(context: Context, data: ListData) {
+            val manager = AppWidgetManager.getInstance(context)
+            val ids = manager.getAppWidgetIds(ComponentName(context, ListWidgetReceiver::class.java))
+            for (id in ids) {
+                val config = ListWidgetPrefs.load(context, id) ?: continue
+                if (config.listId != data.id) continue
+                val count = data.items.count { it.statusId == config.columnId }
+                pushStatic(context, id, config, count.toString())
+            }
+        }
+
         private fun pushStatic(context: Context, widgetId: Int, config: ListWidgetConfig, count: String) {
             val views = RemoteViews(context.packageName, R.layout.list_widget_layout)
             views.setTextViewText(R.id.list_widget_count, count)

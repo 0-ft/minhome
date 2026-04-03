@@ -1,5 +1,6 @@
 package com.minhome.widget
 
+import android.content.Context
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,14 +28,18 @@ object ListApi {
         }
     }
 
-    fun fetchList(prefs: Prefs, listId: String): ListData {
+    fun fetchList(prefs: Prefs, listId: String, context: Context? = null): ListData {
         val request = Request.Builder()
             .url("${prefs.serverUrl}/api/lists/$listId")
             .header("Cookie", ApiClient.sessionCookieHeader(prefs.sessionToken))
             .build()
         ApiClient.http.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) throw Exception("Failed to fetch list (${resp.code})")
-            return parseList(JSONObject(resp.body!!.string()))
+            val data = parseList(JSONObject(resp.body!!.string()))
+            if (context != null) {
+                ListWidgetReceiver.refreshFromData(context, data)
+            }
+            return data
         }
     }
 

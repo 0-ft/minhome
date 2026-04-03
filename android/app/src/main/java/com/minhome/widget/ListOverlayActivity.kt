@@ -53,6 +53,7 @@ class ListOverlayActivity : ComponentActivity() {
             )
         }
     }
+
 }
 
 @Composable
@@ -65,7 +66,7 @@ private fun KanbanOverlay(listId: String, focusColumnId: String, onDismiss: () -
     LaunchedEffect(listId) {
         try {
             val data = withContext(Dispatchers.IO) {
-                ListApi.fetchList(Prefs(context), listId)
+                ListApi.fetchList(Prefs(context), listId, context)
             }
             listData = data
         } catch (e: Exception) {
