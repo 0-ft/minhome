@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-app/
+dist-login/
 frontend/dev-dist/
 *.tsbuildinfo
 .venv/

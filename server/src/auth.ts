@@ -53,6 +53,11 @@ function passwordMatches(input: string): boolean {
   return timingSafeEqual(a, b);
 }
 
+export function isSessionAuthenticated(cookieValue: string | undefined): boolean {
+  if (!authEnabled) return true;
+  return !!cookieValue && verifyToken(cookieValue, AUTH_SECRET);
+}
+
 // ── Middleware ────────────────────────────────────────────
 
 export function authMiddleware(tokens: TokenStore): MiddlewareHandler {

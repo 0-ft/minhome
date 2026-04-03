@@ -63,6 +63,7 @@ export default defineConfig({
     }),
   ],
   build: {
+    outDir: "dist-app",
     sourcemap: false,
     rollupOptions: {
       output: {

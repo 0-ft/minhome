@@ -9,7 +9,6 @@ import { RoomFullView } from "./components/RoomFullView.js";
 import { ListsView } from "./components/lists/ListsView.js";
 import { DebugView } from "./components/DebugView.js";
 import { ChatPane } from "./components/ChatPane.js";
-import { LoginPage } from "./components/LoginPage.js";
 import { AppTopHeader } from "./components/navigation/AppTopHeader.js";
 import { DesktopSidebar } from "./components/navigation/DesktopSidebar.js";
 import { MobileTabBar } from "./components/navigation/MobileTabBar.js";
@@ -21,16 +20,7 @@ const MAX_CHAT_WIDTH = 700;
 const DEFAULT_CHAT_WIDTH = 440;
 
 export function App() {
-  const { data: auth, isLoading } = useAuthCheck();
-
-  // Still checking auth status
-  if (isLoading) return null;
-
-  // Auth required but not authenticated — show login
-  if (auth?.required && !auth.authenticated) {
-    return <LoginPage onSuccess={() => window.location.reload()} />;
-  }
-
+  const { data: auth } = useAuthCheck();
   return <AuthenticatedApp showLogout={auth?.required ?? false} />;
 }
 
@@ -96,7 +86,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
         chatOpen={chatOpen}
         onNavigate={(tab) => navigate(`/${tab}`)}
         onToggleChat={() => setChatOpen(!chatOpen)}
-        onLogout={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+        onLogout={() => logout.mutate(undefined, { onSuccess: () => { window.location.href = "/"; } })}
       />
 
       <div className="flex-1 min-w-0 min-h-0 flex">
@@ -158,7 +148,7 @@ function DebugLayout({ showLogout }: { showLogout: boolean }) {
       <AppTopHeader
         showLogout={showLogout}
         onNavigate={(tab) => navigate(`/${tab}`)}
-        onLogout={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+        onLogout={() => logout.mutate(undefined, { onSuccess: () => { window.location.href = "/"; } })}
       />
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-6 py-8">
@@ -190,7 +180,7 @@ function NotFoundPage({ showLogout }: { showLogout: boolean }) {
       <AppTopHeader
         showLogout={showLogout}
         onNavigate={(tab) => navigate(`/${tab}`)}
-        onLogout={() => logout.mutate(undefined, { onSuccess: () => window.location.reload() })}
+        onLogout={() => logout.mutate(undefined, { onSuccess: () => { window.location.href = "/"; } })}
       />
 
       <main className="flex-1 overflow-y-auto">

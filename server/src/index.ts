@@ -1,6 +1,8 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { getCookie } from "hono/cookie";
 import { createApp } from "./app.js";
+import { authEnabled, isSessionAuthenticated } from "./auth.js";
 import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config/config.js";
 import { ChatStore } from "./config/chats.js";
@@ -75,8 +77,11 @@ bridge.on("devices", (devices: unknown) => {
 });
 
 // Serve frontend: proxy to Vite dev server in dev, otherwise serve static build
-const frontendDist = resolve(import.meta.dirname, "../../frontend/dist");
+const distApp = resolve(import.meta.dirname, "../../frontend/dist-app");
+const distLogin = resolve(import.meta.dirname, "../../frontend/dist-login");
 const viteDevUrl = process.env.VITE_DEV_URL;
+
+const SESSION_COOKIE = "minhome_session";
 
 function shouldBypassFrontend(path: string): boolean {
   return (
@@ -99,14 +104,32 @@ function isSpaNavigationRequest(request: Request): boolean {
 
 if (viteDevUrl) {
   console.log(`[server] Dev frontend proxy -> ${viteDevUrl}`);
-  // Frontend handling is mounted last so API/WS/display routes keep precedence.
-  app.all("*", async (c, next) => {
-    if (shouldBypassFrontend(c.req.path)) {
-      return next();
+
+  app.get("/login", async (c) => {
+    if (isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+      return c.redirect("/");
     }
+    try {
+      const target = new URL("/login.html", viteDevUrl);
+      const resp = await fetch(target.toString(), { headers: c.req.raw.headers });
+      return new Response(resp.body, { status: resp.status, headers: resp.headers });
+    } catch {
+      return c.text("Login page unavailable", 502);
+    }
+  });
+
+  app.all("*", async (c, next) => {
+    if (shouldBypassFrontend(c.req.path)) return next();
+
     try {
       const reqUrl = new URL(c.req.url);
       const isSpaNavigation = isSpaNavigationRequest(c.req.raw);
+
+      if (isSpaNavigation && authEnabled && !isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+        const returnTo = c.req.path === "/" ? "" : `?redirect=${encodeURIComponent(c.req.path)}`;
+        return c.redirect(`/login${returnTo}`);
+      }
+
       const proxyPath = isSpaNavigation ? "/index.html" : reqUrl.pathname + reqUrl.search;
       const target = new URL(proxyPath, viteDevUrl);
       const resp = await fetch(target.toString(), {
@@ -114,29 +137,62 @@ if (viteDevUrl) {
         headers: c.req.raw.headers,
         body: c.req.method === "GET" || c.req.method === "HEAD" ? undefined : c.req.raw.body,
       });
-      return new Response(resp.body, {
-        status: resp.status,
-        headers: resp.headers,
-      });
+      return new Response(resp.body, { status: resp.status, headers: resp.headers });
     } catch {
       return next();
     }
   });
-} else if (existsSync(frontendDist)) {
-  console.log(`[server] Serving frontend from ${frontendDist}`);
-  const serveFrontendStatic = serveStatic({ root: frontendDist });
-  const serveFrontendIndex = serveStatic({ root: frontendDist, path: "index.html" });
+} else if (existsSync(distApp)) {
+  console.log(`[server] Serving app from ${distApp}`);
+  if (existsSync(distLogin)) {
+    console.log(`[server] Serving login from ${distLogin}`);
+  }
 
-  // Frontend handling is mounted last so API/WS/display routes keep precedence.
-  app.use("*", async (c, next) => {
-    if (shouldBypassFrontend(c.req.path)) return next();
-    return serveFrontendStatic(c, next);
+  const serveAppStatic = serveStatic({ root: distApp });
+  const serveAppIndex = serveStatic({ root: distApp, path: "index.html" });
+  const serveLoginStatic = serveStatic({
+    root: distLogin,
+    rewriteRequestPath: (p) => p.replace(/^\/login/, ""),
+  });
+  const serveLoginIndex = serveStatic({ root: distLogin, path: "login.html" });
+
+  // 1. Login page HTML at /login
+  app.get("/login", async (c, next) => {
+    if (isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+      return c.redirect("/");
+    }
+    return serveLoginIndex(c, next);
   });
 
-  // SPA fallback: index for non-backend paths that were not static assets.
+  // 2. Login static assets (always public, no auth)
+  app.use("/login/*", async (c, next) => {
+    return serveLoginStatic(c, next);
+  });
+
+  // 3. App static assets (auth required when auth is enabled)
+  app.use("*", async (c, next) => {
+    if (shouldBypassFrontend(c.req.path)) return next();
+    if (c.req.path.startsWith("/login")) return next();
+
+    if (authEnabled && !isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+      if (!isSpaNavigationRequest(c.req.raw)) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+      return next();
+    }
+
+    return serveAppStatic(c, next);
+  });
+
+  // 4. SPA fallback: redirect to /login or serve app HTML
   app.get("*", async (c, next) => {
     if (shouldBypassFrontend(c.req.path)) return next();
-    return serveFrontendIndex(c, next);
+
+    if (authEnabled && !isSessionAuthenticated(getCookie(c, SESSION_COOKIE))) {
+      const returnTo = c.req.path === "/" ? "" : `?redirect=${encodeURIComponent(c.req.path)}`;
+      return c.redirect(`/login${returnTo}`);
+    }
+    return serveAppIndex(c, next);
   });
 }
 

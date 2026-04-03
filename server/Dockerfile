@@ -40,7 +40,8 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 # Copy compiled server output and frontend build
 COPY --from=base /app/server/dist server/dist
-COPY --from=base /app/frontend/dist frontend/dist
+COPY --from=base /app/frontend/dist-app frontend/dist-app
+COPY --from=base /app/frontend/dist-login frontend/dist-login
 
 ENV NODE_ENV=production
 ENV PORT=3111

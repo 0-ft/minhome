@@ -170,22 +170,6 @@ export function useAuthCheck() {
   });
 }
 
-export function useLogin() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (password: string) => {
-      const res = await api.api.auth.login.$post({
-        json: { password },
-      });
-      if (!res.ok) throw new Error("Invalid password");
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["auth"] });
-    },
-  });
-}
-
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
