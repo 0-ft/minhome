@@ -67,9 +67,22 @@ class ListWidgetReceiver : AppWidgetProvider() {
                 .putExtra("list_id", config.listId)
                 .putExtra("column_id", config.columnId)
             views.setOnClickPendingIntent(
-                R.id.list_widget_root,
+                R.id.list_widget_tap_area,
                 PendingIntent.getActivity(
                     context, widgetId, launchIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+            )
+
+            val micIntent = Intent(context, ListVoiceOverlayActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra("list_id", config.listId)
+                .putExtra("list_name", config.listName)
+                .putExtra("column_name", config.columnName)
+            views.setOnClickPendingIntent(
+                R.id.list_widget_mic_btn,
+                PendingIntent.getActivity(
+                    context, widgetId + 10000, micIntent,
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
             )

@@ -37,9 +37,13 @@ class VoiceService : Service() {
 
         val isRunning: Boolean get() = _stateFlow.value != VoiceState.IDLE
 
-        fun start(context: Context) {
+        fun start(context: Context, extraInstructions: String? = null) {
             if (!isRunning) {
-                context.startForegroundService(Intent(context, VoiceService::class.java))
+                val intent = Intent(context, VoiceService::class.java)
+                if (extraInstructions != null) {
+                    intent.putExtra("extra_instructions", extraInstructions)
+                }
+                context.startForegroundService(intent)
             }
         }
 
@@ -53,6 +57,7 @@ class VoiceService : Service() {
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
     private var recording = false
+    private var extraInstructions: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -71,6 +76,7 @@ class VoiceService : Service() {
         _userTranscript.value = ""
         _assistantTranscript.value = ""
         _stateFlow.value = VoiceState.CONNECTING
+        extraInstructions = intent?.getStringExtra("extra_instructions")
 
         val prefs = Prefs(this)
         if (!prefs.isLoggedIn) {
@@ -111,7 +117,9 @@ class VoiceService : Service() {
         webSocket = ApiClient.http.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.d(TAG, "WebSocket open")
-                ws.send(JSONObject().put("type", "voice_start").toString())
+                val startMsg = JSONObject().put("type", "voice_start")
+                extraInstructions?.let { startMsg.put("extra_instructions", it) }
+                ws.send(startMsg.toString())
             }
 
             override fun onMessage(ws: WebSocket, text: String) {

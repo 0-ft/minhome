@@ -45,6 +45,13 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Minhome.Overlay" />
 
+        <activity
+            android:name=".ListVoiceOverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Minhome.Overlay" />
+
         <receiver
             android:name=".VoiceWidgetReceiver"
             android:exported="true">
