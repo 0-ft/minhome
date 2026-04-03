@@ -102,6 +102,9 @@ export function createBrowserVoiceWSHandler(opts: { toolCtx: ToolContext }) {
           onAssistantTranscript: (text: string) => {
             ws.send(JSON.stringify({ type: "assistant_transcript", text }));
           },
+          onAssistantTranscriptDelta: (delta: string) => {
+            ws.send(JSON.stringify({ type: "assistant_transcript_delta", delta }));
+          },
         };
 
         const chatSource = opts.toolCtx.chats.get(chatId)?.source ?? "voice";

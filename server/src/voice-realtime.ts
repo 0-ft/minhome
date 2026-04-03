@@ -72,6 +72,8 @@ export interface RealtimeCallbacks {
   /** Optional transcript taps for live browser UI/debug usage. */
   onUserTranscript?: (text: string) => void;
   onAssistantTranscript?: (text: string) => void;
+  /** Incremental assistant transcript tokens (fired before the final onAssistantTranscript). */
+  onAssistantTranscriptDelta?: (delta: string) => void;
 }
 
 // ── RealtimeSession ──────────────────────────────────────────
@@ -441,6 +443,9 @@ export class RealtimeSession {
     // Audio output
     this.rt.on("response.output_audio.delta", (e) => {
       this.handleAudioDelta(e.delta);
+    });
+    this.rt.on("response.output_audio_transcript.delta" as any, (e: any) => {
+      if (e.delta) this.callbacks.onAssistantTranscriptDelta?.(e.delta);
     });
     this.rt.on("response.output_audio_transcript.done", (e) => {
       if (e.transcript) {
