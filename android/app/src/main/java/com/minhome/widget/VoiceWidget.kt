@@ -11,8 +11,8 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.action.actionSendBroadcast
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.*
+import androidx.compose.ui.graphics.Color
 import androidx.glance.unit.ColorProvider
-import android.graphics.Color
 
 class VoiceWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
@@ -30,7 +30,7 @@ private fun VoiceWidgetContent() {
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(if (isActive) ColorProvider(Color.parseColor("#1B5E20")) else ColorProvider(Color.parseColor("#1E293B")))
+            .background(ColorProvider(if (isActive) Color(0xFF1B5E20) else Color(0xFF1E293B)))
             .clickable(actionSendBroadcast(
                 Intent(context, VoiceWidgetReceiver::class.java).setAction(ACTION_TOGGLE_VOICE)
             )),
