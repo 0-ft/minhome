@@ -238,8 +238,8 @@ function logMemory() {
   const maps = [
     `mqtt_devices=${bridge.devices.size}`,
     `mqtt_states=${bridge.states.size}`,
-    `audio_streams=${toolCtx.audioStreams.size}`,
-    `audio_sources=${toolCtx.audioSources.size}`,
+    `audio_streams=${toolCtx.audioStreams?.size ?? 0}`,
+    `audio_sources=${toolCtx.audioSources?.size ?? 0}`,
   ].join(" ");
   const line =
     `${new Date().toISOString()} uptime=${uptimeH}h` +

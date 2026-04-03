@@ -1,9 +1,7 @@
 services:
   caddy:
     container_name: minhome-caddy
-    build:
-      context: .
-      dockerfile: infra/tunnel/caddy/Dockerfile
+    image: ghcr.io/caddybuilds/caddy-cloudflare:2
     restart: unless-stopped
     environment:
       - TUNNEL_HOSTNAME=${TUNNEL_HOSTNAME}
