@@ -3,4 +3,6 @@
     <string name="app_name">Minhome</string>
     <string name="voice_widget_name">Minhome Voice</string>
     <string name="voice_widget_description">Tap to talk to Minhome</string>
+    <string name="list_widget_name">Minhome List</string>
+    <string name="list_widget_description">Show list column item count</string>
 </resources>

@@ -74,6 +74,7 @@ private fun SettingsScreen(prefs: Prefs) {
             label = { Text("Server URL") },
             placeholder = { Text("https://minhome.example.com") },
             singleLine = true,
+            enabled = !prefs.isLoggedIn,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(12.dp))

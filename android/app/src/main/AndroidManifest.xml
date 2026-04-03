@@ -26,6 +26,23 @@
             android:name=".VoiceOverlayActivity"
             android:exported="false"
             android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Minhome.Overlay" />
+
+        <activity
+            android:name=".ListWidgetConfigActivity"
+            android:exported="true"
+            android:label="Configure List Widget">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ListOverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
             android:theme="@style/Theme.Minhome.Overlay" />
 
         <receiver
@@ -37,6 +54,17 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/voice_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ListWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/list_widget_info" />
         </receiver>
 
         <service
