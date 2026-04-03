@@ -394,7 +394,7 @@ export class RealtimeSession {
         content: [{ type: "input_text", text: this.extraInstructions }],
       } as any,
     });
-    console.log(`[realtime] Injected extra instructions for session ${this.sessionId}`);
+    console.log(`[realtime] Injected extra instructions for session ${this.sessionId}: ${this.extraInstructions}`);
   }
 
   private bindEvents(): void {

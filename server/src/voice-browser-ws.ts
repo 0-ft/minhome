@@ -111,6 +111,9 @@ export function createBrowserVoiceWSHandler(opts: { toolCtx: ToolContext }) {
         const extraInstructions = typeof msg.extra_instructions === "string"
           ? msg.extra_instructions.trim() || undefined
           : undefined;
+        if (extraInstructions) {
+          console.log(`[voice-ws] voice_start with extra_instructions: ${extraInstructions}`);
+        }
         session = new RealtimeSession(
           sessionId,
           chatId,
