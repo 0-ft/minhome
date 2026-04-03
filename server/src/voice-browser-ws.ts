@@ -47,24 +47,26 @@ export function createBrowserVoiceWSHandler(opts: { toolCtx: ToolContext }) {
 
         if (msg.type !== "voice_start") return;
 
-        const chatId = String(msg.chat_id ?? "").trim();
-        if (!chatId) {
-          ws.send(JSON.stringify({
-            type: "voice_error",
-            code: "missing-chat-id",
-            message: "chat_id is required",
-          }));
-          return;
-        }
+        let chatId = String(msg.chat_id ?? "").trim();
 
-        const existingChat = opts.toolCtx.chats.get(chatId);
-        if (!existingChat) {
-          ws.send(JSON.stringify({
-            type: "voice_error",
-            code: "chat-not-found",
-            message: "Chat not found",
-          }));
-          return;
+        if (chatId) {
+          const existingChat = opts.toolCtx.chats.get(chatId);
+          if (!existingChat) {
+            ws.send(JSON.stringify({
+              type: "voice_error",
+              code: "chat-not-found",
+              message: "Chat not found",
+            }));
+            return;
+          }
+        } else {
+          chatId = opts.toolCtx.config.getVoiceChatId() ?? "";
+          if (!chatId) {
+            const created = opts.toolCtx.chats.create({ source: "voice" });
+            opts.toolCtx.config.setVoiceChatId(created.id);
+            chatId = created.id;
+          }
+          opts.toolCtx.chats.ensure({ id: chatId, source: "voice" });
         }
 
         opts.toolCtx.chats.touch(chatId);
@@ -102,10 +104,11 @@ export function createBrowserVoiceWSHandler(opts: { toolCtx: ToolContext }) {
           },
         };
 
+        const chatSource = opts.toolCtx.chats.get(chatId)?.source ?? "voice";
         session = new RealtimeSession(
           sessionId,
           chatId,
-          existingChat.source,
+          chatSource,
           deviceId,
           callbacks,
           opts.toolCtx,

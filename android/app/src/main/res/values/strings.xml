@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Minhome</string>
+    <string name="voice_widget_name">Minhome Voice</string>
+    <string name="voice_widget_description">Tap to talk to Minhome</string>
+</resources>
