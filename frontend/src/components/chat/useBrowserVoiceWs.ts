@@ -143,6 +143,7 @@ export function useBrowserVoiceWs(chatId: string | null) {
         if (typeof event.data === "string") {
           try {
             const msg = JSON.parse(event.data) as { type?: string; text?: string; delta?: string; message?: string };
+            if (msg.type?.includes("transcript")) console.log("[voice] msg:", msg.type, msg);
             if (msg.type === "voice_ready") {
               wsReadyRef.current = true;
               if (pendingAudioChunksRef.current.length > 0 && ws.readyState === WebSocket.OPEN) {
@@ -154,6 +155,7 @@ export function useBrowserVoiceWs(chatId: string | null) {
             } else if (msg.type === "user_transcript") {
               if (msg.text) setUserTranscript(msg.text);
             } else if (msg.type === "assistant_transcript_delta") {
+              console.log("[voice] delta:", msg.delta);
               if (msg.delta) setAssistantTranscript((prev) => prev + msg.delta);
             } else if (msg.type === "assistant_transcript") {
               if (msg.text) setAssistantTranscript(msg.text);
