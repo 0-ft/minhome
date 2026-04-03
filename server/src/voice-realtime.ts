@@ -348,7 +348,7 @@ export class RealtimeSession {
         } else if ((part.type?.startsWith("data-tool-") || part.type?.startsWith("tool-")) && msg.role === "assistant") {
           const toolPart = part as unknown as PersistedToolPart;
           const toolName = part.type.replace(/^(data-tool-|tool-)/, "");
-          const callId = toolPart.toolCallId ?? `hist-${randomUUID()}`;
+          const callId = (toolPart.toolCallId ?? `hist_${randomUUID().replace(/-/g, "")}`).slice(0, 32);
           this.rt.send({
             type: "conversation.item.create",
             item: {
