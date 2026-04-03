@@ -53,7 +53,8 @@ function int16ToAudioBuffer(ctx: AudioContext, pcm24: Int16Array): AudioBuffer {
 export function useBrowserVoiceWs(chatId: string | null) {
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [lastTranscript, setLastTranscript] = useState<string | null>(null);
+  const [userTranscript, setUserTranscript] = useState("");
+  const [assistantTranscript, setAssistantTranscript] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -125,7 +126,8 @@ export function useBrowserVoiceWs(chatId: string | null) {
     if (!chatId || status === "connecting" || status === "listening" || status === "responding") return;
     setStatus("connecting");
     setError(null);
-    setLastTranscript(null);
+    setUserTranscript("");
+    setAssistantTranscript("");
 
     try {
       const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -140,7 +142,7 @@ export function useBrowserVoiceWs(chatId: string | null) {
       ws.onmessage = (event) => {
         if (typeof event.data === "string") {
           try {
-            const msg = JSON.parse(event.data) as { type?: string; text?: string; message?: string };
+            const msg = JSON.parse(event.data) as { type?: string; text?: string; delta?: string; message?: string };
             if (msg.type === "voice_ready") {
               wsReadyRef.current = true;
               if (pendingAudioChunksRef.current.length > 0 && ws.readyState === WebSocket.OPEN) {
@@ -149,8 +151,12 @@ export function useBrowserVoiceWs(chatId: string | null) {
                 pendingAudioBytesRef.current = 0;
               }
               setStatus("listening");
-            } else if (msg.type === "assistant_transcript" || msg.type === "user_transcript") {
-              if (msg.text) setLastTranscript(msg.text);
+            } else if (msg.type === "user_transcript") {
+              if (msg.text) setUserTranscript(msg.text);
+            } else if (msg.type === "assistant_transcript_delta") {
+              if (msg.delta) setAssistantTranscript((prev) => prev + msg.delta);
+            } else if (msg.type === "assistant_transcript") {
+              if (msg.text) setAssistantTranscript(msg.text);
             } else if (msg.type === "speech_stopped") {
               setStatus("responding");
             } else if (msg.type === "voice_done") {
@@ -234,7 +240,8 @@ export function useBrowserVoiceWs(chatId: string | null) {
   return {
     status,
     error,
-    lastTranscript,
+    userTranscript,
+    assistantTranscript,
     isActive: status === "connecting" || status === "listening" || status === "responding",
     start,
     stop,

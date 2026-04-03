@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Send, X, Loader2, History, Mic } from "lucide-react";
 import { MemoizedMarkdown } from "./MemoizedMarkdown.js";
@@ -41,6 +41,7 @@ export function ChatPane({
     status,
     stop,
     error,
+    markHydrationDirty,
   } = usePersistedChatController("text");
   const { data: chatInfo } = useChatInfo();
   const [input, setInput] = useState("");
@@ -52,11 +53,25 @@ export function ChatPane({
   const isLoading = status === "submitted" || status === "streaming";
   const isVoiceActive = voice.isActive;
 
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, []);
+
+  // Auto-scroll on new messages or streaming voice transcript changes
+  useEffect(scrollToBottom, [messages, scrollToBottom]);
+  useEffect(scrollToBottom, [voice.userTranscript, voice.assistantTranscript, scrollToBottom]);
+
+  // Re-hydrate persisted messages when voice session ends
+  const wasVoiceActiveRef = useRef(false);
+  useEffect(() => {
+    if (isVoiceActive) {
+      wasVoiceActiveRef.current = true;
+    } else if (wasVoiceActiveRef.current) {
+      wasVoiceActiveRef.current = false;
+      markHydrationDirty();
+    }
+  }, [isVoiceActive, markHydrationDirty]);
 
   // Focus once on mount; do not refocus after voice sessions.
   useEffect(() => {
@@ -130,6 +145,13 @@ export function ChatPane({
             <ToolCallGroup key={item.id} parts={item.tools} variant="regular" />
           )
         ))}
+
+        {isVoiceActive && voice.userTranscript && (
+          <MessageBubble id="voice-user" role="user" text={voice.userTranscript} />
+        )}
+        {isVoiceActive && voice.assistantTranscript && (
+          <MessageBubble id="voice-assistant" role="assistant" text={voice.assistantTranscript} />
+        )}
 
         {isLoading && messages.length > 0 && (
           <div className="flex items-center gap-2 text-xs text-sand-500 pl-1">
