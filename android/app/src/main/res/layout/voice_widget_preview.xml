@@ -3,7 +3,9 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/voice_idle_bg">
+    android:padding="8dp"
+    android:background="@drawable/widget_bg"
+    android:clipToPadding="false">
     <ImageView
         android:id="@+id/widget_icon"
         android:layout_width="48dp"

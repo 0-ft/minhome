@@ -22,6 +22,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".VoiceOverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Minhome.Overlay" />
+
         <receiver
             android:name=".VoiceWidgetReceiver"
             android:exported="true">

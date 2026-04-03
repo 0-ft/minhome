@@ -7,12 +7,16 @@ import android.media.*
 import android.os.IBinder
 import android.util.Log
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import okhttp3.*
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+
+enum class VoiceState { IDLE, CONNECTING, LISTENING, RESPONDING }
 
 class VoiceService : Service() {
 
@@ -22,16 +26,25 @@ class VoiceService : Service() {
         const val NOTIFICATION_ID = 1
         const val SAMPLE_RATE = 24000
 
-        @Volatile
-        var isRunning = false
-            private set
+        private val _stateFlow = MutableStateFlow(VoiceState.IDLE)
+        val stateFlow: StateFlow<VoiceState> = _stateFlow
 
-        fun toggle(context: Context) {
-            if (isRunning) {
-                context.stopService(Intent(context, VoiceService::class.java))
-            } else {
+        private val _userTranscript = MutableStateFlow("")
+        val userTranscript: StateFlow<String> = _userTranscript
+
+        private val _assistantTranscript = MutableStateFlow("")
+        val assistantTranscript: StateFlow<String> = _assistantTranscript
+
+        val isRunning: Boolean get() = _stateFlow.value != VoiceState.IDLE
+
+        fun start(context: Context) {
+            if (!isRunning) {
                 context.startForegroundService(Intent(context, VoiceService::class.java))
             }
+        }
+
+        fun stop(context: Context) {
+            context.stopService(Intent(context, VoiceService::class.java))
         }
     }
 
@@ -55,8 +68,9 @@ class VoiceService : Service() {
         }
 
         startForeground(NOTIFICATION_ID, buildNotification("Connecting…"))
-        isRunning = true
-        setWidgetStatus("connecting")
+        _userTranscript.value = ""
+        _assistantTranscript.value = ""
+        _stateFlow.value = VoiceState.CONNECTING
 
         val prefs = Prefs(this)
         if (!prefs.isLoggedIn) {
@@ -79,17 +93,9 @@ class VoiceService : Service() {
         audioTrack?.stop()
         audioTrack?.release()
         audioTrack = null
-        isRunning = false
-        val ctx = applicationContext
-        scope.launch {
-            VoiceWidget.setStatus(ctx, "idle")
-        }.invokeOnCompletion { scope.cancel() }
+        scope.cancel()
+        _stateFlow.value = VoiceState.IDLE
         super.onDestroy()
-    }
-
-    private fun setWidgetStatus(status: String) {
-        val ctx = applicationContext
-        scope.launch { VoiceWidget.setStatus(ctx, status) }
     }
 
     private fun connectWebSocket(prefs: Prefs) {
@@ -115,12 +121,12 @@ class VoiceService : Service() {
                         "voice_ready" -> {
                             Log.d(TAG, "Voice ready, starting mic")
                             updateNotification("Listening…")
-                            setWidgetStatus("listening")
+                            _stateFlow.value = VoiceState.LISTENING
                             startMicCapture()
                         }
                         "speech_stopped" -> {
                             updateNotification("Working…")
-                            setWidgetStatus("responding")
+                            _stateFlow.value = VoiceState.RESPONDING
                         }
                         "voice_done" -> {
                             Log.d(TAG, "Voice done")
@@ -135,10 +141,18 @@ class VoiceService : Service() {
                             stopSelf()
                         }
                         "user_transcript" -> {
-                            Log.d(TAG, "User: ${msg.optString("text")}")
+                            val text = msg.optString("text")
+                            Log.d(TAG, "User: $text")
+                            _userTranscript.value = text
+                        }
+                        "assistant_transcript_delta" -> {
+                            val delta = msg.optString("delta")
+                            _assistantTranscript.value += delta
                         }
                         "assistant_transcript" -> {
-                            Log.d(TAG, "Assistant: ${msg.optString("text")}")
+                            val text = msg.optString("text")
+                            Log.d(TAG, "Assistant: $text")
+                            _assistantTranscript.value = text
                         }
                     }
                 } catch (e: Exception) {
