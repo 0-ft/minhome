@@ -1,7 +1,9 @@
 package com.minhome.widget
 
 import android.content.Context
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -40,6 +42,18 @@ object ListApi {
                 ListWidgetReceiver.refreshFromData(context, data)
             }
             return data
+        }
+    }
+
+    fun moveItem(prefs: Prefs, listId: String, itemId: Int, newStatusId: String) {
+        val body = JSONObject().put("status_id", newStatusId)
+        val request = Request.Builder()
+            .url("${prefs.serverUrl}/api/lists/$listId/items/$itemId/status")
+            .patch(body.toString().toRequestBody("application/json".toMediaType()))
+            .header("Cookie", ApiClient.sessionCookieHeader(prefs.sessionToken))
+            .build()
+        ApiClient.http.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw Exception("Failed to move item (${resp.code})")
         }
     }
 
