@@ -186,6 +186,14 @@ Provides an LLM-powered assistant that can inspect and control the smart home.
 
 The AI model is configured via `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` environment variables. Any OpenAI-compatible provider works.
 
+### Realtime voice (`src/voice-realtime.ts`)
+
+Speech-to-speech sessions are powered by the OpenAI Realtime API and require:
+
+- `OPENAI_API_KEY` — OpenAI API key (must support Realtime).
+- `OPENAI_REALTIME_MODEL` — **required**, no code default. Set to a Realtime model id such as `gpt-realtime-2`. The server throws on session open if this is missing.
+- `OPENAI_REALTIME_REASONING_EFFORT` — optional, defaults to `low`. Accepts `minimal`, `low`, `medium`, `high`, or `xhigh` and is forwarded to the session as `reasoning.effort` for reasoning-capable models like `gpt-realtime-2`.
+
 ### MCP Server (`src/mcp.ts`)
 
 A standalone [Model Context Protocol](https://modelcontextprotocol.io/) server that communicates over stdio. It uses the Hono RPC client to call the server's REST API.

@@ -106,6 +106,11 @@ Create a `.env` file in the project root (used by Docker Compose):
 AI_API_KEY=sk-...
 AI_BASE_URL=https://api.openai.com/v1   # or any OpenAI-compatible endpoint
 AI_MODEL=gpt-4o                          # model identifier
+
+# Required for Realtime voice (optional — omit to disable voice)
+OPENAI_API_KEY=sk-...
+OPENAI_REALTIME_MODEL=gpt-realtime-2     # required when voice is enabled, no code default
+OPENAI_REALTIME_REASONING_EFFORT=low     # minimal | low | medium | high | xhigh
 ```
 
 ### 4. Start the stack
@@ -226,7 +231,10 @@ Stores automation rules. All triggers, conditions, and actions that reference de
 | `DATA_DIR` | repo root | Directory containing `config.json` and `automations.json` |
 | `AI_API_KEY` | _(none)_ | OpenAI-compatible API key (enables AI chat) |
 | `AI_BASE_URL` | _(OpenAI default)_ | Custom base URL for AI provider |
-| `AI_MODEL` | `gpt-4o` | Model identifier |
+| `AI_MODEL` | `gpt-4o` | Model identifier for the text chat AI |
+| `OPENAI_API_KEY` | _(none)_ | OpenAI API key for the Realtime voice session (enables voice) |
+| `OPENAI_REALTIME_MODEL` | _(required for voice)_ | Realtime voice model id (e.g. `gpt-realtime-2`). No code fallback — must be set in `.env`. |
+| `OPENAI_REALTIME_REASONING_EFFORT` | `low` | Reasoning effort for `gpt-realtime-2`: `minimal`, `low`, `medium`, `high`, or `xhigh`. |
 | `MINHOME_URL` | `http://localhost:3111` | Server URL (used by CLI and MCP server) |
 | `TUNNEL_HOSTNAME` | _(none)_ | Public hostname Caddy should obtain a certificate for |
 | `TUNNEL_ID` | _(none)_ | Named Cloudflare tunnel UUID |

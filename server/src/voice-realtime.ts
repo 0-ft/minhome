@@ -30,6 +30,18 @@ interface PersistedToolPart {
   errorText?: string;
 }
 
+// ── Reasoning effort (gpt-realtime-2) ─────────────────────────
+
+const REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh"] as const;
+type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+function readReasoningEffort(): ReasoningEffort {
+  const raw = (process.env.OPENAI_REALTIME_REASONING_EFFORT ?? "low").toLowerCase();
+  return (REASONING_EFFORTS as readonly string[]).includes(raw)
+    ? (raw as ReasoningEffort)
+    : "low";
+}
+
 // ── Convert Zod tool defs → OpenAI Realtime tool format ──────
 
 function buildRealtimeTools(ctx: ToolContext) {
@@ -157,7 +169,10 @@ export class RealtimeSession {
       throw new Error("OPENAI_API_KEY not set");
     }
 
-    const model = process.env.OPENAI_REALTIME_MODEL ?? "gpt-realtime";
+    const model = process.env.OPENAI_REALTIME_MODEL;
+    if (!model) {
+      throw new Error("OPENAI_REALTIME_MODEL not set — set it in .env (e.g. gpt-realtime-2)");
+    }
     console.log(`[realtime] Opening session ${this.sessionId} (model: ${model})`);
     debugLog.add("voice_session_start", `Voice session: ${this.sessionId}`, { sessionId: this.sessionId, model });
 
@@ -259,14 +274,34 @@ export class RealtimeSession {
       this.toolCtx.voiceDevices,
     );
 
-    const voiceSystem = base
-      + "\n\nVoice response rules:\n"
-      + "- Speak in plain text only. Do not use markdown or XML tags.\n"
-      + "- Keep responses very short: one brief sentence by default.\n"
-      + "- State only the essential result or next question.\n"
-      + "- Do not add conversational sign-offs or filler (for example: \"let me know if you need anything else\", \"feel free to ask\", \"anything else\").\n"
-      + "- If the user asks a yes/no action and it succeeded, confirm directly and stop.\n"
-      + "- If the requested state is already true, say that briefly and stop.";
+    const voiceSystem = base + `
+
+# Role and Objective
+You are a voice-first smart-home assistant. Success means understanding the user's intent and either completing the action or asking one short clarifying question.
+
+# Verbosity
+- Direct answers: one short sentence.
+- Confirmations after a successful action: one short sentence (for example, "Done — the kitchen light is on").
+- If the requested state is already true, say so briefly and stop.
+- Do not add sign-offs or filler such as "let me know if you need anything else", "feel free to ask", or "anything else".
+
+# Reasoning
+- For direct device commands, status lookups, and short confirmations, respond quickly and do not reason.
+- For multi-step automations, troubleshooting, or ambiguous requests, reason briefly before acting.
+- Do not reason while the user's audio is unclear; ask for clarification instead.
+
+# Tools
+- For read-only tools (e.g. listing devices, room config), call them as soon as intent is clear.
+- For write tools that change device state or modify automations, summarize the intended action in one short sentence first, then call the tool.
+- Use only the tools provided. Do not invent or simulate tools.
+
+# Unclear Audio
+- Only act on audio you understand clearly.
+- If audio is unclear, ambiguous, or cut off, ask "Sorry, could you say that again?" and stop.
+- Do not guess identifiers or device names from unclear audio.
+
+# Output style
+- Speak in plain text only. Do not use markdown or XML tags.`;
 
     const { tools } = buildRealtimeTools(this.toolCtx);
 
@@ -275,6 +310,7 @@ export class RealtimeSession {
       session: {
         type: "realtime",
         instructions: voiceSystem,
+        reasoning: { effort: readReasoningEffort() },
         audio: {
           input: {
             format: { type: "audio/pcm", rate: 24000 },

@@ -53,6 +53,31 @@ export function ChatPane({
   const isLoading = status === "submitted" || status === "streaming";
   const isVoiceActive = voice.isActive;
 
+  // Once the persisted version of the current voice turn arrives via
+  // `chats_change`, suppress the matching ephemeral bubble to avoid showing
+  // the same text twice (the persisted message renders via `renderItems` and
+  // the ephemeral one would otherwise linger until the voice session ends).
+  const lastTextByRole = useMemo(() => {
+    let user: string | null = null;
+    let assistant: string | null = null;
+    for (let i = renderItems.length - 1; i >= 0; i -= 1) {
+      const item = renderItems[i];
+      if (item.kind !== "text") continue;
+      if (item.role === "user" && user === null) user = item.text.trim();
+      else if (item.role === "assistant" && assistant === null) assistant = item.text.trim();
+      if (user !== null && assistant !== null) break;
+    }
+    return { user, assistant };
+  }, [renderItems]);
+  const showVoiceUserBubble
+    = isVoiceActive
+    && voice.userTranscript.trim().length > 0
+    && lastTextByRole.user !== voice.userTranscript.trim();
+  const showVoiceAssistantBubble
+    = isVoiceActive
+    && voice.assistantTranscript.trim().length > 0
+    && lastTextByRole.assistant !== voice.assistantTranscript.trim();
+
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -148,10 +173,10 @@ export function ChatPane({
           )
         ))}
 
-        {isVoiceActive && voice.userTranscript && (
+        {showVoiceUserBubble && (
           <MessageBubble id="voice-user" role="user" text={voice.userTranscript} />
         )}
-        {isVoiceActive && voice.assistantTranscript && (
+        {showVoiceAssistantBubble && (
           <MessageBubble id="voice-assistant" role="assistant" text={voice.assistantTranscript} />
         )}
 
