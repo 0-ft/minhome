@@ -56,8 +56,8 @@ export const DisplayDeviceSchema = z.object({
   refresh_rate: z.number().positive(),
   /** Display layout orientation. */
   orientation: z.enum(["landscape", "portrait"]),
-  /** PNG color depth in bits per pixel (1 -> 2 colours, 2 -> 4 colours). */
-  color_depth: z.number().int().min(1).max(2),
+  /** PNG colour depth in bits per pixel (1 -> 2 colours, 2 -> 4, 3 -> 8, 4 -> 16 greys). */
+  color_depth: z.number().int().min(1).max(4),
   /** Inner padding in pixels applied inside each tile container. */
   tile_padding: z.number().nonnegative().default(0),
   /** Gutter in pixels between adjacent tiles. */

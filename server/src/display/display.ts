@@ -5,7 +5,7 @@
  *   GET  /display/api/setup   – device registration
  *   GET  /display/api/display – polling endpoint (image URL + refresh rate)
  *   POST /display/api/log     – device log ingestion
- *   GET  /display/image       – 800×480 PNG (configurable colour depth)
+ *   GET  /display/image       – PNG at the device's reported size (configurable colour depth)
  *   GET  /display/html        – debug HTML of pre-Satori render tree
  */
 
@@ -184,9 +184,9 @@ function resolveTilesForImage(device: DeviceMatch | undefined): TileConfig[] {
   return defaultTiles("Configure display tiles");
 }
 
-function getPaletteColourCount(colorDepth: DisplayDeviceConfig["color_depth"]): 2 | 4 {
-  if (colorDepth === 2) return 4;
-  return 2;
+function getPaletteColourCount(colorDepth: DisplayDeviceConfig["color_depth"]): number {
+  // 1 -> 2, 2 -> 4, 3 -> 8, 4 -> 16 greys (the TRMNL X panel takes 16).
+  return 2 ** colorDepth;
 }
 
 async function buildDisplayRootElement(
