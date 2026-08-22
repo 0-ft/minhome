@@ -158,9 +158,15 @@ make tunnel-setup
 Then start the tunnel stack:
 
 ```bash
-make up-tunnel BUILD=1       # production
-make up-dev-tunnel BUILD=1   # development (with Vite HMR over wss)
+make up-tunnel BUILD=1          # production
+make up-hybrid-tunnel BUILD=1   # hot-reload server, built frontend assets
 ```
+
+The Vite dev server is **never** exposed through the tunnel. It serves any file
+under the workspace root via `/@fs/` and has no authentication of its own, so
+publishing it would leak `data/` (including `tokens.json`) to the internet. Use
+the hybrid overlay when you want server hot-reload on a tunnelled host; for
+frontend hot-reload, use `pnpm up:dev` and reach Vite over the LAN on port 5173.
 
 See [`infra/tunnel/README.md`](infra/tunnel/README.md) for full details, manual steps, and troubleshooting.
 

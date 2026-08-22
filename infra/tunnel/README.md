@@ -24,7 +24,7 @@ After setup completes:
 
 ```bash
 make up-tunnel BUILD=1       # production
-make up-dev-tunnel BUILD=1   # development (Vite HMR over wss)
+make up-hybrid-tunnel BUILD=1   # hot-reload server, built frontend assets
 ```
 
 ---

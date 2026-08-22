@@ -1,4 +1,12 @@
 services:
+  # Whenever the tunnel is up, force the server to serve the built frontend.
+  # This overrides VITE_DEV_URL from the dev overlay, so even a hand-rolled
+  # `-f docker-compose.dev.yml -f docker-compose.tunnel.yml` cannot publish
+  # the Vite dev server (which serves arbitrary repo files via /@fs/).
+  server:
+    environment:
+      - VITE_DEV_URL=
+
   caddy:
     container_name: minhome-caddy
     image: ghcr.io/caddybuilds/caddy-cloudflare:2
@@ -8,6 +16,7 @@ services:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     volumes:
       - ./infra/tunnel/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/var/log/caddy
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

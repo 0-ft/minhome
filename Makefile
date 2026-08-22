@@ -1,4 +1,4 @@
-.PHONY: up up-tunnel up-dev up-dev-tunnel up-hybrid up-hybrid-tunnel down down-tunnel down-dev down-dev-tunnel down-hybrid down-hybrid-tunnel logs logs-tunnel logs-dev logs-dev-tunnel logs-hybrid logs-hybrid-tunnel reload reload-bridge logs-bridge tunnel-setup
+.PHONY: up up-tunnel up-dev up-hybrid up-hybrid-tunnel down down-tunnel down-dev down-hybrid down-hybrid-tunnel logs logs-tunnel logs-dev logs-hybrid logs-hybrid-tunnel reload reload-bridge logs-bridge tunnel-setup
 
 up:
 	docker compose up -d $(if $(BUILD),--build)
@@ -9,8 +9,6 @@ up-tunnel:
 up-dev:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d $(if $(BUILD),--build)
 
-up-dev-tunnel:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tunnel.yml up -d $(if $(BUILD),--build)
 
 up-hybrid:
 	docker compose -f docker-compose.yml -f docker-compose.hybrid.yml up -d $(if $(BUILD),--build)
@@ -27,8 +25,6 @@ down-tunnel:
 down-dev:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
-down-dev-tunnel:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tunnel.yml down
 
 down-hybrid:
 	docker compose -f docker-compose.yml -f docker-compose.hybrid.yml down
@@ -45,8 +41,6 @@ logs-tunnel:
 logs-dev:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
 
-logs-dev-tunnel:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.tunnel.yml logs -f
 
 logs-hybrid:
 	docker compose -f docker-compose.yml -f docker-compose.hybrid.yml logs -f
