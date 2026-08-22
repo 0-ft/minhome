@@ -94,11 +94,14 @@ export function createListDisplayElement(
             const iconSrc = iconSvg ? svgToDataUri(iconSvg) : null;
             return (
               <div className="item" key={item.id}>
-                <div className="meta">
-                  {iconSrc ? <img src={iconSrc} width="16" height="16" alt="" /> : null}
-                </div>
+                <div className="meta" />
+                {iconSrc ? (
+                  <div className="icon">
+                    <img src={iconSrc} alt="" />
+                  </div>
+                ) : null}
                 <div className="content">
-                  <span className="label">{renderInlineMarkdownTitle(item.title)}</span>
+                  <span className="title title--small">{renderInlineMarkdownTitle(item.title)}</span>
                 </div>
               </div>
             );

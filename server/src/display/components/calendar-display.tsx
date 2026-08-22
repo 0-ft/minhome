@@ -206,9 +206,10 @@ function renderAgenda(
         const { continuesFromPrev, continuesToNext } = getEventContinuation(event, day);
         return (
           <div className="item" key={`${event.start.toISOString()}-${idx}`}>
-            <div className="meta">
-              {continuesFromPrev ? renderContinuationTriangle("left") : null}
-            </div>
+            <div className="meta" />
+            {continuesFromPrev ? (
+              <div className="icon">{renderContinuationTriangle("left")}</div>
+            ) : null}
             <div className="content">
               <span className="label label--small">{eventTimeLabelForAgenda(event, day)}</span>
               <span className="title title--small">{event.summary}</span>
