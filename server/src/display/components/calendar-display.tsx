@@ -182,7 +182,7 @@ function renderContinuationTriangle(direction: "left" | "right"): ReactElement {
     : "1.5,1 8.5,5 1.5,9";
 
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" tw="block">
+    <svg width="10" height="10" viewBox="0 0 10 10" style={{ display: "block" }}>
       <polygon points={points} fill={EINK_FOREGROUND} />
     </svg>
   );
@@ -195,45 +195,33 @@ function renderAgenda(
   const day = new Date();
 
   if (events.length === 0) {
-    return (
-      <div tw="flex flex-1 min-w-0 min-h-0 flex-col gap-1.5 overflow-visible">
-        <div tw="text-[16px] font-bold leading-[1.2] break-words">No events for today</div>
-      </div>
-    );
+    return <span className="description">No events for today</span>;
   }
 
+  // Each event is a framework `item`: the `meta` slot carries the continuation
+  // marker, so the framework owns the rule, spacing and type scale.
   return (
-    <div tw="flex flex-1 min-w-0 min-h-0 flex-col gap-1.5 overflow-visible">
-      <div tw="flex flex-col gap-1.5 overflow-visible">
-        {events.map((event, idx) => {
-          const { continuesFromPrev, continuesToNext } = getEventContinuation(event, day);
-          return (
-            <div key={`${event.start.toISOString()}-${idx}`} tw="flex items-stretch gap-1">
-              {continuesFromPrev
-                ? (
-                    <div tw="flex items-center justify-center text-[12px] font-bold leading-[1] text-black w-[10px] min-w-[10px] overflow-visible">
-                      <div tw="flex text-[12px] leading-[1]">{renderContinuationTriangle("left")}</div>
-                    </div>
-                  )
-                : <div tw="w-[10px] min-w-[10px]" />}
-              <div tw="border-l-2 border-black py-[5px] pl-[6px] flex flex-col gap-1 flex-1">
-                <div tw="text-[14px] font-bold leading-[1.2]">{eventTimeLabelForAgenda(event, day)}</div>
-                <div tw="text-[16px] font-bold leading-[1.2] break-words">{event.summary}</div>
-                {config.show_location && event.location ? (
-                  <div tw="text-[13px] font-medium leading-[1.2] break-words">{event.location}</div>
-                ) : null}
-              </div>
-              {continuesToNext
-                ? (
-                    <div tw="flex items-center justify-end text-[12px] font-bold leading-[1] text-black w-[10px] min-w-[10px]">
-                      <div tw="flex text-[12px] leading-[1] ml-[-2px]">{renderContinuationTriangle("right")}</div>
-                    </div>
-                  )
-                : <div tw="w-[10px] min-w-[10px]" />}
+    <div className="flex flex--col gap--small">
+      {events.map((event, idx) => {
+        const { continuesFromPrev, continuesToNext } = getEventContinuation(event, day);
+        return (
+          <div className="item" key={`${event.start.toISOString()}-${idx}`}>
+            <div className="meta">
+              {continuesFromPrev ? renderContinuationTriangle("left") : null}
             </div>
-          );
-        })}
-      </div>
+            <div className="content">
+              <span className="label label--small">{eventTimeLabelForAgenda(event, day)}</span>
+              <span className="title title--small">{event.summary}</span>
+              {config.show_location && event.location ? (
+                <span className="description">{event.location}</span>
+              ) : null}
+              {continuesToNext ? (
+                <span className="label label--small">{renderContinuationTriangle("right")}</span>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -249,11 +237,11 @@ function renderGrid(
   const eventsPerCell = isMonth ? 2 : 3;
 
   return (
-    <div tw="flex flex-1 min-w-0 min-h-0 flex-col gap-1">
+    <div style={{ display: "flex", flex: 1, minWidth: 0, minHeight: 0, flexDirection: "column", gap: 4 }}>
       {Array.from({ length: rows }, (_, rowIdx) => {
         const rowDays = days.slice(rowIdx * 7, rowIdx * 7 + 7);
         return (
-          <div key={`row-${rowIdx}`} tw="flex flex-1 gap-1 min-h-0">
+          <div key={`row-${rowIdx}`} style={{ display: "flex", flex: 1, gap: 4, minHeight: 0 }}>
             {rowDays.map((day, dayIdx) => {
               const dayEvents = events
                 .filter((event) => overlapsDay(event, day))
@@ -263,30 +251,27 @@ function renderGrid(
               const outsideCurrentMonth = isMonth && day.getMonth() !== now.getMonth();
 
               return (
-                <div key={`day-${rowIdx}-${dayIdx}`} tw="flex-1 p-1 flex flex-col gap-[3px] min-w-0 overflow-hidden bg-white">
+                <div key={`day-${rowIdx}-${dayIdx}`} style={{ flex: 1, padding: 4, display: "flex", flexDirection: "column", gap: 3, minWidth: 0, overflow: "hidden" }}>
                   <div
-                    tw="flex justify-between items-center font-bold pb-[2px] min-h-[14px]"
-                    style={{ fontSize: isMonth ? 10 : 12 }}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, paddingBottom: 2, minHeight: 14, fontSize: isMonth ? 10 : 12 }}
                   >
-                    <div tw="flex">{WEEKDAY_SHORT_FORMATTER.format(day)}</div>
-                    <div tw="flex">{DAY_NUMBER_FORMATTER.format(day)}</div>
+                    <div>{WEEKDAY_SHORT_FORMATTER.format(day)}</div>
+                    <div>{DAY_NUMBER_FORMATTER.format(day)}</div>
                   </div>
-                  <div tw="flex flex-col gap-[2px] min-w-0 overflow-hidden">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, overflow: "hidden" }}>
                     {visible.length > 0 ? (
-                      <div tw="flex flex-col gap-[2px]">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         {visible.map((event, eventIdx) => (
                           <div
                             key={`event-${eventIdx}`}
-                            tw="leading-[1.2] font-medium px-[3px] py-[2px] whitespace-normal break-words overflow-hidden bg-white"
-                            style={{ fontSize: isMonth ? 9 : 11 }}
+                            style={{ lineHeight: 1.2, padding: "2px 3px", overflowWrap: "anywhere", overflow: "hidden", fontSize: isMonth ? 9 : 11 }}
                           >
                             {formatGridEventText(event, config.show_location)}
                           </div>
                         ))}
                         {hiddenCount > 0 ? (
                           <div
-                            tw="leading-[1.2] font-bold p-0 whitespace-normal break-words overflow-hidden bg-white"
-                            style={{ fontSize: isMonth ? 9 : 11 }}
+                            style={{ lineHeight: 1.2, fontWeight: 700, overflowWrap: "anywhere", overflow: "hidden", fontSize: isMonth ? 9 : 11 }}
                           >
                             {`+${hiddenCount} more`}
                           </div>
@@ -294,8 +279,7 @@ function renderGrid(
                       </div>
                     ) : (
                       <div
-                        tw="leading-[1.2] font-medium p-0 whitespace-normal break-words overflow-hidden bg-white"
-                        style={{ fontSize: isMonth ? 9 : 11, opacity: outsideCurrentMonth ? 0.35 : 0.55 }}
+                        style={{ lineHeight: 1.2, overflowWrap: "anywhere", overflow: "hidden", fontSize: isMonth ? 9 : 11, opacity: outsideCurrentMonth ? 0.35 : 0.55 }}
                       >
                         {outsideCurrentMonth ? "" : "No events"}
                       </div>
@@ -339,17 +323,10 @@ export async function createCalendarDisplayElement(
         : renderGrid(events, config);
 
     return componentSuccess(
-      <div tw="font-sans flex flex-1 min-w-0 min-h-0 flex-col text-black gap-1.5">
-        <div
-          tw="text-[18px] font-bold leading-[1.1] pb-1 mb-[2px]"
-          style={{ fontSize: titleFontSize }}
-        >
-          {title}
-        </div>
-        {subtitle ? <div tw="text-[12px] font-semibold mt-[-2px] mb-[2px]">{subtitle}</div> : null}
-        <div tw="flex flex-1 min-h-0">
-          {body}
-        </div>
+      <div className="flex flex--col gap--small">
+        <span className="title title--small">{title}</span>
+        {subtitle ? <span className="label label--small">{subtitle}</span> : null}
+        {body}
       </div>,
     );
   } catch (error) {

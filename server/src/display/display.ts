@@ -6,19 +6,21 @@
  *   GET  /display/api/display – polling endpoint (image URL + refresh rate)
  *   POST /display/api/log     – device log ingestion
  *   GET  /display/image       – PNG at the device's reported size (configurable colour depth)
- *   GET  /display/html        – debug HTML of pre-Satori render tree
+ *   GET  /display/html        – the exact framework document /display/image screenshots
  */
 
 import { Hono } from "hono";
 import sharp from "sharp";
-import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CalendarService } from "../calendar/service.js";
 import type { ConfigStore, DisplayDeviceConfig, DisplaysConfig } from "../config/config.js";
+import { getDisplayColorDepth } from "../config/config.js";
 import type { ListStore } from "../config/lists.js";
 import { debugLog } from "../debug-log.js";
-import type { TileConfig } from "./tiles.js";
-import { createComponentElement, renderElementToPngBuffer } from "./render.js";
+import type { ScreenLayout } from "./layout.js";
+import { createComponentElement } from "./render-components.js";
+import { buildFrameworkDocument, renderDocumentToPngBuffer } from "./render-browser.js";
+import { FRAMEWORK_DEVICES } from "./device-profiles.js";
 import type { ListProvider } from "./components/list-display.js";
 
 function normalizeMac(mac: string): string {
@@ -85,7 +87,7 @@ type ImageRenderTimings = {
 
 const DEFAULT_REFRESH_RATE = 300;
 const DEFAULT_ORIENTATION: DisplayDeviceConfig["orientation"] = "landscape";
-const DEFAULT_COLOR_DEPTH: DisplayDeviceConfig["color_depth"] = 1;
+const DEFAULT_FRAMEWORK_DEVICE = "og" as const;
 
 function parsePositiveInt(value: string | undefined): number | undefined {
   if (!value) return undefined;
@@ -113,181 +115,55 @@ function appendDimensionsToImageUrl(imageUrl: string, dimensions: DisplayDimensi
   return url.toString();
 }
 
-function getRenderDimensions(
-  orientation: DisplayDeviceConfig["orientation"],
-  deviceDimensions: DisplayDimensions,
-): { width: number; height: number } {
-  if (orientation === "portrait") {
-    return { width: deviceDimensions.height, height: deviceDimensions.width };
-  }
-  return { width: deviceDimensions.width, height: deviceDimensions.height };
-}
-
-function regionToPixels(
-  region: TileConfig["region"],
-  width: number,
-  height: number,
-): { left: number; top: number; width: number; height: number } {
-  const left = Math.max(0, Math.min(width - 1, Math.round(region.x * width)));
-  const top = Math.max(0, Math.min(height - 1, Math.round(region.y * height)));
-  const right = Math.max(left + 1, Math.min(width, Math.round((region.x + region.w) * width)));
-  const bottom = Math.max(top + 1, Math.min(height, Math.round((region.y + region.h) * height)));
-
+function defaultLayout(fallbackText: string): ScreenLayout {
   return {
-    left,
-    top,
-    width: right - left,
-    height: bottom - top,
+    view: "full",
+    layout: ["top"],
+    columns: [{ component: { kind: "string_display", text: fallbackText, size: "large" } }],
   };
 }
 
-function applyTileGutter(
-  region: TileConfig["region"],
-  rect: { left: number; top: number; width: number; height: number },
-  gutter: number,
-): { left: number; top: number; width: number; height: number } {
-  const epsilon = 1e-6;
-  const touchesRightEdge = (region.x + region.w) >= (1 - epsilon);
-  const touchesBottomEdge = (region.y + region.h) >= (1 - epsilon);
-  const rightGutter = touchesRightEdge ? 0 : gutter;
-  const bottomGutter = touchesBottomEdge ? 0 : gutter;
-
-  return {
-    left: rect.left,
-    top: rect.top,
-    width: Math.max(1, rect.width - rightGutter),
-    height: Math.max(1, rect.height - bottomGutter),
-  };
+function resolveLayoutForImage(device: DeviceMatch | undefined): ScreenLayout {
+  if (!device) return defaultLayout("Display token not recognized");
+  if (device.display.layout.columns.length > 0) return device.display.layout;
+  return defaultLayout("Configure display layout");
 }
 
-function defaultTiles(fallbackText: string): TileConfig[] {
-  return [
-    {
-      region: { x: 0, y: 0, w: 1, h: 1 },
-      component: {
-        kind: "string_display",
-        text: fallbackText,
-      },
-    },
-  ];
-}
-
-function resolveTilesForImage(device: DeviceMatch | undefined): TileConfig[] {
-  if (!device) {
-    return defaultTiles("Display token not recognized");
-  }
-
-  if (device.display.tiles.length > 0) {
-    return device.display.tiles;
-  }
-
-  return defaultTiles("Configure display tiles");
-}
-
-function getPaletteColourCount(colorDepth: DisplayDeviceConfig["color_depth"]): number {
+function getPaletteColourCount(colorDepth: number): number {
   // 1 -> 2, 2 -> 4, 3 -> 8, 4 -> 16 greys (the TRMNL X panel takes 16).
   return 2 ** colorDepth;
 }
 
-async function buildDisplayRootElement(
+/** Render the configured columns into the framework's view/layout/columns markup. */
+async function buildScreenBodyHtml(
   device: DeviceMatch | undefined,
   calendarService: CalendarService,
   listProvider: ListProvider,
-  orientation: DisplayDeviceConfig["orientation"],
-  dimensions: DisplayDimensions,
-): Promise<{
-  rootElement: ReactElement;
-  renderSize: { width: number; height: number };
-  timings: { layoutMs: number; componentsMs: number };
-}> {
-  const renderSize = getRenderDimensions(orientation, dimensions);
-  const tiles = resolveTilesForImage(device);
-  const tilePadding = Math.max(0, Math.round(device?.display.tile_padding ?? 0));
-  const tileGutter = Math.max(0, Math.round(device?.display.tile_gutter ?? 0));
-  const layoutStart = Date.now();
-  const tileLayouts = tiles.map((tile) => {
-    const regionPixels = regionToPixels(tile.region, renderSize.width, renderSize.height);
-    const pixelRegion = applyTileGutter(tile.region, regionPixels, tileGutter);
-    return {
-      tile,
-      pixelRegion,
-      key: `${pixelRegion.left}:${pixelRegion.top}:${pixelRegion.width}:${pixelRegion.height}`,
-    };
-  });
-  const layoutMs = Date.now() - layoutStart;
+): Promise<{ html: string; timings: { layoutMs: number; componentsMs: number } }> {
+  const layout = resolveLayoutForImage(device);
 
   const componentsStart = Date.now();
-  const tileElements = await Promise.all(
-    tileLayouts.map(async ({ tile, pixelRegion, key }) => {
-      const tileElement = await createComponentElement(
-        tile.component,
-        calendarService,
-        listProvider,
-      );
-
-      return createElement(
-        "div",
-        {
-          key,
-          style: {
-            display: "flex",
-            flexDirection: "column",
-            position: "absolute",
-            left: pixelRegion.left,
-            top: pixelRegion.top,
-            width: pixelRegion.width,
-            height: pixelRegion.height,
-            overflow: "hidden",
-          },
-        },
-        createElement(
-          "div",
-          {
-            style: {
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              minWidth: 0,
-              minHeight: 0,
-              boxSizing: "border-box",
-              backgroundColor: "#ffffff",
-              padding: tilePadding,
-              overflow: "hidden",
-            },
-          },
-          tileElement,
-        ),
-      );
-    }),
+  const columnElements = await Promise.all(
+    layout.columns.map((column) =>
+      createComponentElement(column.component, calendarService, listProvider),
+    ),
   );
   const componentsMs = Date.now() - componentsStart;
 
-  const rootElement = createElement(
-    "div",
-    {
-      tw: "font-sans",
-      style: {
-        width: renderSize.width,
-        height: renderSize.height,
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-        backgroundColor: "#909090",
-        overflow: "hidden",
-        fontFamily: "Inter, sans-serif",
-      },
-    },
-    tileElements,
-  );
+  const layoutStart = Date.now();
+  const layoutClasses = ["layout", ...layout.layout.map((m) => `layout--${m}`)].join(" ");
+  const columnsHtml = columnElements
+    .map((element) => `<div class="column">${renderToStaticMarkup(element)}</div>`)
+    .join("");
+  const html =
+    `<div class="view view--${layout.view}">` +
+      `<div class="${layoutClasses}">` +
+        `<div class="columns">${columnsHtml}</div>` +
+      `</div>` +
+    `</div>`;
+  const layoutMs = Date.now() - layoutStart;
 
-  return {
-    rootElement,
-    renderSize,
-    timings: {
-      layoutMs,
-      componentsMs,
-    },
-  };
+  return { html, timings: { layoutMs, componentsMs } };
 }
 
 async function generateImage(
@@ -295,35 +171,37 @@ async function generateImage(
   calendarService: CalendarService,
   listProvider: ListProvider,
   orientation: DisplayDeviceConfig["orientation"],
-  colorDepth: DisplayDeviceConfig["color_depth"],
-  dimensions: DisplayDimensions,
+  colorDepth: number,
+  frameworkDevice: keyof typeof FRAMEWORK_DEVICES,
 ): Promise<{ png: Buffer; timings: ImageRenderTimings }> {
   const totalStart = Date.now();
 
   const buildStart = Date.now();
-  const { rootElement, renderSize, timings: buildTimings } = await buildDisplayRootElement(
+  const { html: bodyHtml, timings: buildTimings } = await buildScreenBodyHtml(
     device,
     calendarService,
     listProvider,
-    orientation,
-    dimensions,
   );
+  const document = buildFrameworkDocument(bodyHtml, { device: frameworkDevice, colorDepth });
   const buildRootMs = Date.now() - buildStart;
 
+  // Size comes from the framework profile, not the device's reported headers: the
+  // stylesheet paints at profile size regardless of what the panel claims.
+  const profile = FRAMEWORK_DEVICES[frameworkDevice];
   const rendererStart = Date.now();
-  const rendered = await renderElementToPngBuffer(rootElement, renderSize.width, renderSize.height);
+  const rendered = await renderDocumentToPngBuffer(document, {
+    width: profile.deviceWidth,
+    height: profile.deviceHeight,
+  });
   const rendererMs = Date.now() - rendererStart;
 
   const postprocessStart = Date.now();
-  let image = sharp(rendered)
-    .grayscale()
-    .removeAlpha();
-
+  let image = sharp(rendered).grayscale().removeAlpha();
   if (orientation === "portrait") {
     image = image.rotate(90);
   }
-
-  // Quantize after rendering so both 1-bit and 2-bit use the same pipeline.
+  // Chromium emits antialiased 8-bit greys; this is what produces the indexed PNG
+  // the firmware reads. dither:0 because the framework does its own dithering.
   const colours = getPaletteColourCount(colorDepth);
   const png = await image.png({ palette: true, colours, dither: 0 }).toBuffer();
   const postprocessMs = Date.now() - postprocessStart;
@@ -505,7 +383,10 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
       (token && lookupDeviceByToken(displays, token)) ||
       undefined;
     const orientation = matchedDevice?.display.orientation ?? DEFAULT_ORIENTATION;
-    const colorDepth = matchedDevice?.display.color_depth ?? DEFAULT_COLOR_DEPTH;
+    const frameworkDevice = matchedDevice?.display.framework_device ?? DEFAULT_FRAMEWORK_DEVICE;
+    const colorDepth = matchedDevice
+      ? getDisplayColorDepth(matchedDevice.display)
+      : FRAMEWORK_DEVICES[DEFAULT_FRAMEWORK_DEVICE].colorDepth;
 
     const { png, timings } = await generateImage(
       matchedDevice,
@@ -513,7 +394,7 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
       listProvider,
       orientation,
       colorDepth,
-      dimensions,
+      frameworkDevice,
     );
     const paletteColours = getPaletteColourCount(colorDepth);
     const mem = process.memoryUsage();
@@ -575,69 +456,15 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
       (headerMac && lookupDeviceByMac(displays, headerMac)) ||
       (token && lookupDeviceByToken(displays, token)) ||
       undefined;
-    const orientation = matchedDevice?.display.orientation ?? DEFAULT_ORIENTATION;
+    const frameworkDevice = matchedDevice?.display.framework_device ?? DEFAULT_FRAMEWORK_DEVICE;
+    const colorDepth = matchedDevice
+      ? getDisplayColorDepth(matchedDevice.display)
+      : FRAMEWORK_DEVICES[DEFAULT_FRAMEWORK_DEVICE].colorDepth;
 
-    const { rootElement, renderSize } = await buildDisplayRootElement(
-      matchedDevice,
-      calendarService,
-      listProvider,
-      orientation,
-      dimensions,
-    );
-    const renderedMarkup = renderToStaticMarkup(rootElement);
-
-    const html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Display HTML Preview</title>
-    <style>
-      @font-face {
-        font-family: "Inter";
-        font-style: normal;
-        font-weight: 100 900;
-        src: url("https://cdn.jsdelivr.net/npm/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
-          format("woff2-variations");
-      }
-      @font-face {
-        font-family: "Inter";
-        font-style: italic;
-        font-weight: 100 900;
-        src: url("https://cdn.jsdelivr.net/npm/@fontsource-variable/inter/files/inter-latin-wght-italic.woff2")
-          format("woff2-variations");
-      }
-      @font-face {
-        font-family: "Inter Mono";
-        font-style: normal;
-        font-weight: 100 900;
-        src: url("https://cdn.jsdelivr.net/npm/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
-          format("woff2-variations");
-      }
-      body {
-        margin: 0;
-        padding: 16px;
-        background: #111;
-        font-family: Inter, system-ui, sans-serif;
-      }
-      [tw~="font-sans"] { font-family: Inter, sans-serif; }
-      [tw~="font-mono"] { font-family: "Inter Mono", monospace; }
-      [tw~="font-normal"] { font-weight: 400; }
-      [tw~="font-medium"] { font-weight: 500; }
-      [tw~="font-semibold"] { font-weight: 600; }
-      [tw~="font-bold"] { font-weight: 700; }
-      [tw~="not-italic"] { font-style: normal; }
-    </style>
-  </head>
-  <body>
-    <div style="margin-bottom:8px;font-size:12px;">
-      Render size: ${renderSize.width}x${renderSize.height} (orientation: ${orientation})
-    </div>
-    <div style="width:${renderSize.width}px;height:${renderSize.height}px;overflow:hidden;box-shadow:0 0 0 1px #444;">
-      ${renderedMarkup}
-    </div>
-  </body>
-</html>`;
+    // Emit exactly the document the screenshot renders, so this endpoint is a
+    // faithful debug view rather than a lookalike with its own styling.
+    const { html: bodyHtml } = await buildScreenBodyHtml(matchedDevice, calendarService, listProvider);
+    const html = buildFrameworkDocument(bodyHtml, { device: frameworkDevice, colorDepth });
 
     return c.html(html);
   });

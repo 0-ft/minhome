@@ -3,7 +3,8 @@ import { dirname, resolve } from "path";
 import { z } from "zod";
 import { DeviceConfigSchema, EntityConfigSchema, extractEntitiesFromExposes } from "./devices.js";
 import { RoomSchema, type FurnitureItem } from "./room.js";
-import { TileConfigSchema } from "../display/tiles.js";
+import { ScreenLayoutSchema } from "../display/layout.js";
+import { FRAMEWORK_DEVICES, FRAMEWORK_DEVICE_IDS } from "../display/device-profiles.js";
 
 // Re-export sub-module types for consumers
 export { DeviceConfigSchema, EntityConfigSchema } from "./devices.js";
@@ -56,16 +57,29 @@ export const DisplayDeviceSchema = z.object({
   refresh_rate: z.number().positive(),
   /** Display layout orientation. */
   orientation: z.enum(["landscape", "portrait"]),
-  /** PNG colour depth in bits per pixel (1 -> 2 colours, 2 -> 4, 3 -> 8, 4 -> 16 greys). */
-  color_depth: z.number().int().min(1).max(4),
-  /** Inner padding in pixels applied inside each tile container. */
-  tile_padding: z.number().nonnegative().default(0),
-  /** Gutter in pixels between adjacent tiles. */
-  tile_gutter: z.number().nonnegative().default(0),
-  tiles: z.array(TileConfigSchema),
+  /**
+   * Which TRMNL framework device profile to render as. Any panel the framework
+   * knows about is selectable; the profile supplies the render size, pixel ratio
+   * and native colour depth. Generated from the vendored stylesheet, so this list
+   * tracks whatever framework version is vendored.
+   */
+  framework_device: z.enum(FRAMEWORK_DEVICE_IDS).default("og"),
+  /**
+   * PNG colour depth in bits per pixel (1 -> 2 colours, 2 -> 4, 3 -> 8, 4 -> 16 greys).
+   * Defaults to the framework profile's own depth; only set it to deliberately
+   * drive a panel at something other than its native depth.
+   */
+  color_depth: z.number().int().min(1).max(4).optional(),
+  /** Screen contents, in the framework's view/layout/columns primitives. */
+  layout: ScreenLayoutSchema,
 });
 
 export type DisplayDeviceConfig = z.infer<typeof DisplayDeviceSchema>;
+
+/** A display's effective colour depth: explicit override, else the profile's native depth. */
+export function getDisplayColorDepth(display: DisplayDeviceConfig): number {
+  return display.color_depth ?? FRAMEWORK_DEVICES[display.framework_device].colorDepth;
+}
 export const DisplaysConfigSchema = z.array(DisplayDeviceSchema).default([]);
 export type DisplaysConfig = z.infer<typeof DisplaysConfigSchema>;
 

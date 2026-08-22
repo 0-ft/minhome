@@ -333,11 +333,11 @@ function renderChart(
   if (points.length === 0) {
     return (
       <div
-        tw="font-sans flex flex-1 min-w-0 min-h-0 flex-col gap-2 text-black bg-white"
+        style={{ display: "flex", flex: 1, minWidth: 0, minHeight: 0, flexDirection: "column", gap: 8 }}
       >
-        <div tw="text-[18px] font-bold leading-[1.15] break-words">{series.title}</div>
-        <div tw="text-[12px] font-semibold leading-[1.2]">{series.subtitle}</div>
-        <div tw="text-[14px] font-semibold">No data in selected window</div>
+        <span className="title title--small">{series.title}</span>
+        <span className="label label--small">{series.subtitle}</span>
+        <span className="description">No data in selected window</span>
       </div>
     );
   }
@@ -373,15 +373,15 @@ function renderChart(
 
   return (
     <div
-      tw="font-sans flex flex-1 min-w-0 min-h-0 flex-col gap-2 text-black bg-white"
+      style={{ display: "flex", flex: 1, minWidth: 0, minHeight: 0, flexDirection: "column", gap: 8 }}
     >
-      <div tw="text-[18px] font-bold leading-[1.15] break-words">{series.title}</div>
-      <div tw="text-[12px] font-normal leading-[1.2]">{statsLine}</div>
-      <div tw="flex flex-1 min-h-0 min-w-0">
+      <span className="title title--small">{series.title}</span>
+      <span className="label label--small">{statsLine}</span>
+      <div style={{ display: "flex", flex: 1, minHeight: 0, minWidth: 0 }}>
         <img
           src={chartDataUrl}
           alt=""
-          tw="block w-full h-full object-contain"
+          style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
         />
       </div>
     </div>
