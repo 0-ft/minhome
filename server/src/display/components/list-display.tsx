@@ -102,7 +102,10 @@ export function createListDisplayElement(
               <div className="item" key={item.id}>
                 <div className="content">
                   <span
-                    className="title title--small"
+                    // font--regular keeps the 16px TRMNL16 size but drops the
+                    // bold that `title` carries by design; list entries are not
+                    // headings. Utilities are the last cascade layer, so it wins.
+                    className="title title--small font--regular"
                     style={{ display: "block", paddingLeft: "1.6em", textIndent: "-1.6em" }}
                   >
                     {iconSrc ? (
