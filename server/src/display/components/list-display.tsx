@@ -93,10 +93,14 @@ export function createListDisplayElement(
             const iconSvg = getLucideIconSvgByName(statusIconByStatus.get(item.statusId));
             const iconSrc = iconSvg ? svgToDataUri(iconSvg) : null;
             return (
+              // No `meta`: it renders as a faint dithered rule we do not want, and
+              // it is optional in the framework's item markup.
               <div className="item" key={item.id}>
-                <div className="meta" />
                 {iconSrc ? (
-                  <div className="icon">
+                  // `.icon` bottom-aligns its content (justify-content: flex-end),
+                  // which sits the glyph low against the text; flex--center is a
+                  // utility, and utilities are the last cascade layer, so it wins.
+                  <div className="icon flex--center">
                     <img src={iconSrc} alt="" />
                   </div>
                 ) : null}
