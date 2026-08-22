@@ -1,9 +1,11 @@
 services:
-  # Override server: mount source for hot-reload instead of building an image
+  # Override server: mount source for hot-reload, but still build an image --
+  # display rendering needs Chromium, which stock node:22-slim does not have.
   server:
-    image: node:22-slim
-    build: !reset null
-    command: sh -c "corepack enable && corepack prepare pnpm@10 --activate && pnpm install && pnpm --filter @minhome/server dev"
+    build:
+      context: .
+      dockerfile: server/Dockerfile.dev
+    command: sh -c "pnpm install && pnpm --filter @minhome/server dev"
     working_dir: /app
     volumes:
       - .:/app
