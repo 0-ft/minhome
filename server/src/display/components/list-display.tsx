@@ -93,19 +93,32 @@ export function createListDisplayElement(
             const iconSvg = getLucideIconSvgByName(statusIconByStatus.get(item.statusId));
             const iconSrc = iconSvg ? svgToDataUri(iconSvg) : null;
             return (
-              // No `meta`: it renders as a faint dithered rule we do not want, and
-              // it is optional in the framework's item markup.
+              // The icon sits inside the text's own line box rather than in a
+              // sibling flex column, so `vertical-align: middle` aligns it to the
+              // first line's midline -- the browser derives that from the font,
+              // with no line-height constants for us to get wrong or re-tune per
+              // device. The negative text-indent against the padding gives the
+              // hanging indent, so wrapped lines clear the icon.
               <div className="item" key={item.id}>
-                {iconSrc ? (
-                  // `.icon` bottom-aligns its content (justify-content: flex-end),
-                  // which sits the glyph low against the text; flex--center is a
-                  // utility, and utilities are the last cascade layer, so it wins.
-                  <div className="icon flex--center">
-                    <img src={iconSrc} alt="" />
-                  </div>
-                ) : null}
                 <div className="content">
-                  <span className="title title--small">{renderInlineMarkdownTitle(item.title)}</span>
+                  <span
+                    className="title title--small"
+                    style={{ display: "block", paddingLeft: "1.6em", textIndent: "-1.6em" }}
+                  >
+                    {iconSrc ? (
+                      <img
+                        src={iconSrc}
+                        alt=""
+                        style={{
+                          width: "1em",
+                          height: "1em",
+                          marginRight: "0.6em",
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    ) : null}
+                    {renderInlineMarkdownTitle(item.title)}
+                  </span>
                 </div>
               </div>
             );
