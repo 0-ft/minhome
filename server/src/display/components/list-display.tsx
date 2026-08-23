@@ -102,10 +102,12 @@ export function createListDisplayElement(
               <div className="item" key={item.id}>
                 <div className="content">
                   <span
-                    // font--regular keeps the 16px TRMNL16 size but drops the
-                    // bold that `title` carries by design; list entries are not
-                    // headings. Utilities are the last cascade layer, so it wins.
-                    className="title title--small font--regular"
+                    // A list entry is a label, not a heading: the framework uses
+                    // `title` for an item's heading with a `description` under it,
+                    // which is not the shape of a todo line. font--regular drops
+                    // the bold `label` carries by default; utilities are the last
+                    // cascade layer, so it wins without a specificity fight.
+                    className="label font--regular"
                     style={{ display: "block", paddingLeft: "1.6em", textIndent: "-1.6em" }}
                   >
                     {iconSrc ? (
