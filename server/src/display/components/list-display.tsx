@@ -37,6 +37,14 @@ function getLucideIconSvgByName(name: string | undefined): string | null {
   return maybeSvg.replaceAll("currentColor", "#000");
 }
 
+/**
+ * Gap between a list bullet and its text. This is the framework's own icon
+ * spacing (`.item .icon { margin-right: calc(6px * var(--ui-scale)) }`) rather
+ * than a number of ours, so it tracks --ui-scale across device profiles the way
+ * the rest of the framework's spacing does.
+ */
+const ICON_GAP = "calc(6px * var(--ui-scale, 1))";
+
 function svgToDataUri(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
@@ -108,7 +116,11 @@ export function createListDisplayElement(
                     // the bold `label` carries by default; utilities are the last
                     // cascade layer, so it wins without a specificity fight.
                     className="label font--regular"
-                    style={{ display: "block", paddingLeft: "1.6em", textIndent: "-1.6em" }}
+                    style={{
+                      display: "block",
+                      paddingLeft: `calc(1em + ${ICON_GAP})`,
+                      textIndent: `calc(-1em - ${ICON_GAP})`,
+                    }}
                   >
                     {iconSrc ? (
                       <img
@@ -117,7 +129,7 @@ export function createListDisplayElement(
                         style={{
                           width: "1em",
                           height: "1em",
-                          marginRight: "0.6em",
+                          marginRight: ICON_GAP,
                           verticalAlign: "middle",
                         }}
                       />
