@@ -3,7 +3,7 @@ import { useDevices, useSetDevice, useRenameDevice, useRenameEntity, useRefreshS
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
-import { DebouncedSlider } from "./ui/slider.js";
+import { ThrottledSlider } from "./ui/slider.js";
 import { EditableText } from "./ui/editable-text.js";
 import { Lightbulb, Plug, Power, Thermometer, Sun, ChevronRight, Radio, Palette } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
@@ -264,23 +264,23 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
 
       {/* Sliders */}
       {features.brightnessProperty && (
-        <DebouncedSlider
+        <ThrottledSlider
           min={1} max={254}
           serverValue={serverBrightness}
           value={brightness}
           onValueChange={setBrightness}
-          onCommit={(val) => onSet({ [features.brightnessProperty!]: val })}
+          onCommit={(val) => onSet({ [features.brightnessProperty!]: val, transition: 0 })}
           label={<Sun className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
         />
       )}
 
       {features.colorTempProperty && (
-        <DebouncedSlider
+        <ThrottledSlider
           min={142} max={500}
           serverValue={serverColorTemp}
           value={colorTemp}
           onValueChange={setColorTemp}
-          onCommit={(val) => onSet({ [features.colorTempProperty!]: val })}
+          onCommit={(val) => onSet({ [features.colorTempProperty!]: val, transition: 0 })}
           label={<Thermometer className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
         />
       )}
@@ -288,21 +288,21 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
       {/* Colour sliders (hue + saturation) */}
       {features.colorProperty && (
         <>
-          <DebouncedSlider
+          <ThrottledSlider
             min={0} max={360}
             serverValue={serverHue}
             value={hue}
             onValueChange={setHue}
-            onCommit={(val) => onSet({ [features.colorProperty!]: { hue: val, saturation } })}
+            onCommit={(val) => onSet({ [features.colorProperty!]: { hue: val, saturation }, transition: 0 })}
             label={<Palette className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-blood-200"}`} />}
             trackBackground={HUE_GRADIENT}
           />
-          <DebouncedSlider
+          <ThrottledSlider
             min={0} max={100}
             serverValue={serverSaturation}
             value={saturation}
             onValueChange={setSaturation}
-            onCommit={(val) => onSet({ [features.colorProperty!]: { hue, saturation: val } })}
+            onCommit={(val) => onSet({ [features.colorProperty!]: { hue, saturation: val }, transition: 0 })}
             label={
               <div
                 className="h-3.5 w-3.5 rounded-full border border-grey-400/40"

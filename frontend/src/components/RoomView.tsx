@@ -6,6 +6,7 @@ import { Zap as ZapIcon } from "lucide-react";
 import { useDevices, useConfig, useRefreshStates, useSetDevice, useDeviceEvent } from "../api.js";
 import type { DeviceData, Entity } from "../types.js";
 import { miredToRgb } from "../lib/color.js";
+import { useThrottledCommit } from "../lib/useThrottledCommit.js";
 
 // ── Types matching server config/room.ts ─────────────────
 export interface RoomDimensions {
@@ -309,7 +310,22 @@ function LightOrb({
     hasMoved: false, sentOn: false,
   });
   const latestDragRef = useRef<{ brightness: number; hue: number; saturation: number } | null>(null);
-  const commitTimer = useRef<ReturnType<typeof setTimeout>>();
+  // Payloads are built when sent, so "turn on" goes out with whichever update is sent first
+  const dragCommits = useThrottledCommit((vals: { brightness: number; hue: number; saturation: number }) => {
+    const c = stableRef.current;
+    const payload: Record<string, unknown> = {};
+    if (!c.isOn && !dragRef.current.sentOn) {
+      payload[c.stateProperty] = "ON";
+      dragRef.current.sentOn = true;
+    }
+    if (c.hasBrightness && c.entity?.features.brightnessProperty) {
+      payload[c.entity.features.brightnessProperty] = vals.brightness;
+    }
+    if (c.hasColor && c.entity?.features.colorProperty) {
+      payload[c.entity.features.colorProperty] = { hue: vals.hue, saturation: vals.saturation };
+    }
+    c.onDragSet?.(c.light.deviceId, payload);
+  }, 100);
 
   // ── Effective values (prefer drag state for instant feedback) ─
   const effectiveBrightness = dragState?.brightness ?? brightness;
@@ -410,23 +426,8 @@ function LightOrb({
       latestDragRef.current = vals;
       setDragState(vals);
 
-      // Debounced live update
-      clearTimeout(commitTimer.current);
-      commitTimer.current = setTimeout(() => {
-        const c = stableRef.current;
-        const payload: Record<string, unknown> = {};
-        if (!c.isOn && !dragRef.current.sentOn) {
-          payload[c.stateProperty] = "ON";
-          dragRef.current.sentOn = true;
-        }
-        if (c.hasBrightness && c.entity?.features.brightnessProperty) {
-          payload[c.entity.features.brightnessProperty] = newBr;
-        }
-        if (c.hasColor && c.entity?.features.colorProperty) {
-          payload[c.entity.features.colorProperty] = { hue: newHue, saturation: dragRef.current.startSaturation };
-        }
-        c.onDragSet?.(c.light.deviceId, payload);
-      }, 80);
+      // Throttled live update, so the light follows the drag
+      dragCommits.push(vals);
     };
 
     const onUp = () => {
@@ -437,22 +438,8 @@ function LightOrb({
 
       if (dragRef.current.hasMoved) {
         // Final commit with latest values
-        clearTimeout(commitTimer.current);
-        const latest = latestDragRef.current;
-        const c = stableRef.current;
-        if (latest && c.onDragSet) {
-          const payload: Record<string, unknown> = {};
-          if (!c.isOn && !dragRef.current.sentOn) {
-            payload[c.stateProperty] = "ON";
-          }
-          if (c.hasBrightness && c.entity?.features.brightnessProperty) {
-            payload[c.entity.features.brightnessProperty] = latest.brightness;
-          }
-          if (c.hasColor && c.entity?.features.colorProperty) {
-            payload[c.entity.features.colorProperty] = { hue: latest.hue, saturation: latest.saturation };
-          }
-          c.onDragSet(c.light.deviceId, payload);
-        }
+        if (latestDragRef.current) dragCommits.push(latestDragRef.current);
+        dragCommits.flush();
         latestDragRef.current = null;
         setDragState(null);
       } else {
@@ -466,8 +453,6 @@ function LightOrb({
     window.addEventListener("pointerup", onUp);
   }, [canDrag, setOrbitEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cleanup on unmount
-  useEffect(() => () => clearTimeout(commitTimer.current), []);
 
   return (
     <group position={light.position}>
@@ -830,9 +815,10 @@ export function useRoomData() {
     [setDevice],
   );
 
+  // Drags follow the pointer, so they skip the server's default fade
   const onDragSet = useCallback(
     (deviceId: string, payload: Record<string, unknown>) =>
-      setDevice.mutate({ id: deviceId, payload }),
+      setDevice.mutate({ id: deviceId, payload: { ...payload, transition: 0 } }),
     [setDevice],
   );
 

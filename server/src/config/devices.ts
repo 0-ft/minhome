@@ -232,6 +232,35 @@ export function readCanonicalEntityState(
   return result;
 }
 
+/** Fade applied to light changes sent by the server unless a request says otherwise. */
+export const DEFAULT_TRANSITION_SECONDS = 0.3;
+
+/** Whether an entity can fade (Z2M only accepts `transition` for dimmable lights). */
+export function canFade(entity: ExtractedEntity): boolean {
+  const { features } = entity;
+  return !!(features.brightnessProperty || features.colorProperty || features.colorTempProperty);
+}
+
+/**
+ * Add a `transition` to a resolved (MQTT-named) device payload when it changes
+ * a dimmable light. An explicit `transition` in the payload wins, then the
+ * `transition` argument, then the default. Payloads that only touch switches
+ * or non-light properties are returned unchanged.
+ */
+export function withTransition(
+  entities: ExtractedEntity[],
+  payload: Record<string, unknown>,
+  transition: number = DEFAULT_TRANSITION_SECONDS,
+): Record<string, unknown> {
+  if ("transition" in payload) return payload;
+  const touchesLight = entities.filter(canFade).some((entity) => {
+    const { features } = entity;
+    return [features.stateProperty, features.brightnessProperty, features.colorProperty, features.colorTempProperty]
+      .some((prop) => prop !== undefined && prop in payload);
+  });
+  return touchesLight ? { ...payload, transition } : payload;
+}
+
 /**
  * Resolve a canonical entity payload to actual MQTT property names.
  * e.g. { state: "ON" } on entity "l3" → { state_l3: "ON" }

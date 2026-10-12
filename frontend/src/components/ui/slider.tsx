@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useThrottledCommit } from "../../lib/useThrottledCommit.js";
 import { cn } from "../../lib/utils.js";
 
 interface SliderProps {
@@ -16,14 +17,20 @@ interface SliderProps {
   trackBackground?: string;
 }
 
-/** Debounced range slider — local state for smooth dragging, debounced commits */
-export function DebouncedSlider({ min, max, serverValue, onCommit, value, onValueChange, label, className, trackBackground }: SliderProps) {
+/**
+ * Range slider with local state for smooth dragging. While dragging it
+ * commits at most every 100ms (always the latest value), so a light follows
+ * the slider instead of jumping when you pause; the final value is sent on
+ * release.
+ */
+export function ThrottledSlider({ min, max, serverValue, onCommit, value, onValueChange, label, className, trackBackground }: SliderProps) {
   const controlled = value !== undefined;
   const [internalValue, setInternalValue] = useState(serverValue);
   const displayValue = controlled ? value : internalValue;
 
   const isDragging = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const releaseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const commits = useThrottledCommit(onCommit, 100);
 
   useEffect(() => {
     if (!isDragging.current) {
@@ -37,15 +44,15 @@ export function DebouncedSlider({ min, max, serverValue, onCommit, value, onValu
     if (!controlled) setInternalValue(val);
     onValueChange?.(val);
     isDragging.current = true;
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => onCommit(val), 150);
-  }, [onCommit, controlled, onValueChange]);
+    clearTimeout(releaseTimer.current);
+    commits.push(val);
+  }, [commits, controlled, onValueChange]);
 
   const handlePointerUp = useCallback(() => {
-    clearTimeout(timerRef.current);
-    onCommit(displayValue);
-    setTimeout(() => { isDragging.current = false; }, 500);
-  }, [displayValue, onCommit]);
+    commits.flush();
+    // Keep ignoring server echoes briefly so the thumb doesn't snap back while the light catches up
+    releaseTimer.current = setTimeout(() => { isDragging.current = false; }, 500);
+  }, [commits]);
 
   return (
     <div className={cn("flex items-center gap-2.5 flex-1", className)}>

@@ -10,7 +10,7 @@ import { FRAMEWORK_DEVICES, FRAMEWORK_DEVICE_IDS } from "../display/device-profi
 // Re-export sub-module types for consumers
 export { DeviceConfigSchema, EntityConfigSchema } from "./devices.js";
 export type { DeviceConfig, EntityConfig, ExtractedEntity, EntityFeatures, EntityResponse } from "./devices.js";
-export { extractEntitiesFromExposes, buildEntityResponses, resolveEntityPayload, resolveCanonicalProperty, partitionEntityState } from "./devices.js";
+export { extractEntitiesFromExposes, buildEntityResponses, resolveEntityPayload, resolveCanonicalProperty, partitionEntityState, withTransition, DEFAULT_TRANSITION_SECONDS } from "./devices.js";
 export { RoomSchema, RoomDimensionsSchema, FurniturePrimitiveSchema, FurnitureGroupSchema, FurnitureItemSchema, RoomLightSchema, CameraSchema } from "./room.js";
 export type { RoomConfig, RoomDimensions, FurniturePrimitive, FurnitureGroup, FurnitureItem, RoomLight, CameraConfig } from "./room.js";
 

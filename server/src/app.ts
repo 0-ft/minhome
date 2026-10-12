@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { MqttBridge } from "./mqtt.js";
-import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, resolveEntityPayload } from "./config/config.js";
+import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, FurnitureItemSchema, EntityConfigSchema, extractEntitiesFromExposes, resolveEntityPayload, withTransition } from "./config/config.js";
 import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
 import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
@@ -96,9 +96,11 @@ export function createApp(
       zValidator("json", z.record(z.string(), z.unknown())),
       (c) => {
         const id = c.req.param("id");
-        if (!bridge.devices.has(id)) return c.json({ error: "Device not found" }, 404);
-        const payload = c.req.valid("json");
-        bridge.setDeviceState(id, payload as Record<string, unknown>);
+        const device = bridge.devices.get(id);
+        if (!device) return c.json({ error: "Device not found" }, 404);
+        // Light changes fade by DEFAULT_TRANSITION_SECONDS unless the body sets `transition`
+        const payload = c.req.valid("json") as Record<string, unknown>;
+        bridge.setDeviceState(id, withTransition(extractEntitiesFromExposes(device.definition?.exposes ?? []), payload));
         return c.json({ ok: true });
       },
     )
@@ -116,9 +118,10 @@ export function createApp(
         const entity = extracted.find(e => e.key === entityKey);
         if (!entity) return c.json({ error: "Entity not found" }, 404);
 
+        // Light changes fade by DEFAULT_TRANSITION_SECONDS unless the body sets `transition` (seconds)
         const canonical = c.req.valid("json") as Record<string, unknown>;
         const resolved = resolveEntityPayload(entity, canonical);
-        bridge.setDeviceState(id, resolved);
+        bridge.setDeviceState(id, withTransition([entity], resolved));
         return c.json({ ok: true });
       },
     )
@@ -534,10 +537,14 @@ export function createApp(
       return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" });
     })
 
-    .post("/api/vibes/:id/apply", (c) => {
+    // Optional JSON body: { "transition": seconds } to override the default fade
+    .post("/api/vibes/:id/apply", async (c) => {
       const vibe = vibes.get(c.req.param("id"));
       if (!vibe) return c.json({ error: "Vibe not found" }, 404);
-      return c.json(applyVibe(bridge, vibe));
+      const body = z.object({ transition: z.number().min(0).max(60).optional() })
+        .safeParse(await c.req.json().catch(() => ({})));
+      if (!body.success) return c.json({ error: body.error.message }, 400);
+      return c.json(applyVibe(bridge, vibe, { transition: body.data.transition }));
     })
 
     // --- WebSocket ---

@@ -6,6 +6,7 @@ import {
   isControllableEntity,
   readCanonicalEntityState,
   resolveEntityPayload,
+  withTransition,
   type ExtractedEntity,
 } from "./config/devices.js";
 import { VibeColorSchema, type Vibe, type VibeEntitySetting, type VibeStore } from "./config/vibes.js";
@@ -90,13 +91,17 @@ export interface ApplyVibeResult {
 /**
  * Apply a vibe: send every setting, plus OFF to all other controllable
  * entities when `offUnspecified` is set. Payloads are merged so each device
- * gets a single MQTT publish.
+ * gets a single MQTT publish. Lights fade over `transition` seconds.
  */
-export function applyVibe(bridge: MqttBridge, vibe: Vibe): ApplyVibeResult {
+export function applyVibe(bridge: MqttBridge, vibe: Vibe, options: { transition?: number } = {}): ApplyVibeResult {
   const controllable = new Map(listControllableEntities(bridge).map((c) => [entityId(c.deviceId, c.entity.key), c]));
-  const perDevice = new Map<string, Record<string, unknown>>();
+  const perDevice = new Map<string, { payload: Record<string, unknown>; entities: ExtractedEntity[] }>();
   const send = (deviceId: string, entity: ExtractedEntity, payload: Record<string, unknown>) => {
-    perDevice.set(deviceId, { ...perDevice.get(deviceId), ...resolveEntityPayload(entity, payload) });
+    const current = perDevice.get(deviceId) ?? { payload: {}, entities: [] };
+    perDevice.set(deviceId, {
+      payload: { ...current.payload, ...resolveEntityPayload(entity, payload) },
+      entities: [...current.entities, entity],
+    });
   };
 
   const specified = new Set<string>();
@@ -121,7 +126,10 @@ export function applyVibe(bridge: MqttBridge, vibe: Vibe): ApplyVibeResult {
     }
   }
 
-  for (const [deviceId, payload] of perDevice) bridge.setDeviceState(deviceId, payload);
+  // Lights fade (default DEFAULT_TRANSITION_SECONDS) so the room changes as one smooth move
+  for (const [deviceId, { payload, entities }] of perDevice) {
+    bridge.setDeviceState(deviceId, withTransition(entities, payload, options.transition));
+  }
 
   const result: ApplyVibeResult = {
     ok: true,

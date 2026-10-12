@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { z } from "zod";
 import { Cron } from "croner";
 import type { MqttBridge, DeviceState } from "./mqtt.js";
-import { extractEntitiesFromExposes, resolveCanonicalProperty, resolveEntityPayload } from "./config/devices.js";
+import { extractEntitiesFromExposes, resolveCanonicalProperty, resolveEntityPayload, withTransition } from "./config/devices.js";
 import { toolSchemas } from "./tools.js";
 import { debugLog } from "./debug-log.js";
 
@@ -450,7 +450,7 @@ export class AutomationEngine {
           const entityDef = extracted.find(e => e.key === action.entity);
           if (entityDef) {
             const resolved = resolveEntityPayload(entityDef, action.payload as Record<string, unknown>);
-            this.bridge.setDeviceState(action.device, resolved);
+            this.bridge.setDeviceState(action.device, withTransition([entityDef], resolved));
           } else {
             // Fallback: send payload as-is
             this.bridge.setDeviceState(action.device, action.payload as Record<string, unknown>);

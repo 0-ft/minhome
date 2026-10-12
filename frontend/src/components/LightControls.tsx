@@ -1,5 +1,5 @@
 import { Palette, Sun, Thermometer } from "lucide-react";
-import { DebouncedSlider } from "./ui/slider.js";
+import { ThrottledSlider } from "./ui/slider.js";
 import { COLOR_TEMP_GRADIENT, COLOR_TEMP_MAX, COLOR_TEMP_MIN, HUE_GRADIENT, hslCss, saturationGradient } from "../lib/color.js";
 
 export interface LightValues {
@@ -34,7 +34,7 @@ export function LightControls({ show, values, serverValues, onChange, onCommit }
   return (
     <>
       {show.brightness && (
-        <DebouncedSlider
+        <ThrottledSlider
           min={1} max={254}
           serverValue={serverValues.brightness}
           value={values.brightness}
@@ -45,7 +45,7 @@ export function LightControls({ show, values, serverValues, onChange, onCommit }
       )}
 
       {show.colorTemp && (
-        <DebouncedSlider
+        <ThrottledSlider
           min={COLOR_TEMP_MIN} max={COLOR_TEMP_MAX}
           serverValue={serverValues.colorTemp}
           value={values.colorTemp}
@@ -58,7 +58,7 @@ export function LightControls({ show, values, serverValues, onChange, onCommit }
 
       {show.color && (
         <>
-          <DebouncedSlider
+          <ThrottledSlider
             min={0} max={360}
             serverValue={serverValues.hue}
             value={hue}
@@ -67,7 +67,7 @@ export function LightControls({ show, values, serverValues, onChange, onCommit }
             label={<Palette className={iconCls} />}
             trackBackground={HUE_GRADIENT}
           />
-          <DebouncedSlider
+          <ThrottledSlider
             min={0} max={100}
             serverValue={serverValues.saturation}
             value={saturation}

@@ -15,6 +15,8 @@ import {
   extractEntitiesFromExposes,
   buildEntityResponses,
   resolveEntityPayload,
+  withTransition,
+  DEFAULT_TRANSITION_SECONDS,
 } from "./config/config.js";
 import { generateTTS } from "./tts.js";
 import { SharedAudioSource } from "./audio-utils.js";
@@ -78,6 +80,9 @@ const DeviceCommandPayloadSchema = z.object({
   color: ColorPayloadSchema.optional(),
 }).passthrough();
 
+const TransitionSchema = z.number().min(0).max(60).optional()
+  .describe(`Fade time in seconds for lights (default ${DEFAULT_TRANSITION_SECONDS}). Use 0 for an instant change, or longer for a slow fade`);
+
 // ── Helper: build full device response (shared with app.ts) ─
 
 function buildDeviceResponse(bridge: MqttBridge, config: ConfigStore, id: string) {
@@ -131,6 +136,7 @@ export const toolSchemas = {
       payload: DeviceCommandPayloadSchema.describe(
         'Command payload with canonical property names, e.g. {"state":"ON","brightness":200,"color":{"hue":120,"saturation":100}}',
       ),
+      transition: TransitionSchema,
     }),
   },
   control_device: {
@@ -303,6 +309,7 @@ export const toolSchemas = {
       "Switch to a vibe: set every entity it defines, and turn off all other lights and switches if the vibe has off_unspecified.",
     parameters: z.object({
       id: z.string().describe("Vibe id"),
+      transition: TransitionSchema,
     }),
   },
   save_current_as_vibe: {
@@ -373,7 +380,7 @@ export function createTools(): Record<string, ToolDef> {
     control_entity: {
       ...toolSchemas.control_entity,
       execute: async (args, { bridge }) => {
-        const { id, entity, payload: explicitPayload, ...rest } = args;
+        const { id, entity, payload: explicitPayload, transition, ...rest } = args;
         // AI sometimes flattens payload fields into top-level args — reconstruct payload
         const payload = explicitPayload && typeof explicitPayload === "object"
           ? explicitPayload as Record<string, unknown>
@@ -388,7 +395,7 @@ export function createTools(): Record<string, ToolDef> {
         if (!entityDef) throw new Error("Entity not found");
 
         const resolved = resolveEntityPayload(entityDef, payload);
-        bridge.setDeviceState(id, resolved);
+        bridge.setDeviceState(id, withTransition([entityDef], resolved, transition));
         // Dated, so replayed history reads as a past command, not current state
         return { ok: true, sent: payload, at: new Date().toISOString() };
       },
@@ -579,10 +586,10 @@ export function createTools(): Record<string, ToolDef> {
 
     apply_vibe: {
       ...toolSchemas.apply_vibe,
-      execute: async ({ id }, { vibes, bridge }) => {
+      execute: async ({ id, transition }, { vibes, bridge }) => {
         const vibe = vibes.get(id);
         if (!vibe) throw new Error("Vibe not found");
-        return applyVibe(bridge, vibe);
+        return applyVibe(bridge, vibe, { transition });
       },
     },
 

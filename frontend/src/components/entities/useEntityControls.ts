@@ -59,10 +59,12 @@ export function useEntityControls(entity: Entity, onSet: (payload: Record<string
     setValues((v) => ({ ...v, ...next }));
   };
 
+  // Slider changes track the drag, so they skip the server's default fade;
+  // on/off toggles keep it
   const commit = (c: LightCommit) => {
-    if ("brightness" in c) onSet({ [features.brightnessProperty!]: c.brightness });
-    else if ("color_temp" in c) onSet({ [features.colorTempProperty!]: c.color_temp });
-    else onSet({ [features.colorProperty!]: c.color });
+    if ("brightness" in c) onSet({ [features.brightnessProperty!]: c.brightness, transition: 0 });
+    else if ("color_temp" in c) onSet({ [features.colorTempProperty!]: c.color_temp, transition: 0 });
+    else onSet({ [features.colorProperty!]: c.color, transition: 0 });
   };
 
   return {

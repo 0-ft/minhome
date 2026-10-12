@@ -40,6 +40,7 @@ function mergeStatePayload(
 ): Record<string, unknown> {
   const next: Record<string, unknown> = { ...(base ?? {}) };
   for (const [key, value] of Object.entries(payload)) {
+    if (key === "transition") continue; // a command option, not device state
     const current = next[key];
     if (
       value &&
