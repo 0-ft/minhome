@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, Lightbulb, Play, Plug, Power, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowLeft, Camera, Play, Power, Sparkles, Trash2, X } from "lucide-react";
 import { useApplyVibe, useDeleteVibe, useDevices, useUpdateVibe, useVibes } from "../../api.js";
 import type { DeviceData, Entity, Vibe, VibeEntitySetting } from "../../types.js";
 import { listControllableEntities, readCanonicalState, settingKey } from "../../lib/vibes.js";
@@ -13,6 +13,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog.js";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.js";
 import { LightControls, type LightValues } from "../LightControls.js";
 import { LucideIcon } from "../lists/LucideIcon.js";
+import { EntityIcon } from "../entities/EntityIcon.js";
 import { VibeBackground } from "./VibeBackground.js";
 
 interface Draft {
@@ -261,7 +262,6 @@ function EntitySettingCard({ device, entity, setting, offUnspecified, onChange }
   const hasColor = !!features.colorProperty;
   const hasTemp = !!features.colorTempProperty;
   const mode: "color" | "white" = setting?.color ? "color" : setting?.color_temp !== undefined ? "white" : hasColor && !hasTemp ? "color" : "white";
-  const EntityIcon = entity.type === "light" ? Lightbulb : Plug;
 
   const values: LightValues = {
     brightness: setting?.brightness ?? DEFAULT_LIGHT.brightness,
@@ -307,7 +307,7 @@ function EntitySettingCard({ device, entity, setting, offUnspecified, onChange }
           "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
           included && isOn ? "bg-teal-200/60 text-teal-700" : "bg-grey-400/50 text-grey-600",
         )}>
-          <EntityIcon className="h-4 w-4" />
+          <EntityIcon entity={entity} className="h-4 w-4" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 text-sm font-semibold">

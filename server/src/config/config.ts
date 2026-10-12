@@ -84,12 +84,27 @@ export function getDisplayColorDepth(display: DisplayDeviceConfig): number {
 export const DisplaysConfigSchema = z.array(DisplayDeviceSchema).default([]);
 export type DisplaysConfig = z.infer<typeof DisplaysConfigSchema>;
 
+/** Layout of the entities page: card order, kept separately for vibes and entities. */
+export const EntitiesViewSchema = z.object({
+  /** Entity cards, as "<device ieee>:<entity key>". Unlisted entities follow in default order. */
+  entityOrder: z.array(z.string()).default([]),
+  /** Vibe ids for the vibe strip. Unlisted vibes follow in creation order. */
+  vibeOrder: z.array(z.string()).default([]),
+});
+export type EntitiesView = z.infer<typeof EntitiesViewSchema>;
+
+export const ViewsConfigSchema = z.object({
+  entities: EntitiesViewSchema.optional(),
+});
+
 const ConfigSchema = z.object({
   devices: z.record(z.string(), DeviceConfigSchema).default({}),
   room: RoomSchema.optional(),
   voice: VoiceConfigSchema.optional(),
   calendars: CalendarsConfigSchema.optional(),
   displays: DisplaysConfigSchema.optional(),
+  /** Per-view UI layout (e.g. card order on the entities page). */
+  views: ViewsConfigSchema.optional(),
   /** Maximum debug log file size in MB before old entries are dropped. Default 10. */
   debugLogMaxSizeMB: z.number().positive().default(10),
 });
@@ -159,6 +174,19 @@ export class ConfigStore {
   getVoice(): Voice {
     this.reload();
     return this.data.voice?.voice_name ?? "ash";
+  }
+
+  getEntitiesView(): EntitiesView {
+    this.reload();
+    return EntitiesViewSchema.parse(this.data.views?.entities ?? {});
+  }
+
+  setEntitiesView(patch: Partial<EntitiesView>): EntitiesView {
+    this.reload();
+    const next = { ...this.getEntitiesView(), ...patch };
+    this.data.views = { ...this.data.views, entities: next };
+    this.save();
+    return next;
   }
 
   setVoice(voice: Voice): void {

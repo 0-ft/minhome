@@ -179,6 +179,14 @@ export const toolSchemas = {
       color: z.union([z.string().regex(/^#[0-9A-Fa-f]{6}$/), z.literal("")]).describe('Hex colour "#RRGGBB", or empty to clear'),
     }),
   },
+  set_entity_icon: {
+    description: "Set the icon shown for an entity in the dashboard. Empty string restores the default for its type.",
+    parameters: z.object({
+      id: z.string().describe("Device IEEE address"),
+      entity_id: z.string().describe("Entity key, e.g. 'main', 'l1'"),
+      icon: z.string().regex(/^([a-z0-9]+(-[a-z0-9]+)*)?$/).describe("Lucide icon name in kebab-case, e.g. 'lamp-desk', 'fan', 'tv'"),
+    }),
+  },
   get_room_config: {
     description:
       "Read the current 3D room configuration (dimensions, furniture, lights). Always call this before making changes.",
@@ -424,6 +432,14 @@ export function createTools(): Record<string, ToolDef> {
       ...toolSchemas.set_entity_fixed_color,
       execute: async ({ id, entity_id, color }, { config }) => {
         config.setDevice(id, { entities: { [entity_id]: { fixedColor: color ? color.toLowerCase() : undefined } } });
+        return { ok: true };
+      },
+    },
+
+    set_entity_icon: {
+      ...toolSchemas.set_entity_icon,
+      execute: async ({ id, entity_id, icon }, { config }) => {
+        config.setDevice(id, { entities: { [entity_id]: { icon: icon || undefined } } });
         return { ok: true };
       },
     },

@@ -11,6 +11,13 @@ function kebabToPascalCase(value: string): string {
     .join("");
 }
 
+/** The lucide component for a kebab-case name, or null if there is none. */
+export function resolveLucideIcon(name?: string): React.ComponentType<{ className?: string; strokeWidth?: number }> | null {
+  if (!name || !KEBAB_ICON_NAME_RE.test(name)) return null;
+  const iconsByName = LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>>;
+  return iconsByName[kebabToPascalCase(name)] ?? null;
+}
+
 export function LucideIcon({
   name,
   className,
@@ -18,9 +25,7 @@ export function LucideIcon({
   name?: string;
   className?: string;
 }) {
-  if (!name || !KEBAB_ICON_NAME_RE.test(name)) return null;
-  const iconsByName = LucideIcons as Record<string, React.ComponentType<{ className?: string }>>;
-  const Icon = iconsByName[kebabToPascalCase(name)];
+  const Icon = resolveLucideIcon(name);
   if (!Icon) return null;
   return <Icon className={cn("h-3.5 w-3.5", className)} />;
 }

@@ -26,6 +26,8 @@ export interface Entity {
   description?: string;
   /** Colour a non-colour-controllable light gives off ("#RRGGBB"). */
   fixedColor?: string;
+  /** Chosen lucide icon (kebab-case); default depends on type. */
+  icon?: string;
   type: string;
   state: Record<string, unknown>;
   features: EntityFeatures;

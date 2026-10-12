@@ -8,6 +8,8 @@ export const EntityConfigSchema = z.object({
   description: z.string().max(300).optional(),
   /** Colour the light gives off when it can't be colour-controlled, e.g. a pink lamp ("#RRGGBB"; "" = none). */
   fixedColor: z.string().regex(/^(#[0-9a-fA-F]{6})?$/).optional(),
+  /** Lucide icon name in kebab-case, e.g. "lamp-floor" ("" = default for its type). */
+  icon: z.string().regex(/^([a-z0-9]+(-[a-z0-9]+)*)?$/).optional(),
 });
 
 export type EntityConfig = z.infer<typeof EntityConfigSchema>;
@@ -58,6 +60,7 @@ export interface EntityResponse {
   name: string;
   description?: string;
   fixedColor?: string;
+  icon?: string;
   type: string;
   state: Record<string, unknown>;
   features: EntityFeatures;
@@ -168,6 +171,7 @@ export function buildEntityResponses(
     name: entityConfigs?.[e.key]?.name ?? (isSingle ? deviceName : e.key),
     ...(entityConfigs?.[e.key]?.description ? { description: entityConfigs[e.key].description } : {}),
     ...(entityConfigs?.[e.key]?.fixedColor ? { fixedColor: entityConfigs[e.key].fixedColor } : {}),
+    ...(entityConfigs?.[e.key]?.icon ? { icon: entityConfigs[e.key].icon } : {}),
     type: e.type,
     state: stateMap.get(e.key) ?? {},
     features: e.features,

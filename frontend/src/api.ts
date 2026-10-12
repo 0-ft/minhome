@@ -406,13 +406,23 @@ export function useRenameEntity() {
   });
 }
 
-export function useSetEntityFixedColor() {
+export interface EntityConfigPatch {
+  name?: string;
+  description?: string;
+  /** "#rrggbb", or "" to clear. */
+  fixedColor?: string;
+  /** Lucide icon name, or "" for the default. */
+  icon?: string;
+}
+
+/** Update an entity's user config (description, fixed colour, icon, ...). */
+export function useUpdateEntityConfig() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ deviceId, entityId, fixedColor }: { deviceId: string; entityId: string; fixedColor: string }) => {
+    mutationFn: async ({ deviceId, entityId, patch }: { deviceId: string; entityId: string; patch: EntityConfigPatch }) => {
       const res = await api.api.devices[":id"].config.$put({
         param: { id: deviceId },
-        json: { entities: { [entityId]: { fixedColor } } },
+        json: { entities: { [entityId]: patch } },
       });
       return res.json();
     },
@@ -422,19 +432,43 @@ export function useSetEntityFixedColor() {
   });
 }
 
-export function useSetEntityDescription() {
+// --- Entities page layout ---
+
+export interface EntitiesViewLayout {
+  /** "<device>:<entity>" keys; unlisted entities follow in default order. */
+  entityOrder: string[];
+  /** Vibe ids; unlisted vibes follow in creation order. */
+  vibeOrder: string[];
+}
+
+export function useEntitiesView() {
+  return useQuery({
+    queryKey: ["config", "views", "entities"],
+    queryFn: async () => {
+      const res = await api.api.config.views.entities.$get();
+      if (!res.ok) throw new Error("Failed to fetch entities view");
+      return res.json() as Promise<EntitiesViewLayout>;
+    },
+  });
+}
+
+export function useUpdateEntitiesView() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ deviceId, entityId, description }: { deviceId: string; entityId: string; description: string }) => {
-      const res = await api.api.devices[":id"].config.$put({
-        param: { id: deviceId },
-        json: { entities: { [entityId]: { description } } },
-      });
-      return res.json();
+  return createOptimisticMutation({
+    qc,
+    mutationFn: async (patch: Partial<EntitiesViewLayout>) => {
+      const res = await api.api.config.views.entities.$patch({ json: patch });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to save order");
+      return data as EntitiesViewLayout;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["devices"] });
-    },
+    optimistic: (patch) => ({
+      patches: [{
+        queryKey: ["config", "views", "entities"],
+        updater: (previous) => ({ entityOrder: [], vibeOrder: [], ...(previous as EntitiesViewLayout | undefined), ...patch }),
+      }],
+    }),
+    invalidateQueryKeys: [["config", "views", "entities"]],
   });
 }
 

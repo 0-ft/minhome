@@ -2,6 +2,7 @@ import { Lightbulb, Plug, Sparkles, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useDevices, useAutomations, useVibes } from "../api.js";
 import { LucideIcon } from "./lists/LucideIcon.js";
+import { EntityIcon } from "./entities/EntityIcon.js";
 import type { DeviceData } from "../types.js";
 import type { ReactNode } from "react";
 
@@ -40,7 +41,7 @@ export function DeviceBadge({ id, children }: { id?: string; children?: ReactNod
 export function EntityBadge({ id, device: deviceId, children }: { id?: string; device?: string; children?: ReactNode }) {
   const { data: devices } = useDevices();
   const device = deviceId ? findDevice(devices as DeviceData[] | undefined, deviceId) : undefined;
-  const Icon = device && isLight(device) ? Lightbulb : Plug;
+  const entity = device?.entities.find((e) => e.key === id);
 
   return (
     <span
@@ -48,7 +49,9 @@ export function EntityBadge({ id, device: deviceId, children }: { id?: string; d
         bg-grey-200 text-grey-700 border border-grey-300 align-baseline whitespace-nowrap"
       title={id && deviceId ? `${id}@${deviceId}` : undefined}
     >
-      <Icon className="h-3 w-3 shrink-0" />
+      {entity
+        ? <EntityIcon entity={entity} className="h-3 w-3 shrink-0" />
+        : <Plug className="h-3 w-3 shrink-0" />}
       <span>{children}</span>
     </span>
   );

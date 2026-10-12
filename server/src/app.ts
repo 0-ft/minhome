@@ -304,6 +304,21 @@ export function createApp(
       return c.json({ ok: true });
     })
 
+    // Card order on the entities page (vibes and entity cards ordered separately)
+    .get("/api/config/views/entities", (c) => c.json(config.getEntitiesView()))
+
+    .patch("/api/config/views/entities",
+      zValidator("json", z.object({
+        entityOrder: z.array(z.string()).optional(),
+        vibeOrder: z.array(z.string()).optional(),
+      })),
+      (c) => {
+        const view = config.setEntitiesView(c.req.valid("json"));
+        bridge.emit("config_change");
+        return c.json(view);
+      },
+    )
+
     .get("/api/config/room", (c) => {
       const room = config.getRoom();
       if (!room) return c.json({ error: "Room not configured" }, 404);

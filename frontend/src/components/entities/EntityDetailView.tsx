@@ -5,8 +5,7 @@ import {
   useDevices,
   useRenameEntity,
   useSetEntity,
-  useSetEntityDescription,
-  useSetEntityFixedColor,
+  useUpdateEntityConfig,
   useVibes,
 } from "../../api.js";
 import type { DeviceData, Entity, Vibe, VibeEntitySetting } from "../../types.js";
@@ -16,7 +15,8 @@ import { EditableText } from "../ui/editable-text.js";
 import { LightControls } from "../LightControls.js";
 import { LucideIcon } from "../lists/LucideIcon.js";
 import { vibeEditorPath } from "../vibes/VibeStrip.js";
-import { entityIcon } from "./EntityCard.js";
+import { EntityIcon } from "./EntityIcon.js";
+import { IconPicker } from "../ui/icon-picker.js";
 import { useEntityControls } from "./useEntityControls.js";
 
 /** Full page for one entity at /entities/:deviceId/:entityKey. */
@@ -46,8 +46,9 @@ export function EntityDetailView() {
 function EntityDetail({ device, entity }: { device: DeviceData; entity: Entity }) {
   const setEntity = useSetEntity();
   const rename = useRenameEntity();
-  const describe = useSetEntityDescription();
-  const setFixedColor = useSetEntityFixedColor();
+  const updateConfig = useUpdateEntityConfig();
+  const update = (patch: { description?: string; fixedColor?: string; icon?: string }) =>
+    updateConfig.mutate({ deviceId: device.id, entityId: entity.key, patch });
   const { data: vibes } = useVibes();
 
   const isSensor = entity.type === "sensor";
@@ -55,7 +56,6 @@ function EntityDetail({ device, entity }: { device: DeviceData; entity: Entity }
     setEntity.mutate({ deviceId: device.id, entityKey: entity.key, payload }),
   );
   const surface = isSensor ? null : controls.surface;
-  const Icon = entityIcon(entity);
   const hasSliders = !isSensor && Object.values(controls.lightControls.show).some(Boolean);
   const canHaveFixedColor = !isSensor && !entity.features.colorProperty;
   const capabilities = [
@@ -87,7 +87,7 @@ function EntityDetail({ device, entity }: { device: DeviceData; entity: Entity }
             "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
             surface ? "bg-white/25" : "bg-grey-300/80 text-grey-600",
           )}>
-            <Icon className="h-7 w-7" />
+            <EntityIcon entity={entity} className="h-7 w-7" />
           </span>
           <div className="min-w-0 flex-1">
             <EditableText
@@ -145,17 +145,25 @@ function EntityDetail({ device, entity }: { device: DeviceData; entity: Entity }
             <span className="text-[11px] uppercase tracking-wider text-grey-500">Description</span>
             <EditableText
               value={entity.description ?? ""}
-              onSave={(description) => describe.mutate({ deviceId: device.id, entityId: entity.key, description })}
+              onSave={(description) => update({ description })}
               allowEmpty
               placeholder="What is this? e.g. the lamp behind the sofa"
               textClassName="text-sm text-grey-800"
             />
             <span className="text-[11px] text-grey-500">Agents use this to understand what the entity is.</span>
           </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] uppercase tracking-wider text-grey-500">Icon</span>
+            <IconPicker
+              value={entity.icon}
+              onChange={(icon) => update({ icon: icon ?? "" })}
+              placeholder="Default icon"
+            />
+          </div>
           {canHaveFixedColor && (
             <FixedColorField
               value={entity.fixedColor}
-              onChange={(fixedColor) => setFixedColor.mutate({ deviceId: device.id, entityId: entity.key, fixedColor })}
+              onChange={(fixedColor) => update({ fixedColor })}
             />
           )}
         </Panel>

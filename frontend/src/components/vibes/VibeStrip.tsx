@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Pencil, Plus, Sparkles } from "lucide-react";
-import { useApplyVibe, useCaptureVibe, useVibes } from "../../api.js";
+import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { useApplyVibe, useCaptureVibe, useEntitiesView, useUpdateEntitiesView, useVibes } from "../../api.js";
+import { applyOrder } from "../../lib/order.js";
+import { SortableItem, useCardSensors } from "../ui/sortable.js";
 import type { Vibe } from "../../types.js";
 import { cn } from "../../lib/utils.js";
 import { LucideIcon } from "../lists/LucideIcon.js";
@@ -17,20 +21,38 @@ export function VibeStrip() {
   const captureVibe = useCaptureVibe();
   const navigate = useNavigate();
   const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const { data: layout } = useEntitiesView();
+  const updateLayout = useUpdateEntitiesView();
+  const sensors = useCardSensors();
+  const ordered = applyOrder(vibes ?? [], (v) => v.id, layout?.vibeOrder);
+  const ids = ordered.map((v) => v.id);
+
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from === -1 || to === -1) return;
+    updateLayout.mutate({ vibeOrder: arrayMove(ids, from, to) });
+  };
 
   return (
     <section aria-label="Vibes" className="-mx-6">
       <div className="flex gap-3 overflow-x-auto scrollbar-hide px-6 py-1">
-        {(vibes ?? []).map((vibe) => (
-          <VibeCard
-            key={vibe.id}
-            vibe={vibe}
-            active={!!vibe.active}
-            pending={applyVibe.isPending && applyVibe.variables === vibe.id}
-            onApply={() => applyVibe.mutate(vibe.id)}
-            onEdit={() => navigate(vibeEditorPath(vibe.id))}
-          />
-        ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+            {ordered.map((vibe) => (
+              <SortableItem key={vibe.id} id={vibe.id} className="shrink-0">
+                <VibeCard
+                  vibe={vibe}
+                  active={!!vibe.active}
+                  pending={applyVibe.isPending && applyVibe.variables === vibe.id}
+                  onApply={() => applyVibe.mutate(vibe.id)}
+                  onEdit={() => navigate(vibeEditorPath(vibe.id))}
+                />
+              </SortableItem>
+            ))}
+          </SortableContext>
+        </DndContext>
         <button
           type="button"
           onClick={() => setSavePromptOpen(true)}
