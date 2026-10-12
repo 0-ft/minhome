@@ -169,6 +169,16 @@ export const toolSchemas = {
       description: z.string().max(300).describe("Brief description, or empty to clear"),
     }),
   },
+  set_entity_fixed_color: {
+    description:
+      "Record the colour a light gives off when it can't be colour-controlled (e.g. a pink lamp on a smart plug). " +
+      "Used by the dashboard and when designing vibes. Empty string clears it.",
+    parameters: z.object({
+      id: z.string().describe("Device IEEE address"),
+      entity_id: z.string().describe("Entity key, e.g. 'main', 'l1'"),
+      color: z.union([z.string().regex(/^#[0-9A-Fa-f]{6}$/), z.literal("")]).describe('Hex colour "#RRGGBB", or empty to clear'),
+    }),
+  },
   get_room_config: {
     description:
       "Read the current 3D room configuration (dimensions, furniture, lights). Always call this before making changes.",
@@ -406,6 +416,14 @@ export function createTools(): Record<string, ToolDef> {
       execute: async ({ id, entity_id, description }, { config }) => {
         const trimmed = description.trim();
         config.setDevice(id, { entities: { [entity_id]: { description: trimmed || undefined } } });
+        return { ok: true };
+      },
+    },
+
+    set_entity_fixed_color: {
+      ...toolSchemas.set_entity_fixed_color,
+      execute: async ({ id, entity_id, color }, { config }) => {
+        config.setDevice(id, { entities: { [entity_id]: { fixedColor: color ? color.toLowerCase() : undefined } } });
         return { ok: true };
       },
     },

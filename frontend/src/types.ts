@@ -24,6 +24,8 @@ export interface Entity {
   name: string;
   /** User-written note on what the entity is. */
   description?: string;
+  /** Colour a non-colour-controllable light gives off ("#RRGGBB"). */
+  fixedColor?: string;
   type: string;
   state: Record<string, unknown>;
   features: EntityFeatures;

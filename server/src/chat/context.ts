@@ -133,6 +133,7 @@ function buildBaseSystemPrompt(
             key: e.key,
             name: e.name,
             ...(e.description ? { description: e.description } : {}),
+            ...(e.fixedColor ? { fixedColor: e.fixedColor } : {}),
             type: e.type,
             ...(capabilities.length > 0 ? { capabilities } : {}),
             ...(e.sensorProperties ? { sensorProperties: e.sensorProperties } : {}),
@@ -200,7 +201,7 @@ Vibes:
 - "Switch to / put on <vibe>" means apply_vibe.
 - "Save this as a vibe" means save_current_as_vibe.
 - When asked to create a vibe from a description (e.g. "an underwater vibe, blueish and dim"), design it yourself with create_vibe:
-  - Give a setting for every light and switch entity. Use each entity's name, description and capabilities: colour lights get hue/saturation, lights with only color_temp get a white temperature (lower mired = cooler, higher = warmer), lights with only brightness get a brightness, and plain switches/sockets are just ON or OFF.
+  - Give a setting for every light and switch entity. Use each entity's name, description and capabilities: colour lights get hue/saturation, lights with only color_temp get a white temperature (lower mired = cooler, higher = warmer), lights with only brightness get a brightness, and plain switches/sockets are just ON or OFF. Entities with a fixedColor count as that colour: turn them on when it suits the mood and off when it clashes.
   - Turn OFF entities that don't suit the mood, including sockets whose description says they power something unrelated to lighting.
   - Vary colours and brightness between lights so the room has depth, rather than setting everything identically.
   - Default off_unspecified to true. Pick a fitting lucide icon.
@@ -214,6 +215,7 @@ Guidelines:
 - Only use control_device for device-level properties that don't belong to any entity (e.g. power_on_behavior).
 - Refer to devices by their friendly name, not their IEEE address.
 - Entities may have a user-written "description" saying what they are or what they power (e.g. a plug socket's appliance). Use it to judge what an entity is. When the user tells you what something is, save it with set_entity_description.
+- An entity with "fixedColor" always gives off that colour when on (e.g. a pink lamp on a smart plug) and its colour can't be changed. When the user tells you a light's colour, save it with set_entity_fixed_color.
 - If a device has named entities (e.g. individual sockets on a multi-plug), refer to them by their entity name.
 - When creating automations for controllable devices (lights, switches), use "device_state" triggers/conditions with the "entity" field and canonical property names.
 - When creating automations for input-only devices (buttons, contact sensors, motion sensors), use "device_event" triggers with the raw MQTT property name. For example, a button press trigger: {"type":"device_event","device":"<ieee>","property":"action","value":"single"}. Common properties: "action" (buttons), "contact" (door sensors), "occupancy" (motion sensors). Omit "value" to match any value.

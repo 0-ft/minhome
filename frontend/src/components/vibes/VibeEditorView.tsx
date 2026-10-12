@@ -128,7 +128,7 @@ function VibeEditor({ vibe, devices }: { vibe: Vibe; devices: DeviceData[] }) {
 
       {/* Preview header */}
       <div className="relative h-44 rounded-2xl overflow-hidden shadow-md">
-        <VibeBackground vibe={{ id: vibe.id, entities: draft.entities }} animate />
+        <VibeBackground vibe={{ id: vibe.id, entities: draft.entities }} />
         <div className="absolute inset-x-0 bottom-0 p-4 flex items-end gap-3 text-white">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/25 backdrop-blur-sm">
             {draft.icon ? <LucideIcon name={draft.icon} className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
@@ -310,7 +310,16 @@ function EntitySettingCard({ device, entity, setting, offUnspecified, onChange }
           <EntityIcon className="h-4 w-4" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{entity.name}</div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold">
+            <span className="truncate">{entity.name}</span>
+            {entity.fixedColor && (
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full border border-sand-400/60"
+                style={{ background: entity.fixedColor }}
+                title={`Gives off ${entity.fixedColor}`}
+              />
+            )}
+          </div>
           {entity.description
             ? <div className="text-[11px] leading-snug text-sand-600">{entity.description}</div>
             : <div className="text-[10px] font-mono truncate text-sand-500">{device.name}{entity.key !== "main" ? ` · ${entity.key}` : ""}</div>}

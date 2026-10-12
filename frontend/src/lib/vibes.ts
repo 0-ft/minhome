@@ -1,5 +1,4 @@
 import type { DeviceData, Entity, Vibe, VibeEntitySetting } from "../types.js";
-import { miredToRgb } from "./color.js";
 
 // ── Entities a vibe can control ──────────────────────────
 
@@ -110,49 +109,11 @@ export function vibeMatches(vibe: Vibe, devices: DeviceData[]): boolean {
   return true;
 }
 
-// ── Palette for the procedural card background ───────────
-
-export interface PaletteColor {
-  /** CSS colour. */
-  css: string;
-  /** Relative weight (brighter lights dominate). */
-  weight: number;
-}
-
-const GREY_PALETTE: PaletteColor[] = [
-  { css: "hsl(30, 6%, 46%)", weight: 1 },
-  { css: "hsl(215, 8%, 62%)", weight: 0.8 },
-  { css: "hsl(25, 5%, 30%)", weight: 0.7 },
-  { css: "hsl(40, 8%, 74%)", weight: 0.5 },
-];
-
-const DARK_PALETTE: PaletteColor[] = [
-  { css: "hsl(240, 8%, 14%)", weight: 1 },
-  { css: "hsl(220, 10%, 22%)", weight: 0.8 },
-  { css: "hsl(30, 6%, 10%)", weight: 0.6 },
-];
-
-/**
- * Colours a vibe puts into the room: hue lights as hsl, white lights as their
- * colour temperature, each darkened by brightness. Falls back to greys when the
- * vibe has no colour or white settings, and to near-blacks when everything is off.
- */
-export function vibePalette(vibe: Pick<Vibe, "entities">): { colors: PaletteColor[]; isFallback: boolean } {
-  const on = vibe.entities.filter((s) => s.state === "ON");
-  if (on.length === 0) return { colors: DARK_PALETTE, isFallback: true };
-
-  const colors: PaletteColor[] = [];
-  for (const setting of on) {
-    const level = (setting.brightness ?? 200) / 254;
-    if (setting.color) {
-      const lightness = Math.round(26 + level * 36);
-      colors.push({ css: `hsl(${setting.color.hue}, ${setting.color.saturation}%, ${lightness}%)`, weight: 0.4 + level });
-    } else if (setting.color_temp !== undefined) {
-      const intensity = 0.45 + level * 0.55;
-      const [r, g, b] = miredToRgb(setting.color_temp).map((c) => Math.round(c * intensity * 255));
-      colors.push({ css: `rgb(${r}, ${g}, ${b})`, weight: 0.4 + level });
-    }
+/** Fixed colours of non-colour lights (e.g. a pink lamp on a plug), keyed by settingKey. */
+export function fixedColorMap(devices: DeviceData[]): Record<string, string> {
+  const colors: Record<string, string> = {};
+  for (const { device, entity } of listControllableEntities(devices)) {
+    if (entity.fixedColor) colors[settingKey(device.id, entity.key)] = entity.fixedColor;
   }
-  if (colors.length === 0) return { colors: GREY_PALETTE, isFallback: true };
-  return { colors: colors.sort((a, b) => b.weight - a.weight), isFallback: false };
+  return colors;
 }

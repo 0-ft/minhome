@@ -47,6 +47,8 @@ export default defineConfig({
       allow: [
         resolve(repoRoot, "frontend"),
         resolve(repoRoot, "node_modules"),
+        // Shared pure module (vibe artwork), not the rest of server/
+        resolve(repoRoot, "server/src/vibe-art.ts"),
       ],
       // Belt and braces for secrets that could sit inside an allowed dir.
       // Supplying `deny` replaces Vite's defaults, so restate them.

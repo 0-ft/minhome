@@ -70,7 +70,7 @@ function VibeCard({ vibe, active, pending, onApply, onEdit }: {
         active ? "ring-2 ring-teal-400 ring-offset-2 ring-offset-sand-100 shadow-lg" : "hover:shadow-md",
       )}
     >
-      <VibeBackground vibe={vibe} animate={active} />
+      <VibeBackground vibe={vibe} />
       <button
         type="button"
         onClick={onApply}

@@ -406,6 +406,22 @@ export function useRenameEntity() {
   });
 }
 
+export function useSetEntityFixedColor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deviceId, entityId, fixedColor }: { deviceId: string; entityId: string; fixedColor: string }) => {
+      const res = await api.api.devices[":id"].config.$put({
+        param: { id: deviceId },
+        json: { entities: { [entityId]: { fixedColor } } },
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["devices"] });
+    },
+  });
+}
+
 export function useSetEntityDescription() {
   const qc = useQueryClient();
   return useMutation({

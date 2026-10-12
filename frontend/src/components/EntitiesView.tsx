@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { useDevices, useSetEntity, useRenameEntity, useSetEntityDescription, useRefreshStates } from "../api.js";
+import { useDevices, useSetEntity, useRenameEntity, useSetEntityDescription, useSetEntityFixedColor, useRefreshStates } from "../api.js";
 import { Button } from "./ui/button.js";
 import { LightControls } from "./LightControls.js";
+import { FixedColorPicker } from "./FixedColorPicker.js";
 import { VibeStrip } from "./vibes/VibeStrip.js";
 import { EditableText } from "./ui/editable-text.js";
 import { Lightbulb, Plug, Power, Radio } from "lucide-react";
@@ -20,6 +21,7 @@ export function EntitiesView() {
   const setEntity = useSetEntity();
   const renameEntity = useRenameEntity();
   const setDescription = useSetEntityDescription();
+  const setFixedColor = useSetEntityFixedColor();
   const refreshStates = useRefreshStates();
 
   const hasRefreshed = useRef(false);
@@ -73,6 +75,7 @@ export function EntitiesView() {
             onSet={(payload) => setEntity.mutate({ deviceId: device.id, entityKey: entity.key, payload })}
             onRename={(name) => renameEntity.mutate({ deviceId: device.id, entityId: entity.key, name })}
             onDescribe={(description) => setDescription.mutate({ deviceId: device.id, entityId: entity.key, description })}
+            onSetFixedColor={(fixedColor) => setFixedColor.mutate({ deviceId: device.id, entityId: entity.key, fixedColor })}
           />
         ))}
       </div>
@@ -82,12 +85,13 @@ export function EntitiesView() {
 
 // ── Entity Card ──────────────────────────────────────────
 
-function EntityCard({ entity, device, onSet, onRename, onDescribe }: {
+function EntityCard({ entity, device, onSet, onRename, onDescribe, onSetFixedColor }: {
   entity: Entity;
   device: DeviceData;
   onSet: (payload: Record<string, unknown>) => void;
   onRename: (name: string) => void;
   onDescribe: (description: string) => void;
+  onSetFixedColor: (color: string) => void;
 }) {
   const { features, state } = entity;
   const isSensor = entity.type === "sensor";
@@ -173,13 +177,17 @@ function EntityCard({ entity, device, onSet, onRename, onDescribe }: {
               <Power className="h-3 w-3" />
               <span className="font-mono text-[10px] uppercase">{isOn ? "on" : "off"}</span>
             </Button>
-              {features.colorProperty && isOn ? (
-                <div
-                  className="h-3 w-3 rounded-full border border-sand-400/60 transition-colors"
-                  style={{ background: hslCss(hue, saturation) }}
-                />
+              {features.colorProperty ? (
+                isOn ? (
+                  <div
+                    className="h-3 w-3 rounded-full border border-sand-400/60 transition-colors"
+                    style={{ background: hslCss(hue, saturation) }}
+                  />
+                ) : (
+                  <div className="h-1.5 w-1.5 rounded-full transition-colors bg-sand-400" />
+                )
               ) : (
-                <div className={`h-1.5 w-1.5 rounded-full transition-colors ${isOn ? "bg-teal-400" : "bg-sand-400"}`} />
+                <FixedColorPicker value={entity.fixedColor} isOn={isOn} onChange={onSetFixedColor} />
               )}
           </div>
         )}

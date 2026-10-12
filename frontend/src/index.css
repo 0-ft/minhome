@@ -411,23 +411,3 @@ input[type="range"].color-track::-moz-range-track {
   }
 
 }
-
-/* ── Vibe card artwork ─────────────────────────────────── */
-.vibe-blob {
-  transform: rotate(var(--vibe-rotate, 0deg));
-}
-
-.vibe-blob-animate {
-  animation-name: vibe-drift;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-@keyframes vibe-drift {
-  0%, 100% { transform: translate(0, 0) rotate(var(--vibe-rotate, 0deg)) scale(1); }
-  50% { transform: translate(var(--vibe-dx, 0), var(--vibe-dy, 0)) rotate(calc(var(--vibe-rotate, 0deg) + 25deg)) scale(1.08); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vibe-blob-animate { animation: none; }
-}

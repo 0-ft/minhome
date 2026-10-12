@@ -7,7 +7,8 @@ import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
 import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
 import type { VibeStore } from "./config/vibes.js";
-import { applyVibe, captureVibeSettings, findUnknownSettings, normalizeSettingInput, VibeSettingInputSchema } from "./vibes.js";
+import { applyVibe, captureVibeSettings, findUnknownSettings, fixedEntityColors, normalizeSettingInput, VibeSettingInputSchema } from "./vibes.js";
+import { renderVibeArt } from "./vibe-art.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
@@ -496,6 +497,21 @@ export function createApp(
       } catch (e: unknown) {
         return c.json({ error: (e as Error).message }, 404);
       }
+    })
+
+    // Procedural artwork for a vibe; ?width=&height= set the canvas (default 400x250)
+    .get("/api/vibes/:id/art.svg", (c) => {
+      const vibe = vibes.get(c.req.param("id"));
+      if (!vibe) return c.json({ error: "Vibe not found" }, 404);
+      const size = (raw: string | undefined) => {
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 16 && n <= 4096 ? Math.round(n) : undefined;
+      };
+      const svg = renderVibeArt(
+        { id: vibe.id, entities: vibe.entities, fixedColors: fixedEntityColors(bridge, config) },
+        { width: size(c.req.query("width")), height: size(c.req.query("height")) },
+      );
+      return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" });
     })
 
     .post("/api/vibes/:id/apply", (c) => {

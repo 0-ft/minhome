@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { MqttBridge } from "./mqtt.js";
+import type { ConfigStore } from "./config/config.js";
 import {
   extractEntitiesFromExposes,
   isControllableEntity,
@@ -32,6 +33,16 @@ export function listControllableEntities(bridge: MqttBridge): ControllableEntity
 }
 
 const entityId = (deviceId: string, key: string) => `${deviceId}:${key}`;
+
+/** Fixed colours of non-colour lights, keyed by `${device}:${entity}` (for vibe artwork). */
+export function fixedEntityColors(bridge: MqttBridge, config: ConfigStore): Record<string, string> {
+  const colors: Record<string, string> = {};
+  for (const { deviceId, entity } of listControllableEntities(bridge)) {
+    const fixedColor = config.getDevice(deviceId)?.entities?.[entity.key]?.fixedColor;
+    if (fixedColor) colors[entityId(deviceId, entity.key)] = fixedColor;
+  }
+  return colors;
+}
 
 /** Snapshot the current state of every controllable entity as vibe settings. */
 export function captureVibeSettings(bridge: MqttBridge): VibeEntitySetting[] {

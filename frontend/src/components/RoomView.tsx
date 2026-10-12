@@ -293,6 +293,7 @@ function LightOrb({
   // ── Feature checks ───────────────────────────────────
   const hasBrightness = !!entity?.features.brightnessProperty;
   const hasColor = !!entity?.features.colorProperty;
+  const fixedColor = entity?.fixedColor;
   const canDrag = (hasBrightness || hasColor) && !!onDragSet;
 
   // ── Drag state ───────────────────────────────────────
@@ -320,8 +321,9 @@ function LightOrb({
     if (hasColor && (colorMode === "hs" || colorMode === "xy" || dragState)) {
       return new THREE.Color().setHSL(effectiveHue / 360, effectiveSat / 100, 0.5);
     }
+    if (!hasColor && fixedColor) return new THREE.Color(fixedColor);
     return miredToColor(colorTemp);
-  }, [colorTemp, colorMode, effectiveHue, effectiveSat, hasColor, dragState]);
+  }, [colorTemp, colorMode, effectiveHue, effectiveSat, hasColor, fixedColor, dragState]);
 
   const normalizedBr = effectiveBrightness / 254;
   const targetIntensity = effectiveIsOn ? normalizedBr * 4 : 0;
