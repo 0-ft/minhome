@@ -589,9 +589,13 @@ export function createApp(
       }
     })
 
-    // Optional JSON body: { "transition": seconds }
+    // Optional JSON body: { "transition": seconds, "force": true } (force also
+    // re-sends entities that already match the checkpoint)
     .post("/api/checkpoints/:id/restore", async (c) => {
-      const body = z.object({ transition: z.number().min(0).max(60).optional() })
+      const body = z.object({
+        transition: z.number().min(0).max(60).optional(),
+        force: z.boolean().optional(),
+      })
         .safeParse(await c.req.json().catch(() => ({})));
       if (!body.success) return c.json({ error: body.error.message }, 400);
       try {

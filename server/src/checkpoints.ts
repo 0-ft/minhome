@@ -92,10 +92,10 @@ export class CheckpointStore {
   }
 
   /**
-   * Return every entity to its saved state (only those that changed get
-   * commands) and remove the checkpoint.
+   * Return every entity to its saved state and remove the checkpoint. Only
+   * entities that changed get commands, unless `force` sends every one.
    */
-  restore(id: string, options: { transition?: number } = {}): RestoreCheckpointResult {
+  restore(id: string, options: { transition?: number; force?: boolean } = {}): RestoreCheckpointResult {
     const checkpoint = this.require(id);
     this.remove(checkpoint);
     const result: RestoreCheckpointResult = {
@@ -103,7 +103,7 @@ export class CheckpointStore {
       checkpoint: checkpoint.id,
       ...applySettings(this.bridge, checkpoint.settings, {
         offUnspecified: false,
-        force: false,
+        force: options.force ?? false,
         transition: options.transition,
       }),
       at: new Date().toISOString(),

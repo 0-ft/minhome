@@ -370,6 +370,8 @@ export const toolSchemas = {
     parameters: z.object({
       id: z.string().describe("Checkpoint id from create_checkpoint"),
       transition: TransitionSchema,
+      force: z.boolean().optional()
+        .describe("Also re-send entities that already appear to match (use if a light didn't come back)"),
     }),
   },
   discard_checkpoint: {
@@ -672,7 +674,7 @@ export function createTools(): Record<string, ToolDef> {
 
     restore_checkpoint: {
       ...toolSchemas.restore_checkpoint,
-      execute: async ({ id, transition }, { checkpoints }) => checkpoints.restore(id, { transition }),
+      execute: async ({ id, transition, force }, { checkpoints }) => checkpoints.restore(id, { transition, force }),
     },
 
     discard_checkpoint: {
