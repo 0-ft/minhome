@@ -29,11 +29,11 @@ export function ChatHistoryModal({
         onClick={onClose}
         aria-label="Close chat history"
       />
-      <div className="relative w-full max-w-xl rounded-xl border border-sand-300 bg-sand-100 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-sand-300 px-4 py-3">
+      <div className="relative w-full max-w-xl rounded-xl border border-grey-300 bg-grey-100 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-grey-300 px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-sand-900">Chat history</h3>
-            <p className="text-[11px] font-mono text-sand-500 mt-0.5">
+            <h3 className="text-sm font-semibold text-grey-900">Chat history</h3>
+            <p className="text-[11px] font-mono text-grey-500 mt-0.5">
               Resume or delete saved chats
             </p>
           </div>
@@ -47,7 +47,7 @@ export function ChatHistoryModal({
             </button>
             <button
               type="button"
-              className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-grey-500 hover:text-grey-800 hover:bg-grey-200 transition-colors cursor-pointer"
               onClick={onClose}
             >
               <X className="h-4 w-4" />

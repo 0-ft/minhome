@@ -20,16 +20,15 @@ export type LightCommit =
  * The parent owns the displayed values; `serverValues` re-syncs them when not
  * dragging.
  */
-export function LightControls({ show, values, serverValues, active, onChange, onCommit }: {
+export function LightControls({ show, values, serverValues, onChange, onCommit }: {
   show: { brightness?: boolean; colorTemp?: boolean; color?: boolean };
   values: LightValues;
   serverValues: LightValues;
-  /** Tints the slider icons, e.g. when the light is on. */
-  active: boolean;
   onChange: (values: Partial<LightValues>) => void;
   onCommit: (commit: LightCommit) => void;
 }) {
-  const iconCls = `h-3.5 w-3.5 ${active ? "text-teal-600" : "text-sand-500"}`;
+  // Icons take the surrounding text colour, so they read on any card colour
+  const iconCls = "h-3.5 w-3.5 opacity-75";
   const { hue, saturation } = values;
 
   return (
@@ -76,7 +75,7 @@ export function LightControls({ show, values, serverValues, active, onChange, on
             onCommit={(next) => onCommit({ color: { hue, saturation: next } })}
             label={
               <div
-                className="h-3.5 w-3.5 rounded-full border border-sand-400/40"
+                className="h-3.5 w-3.5 rounded-full border border-current/30"
                 style={{ background: hslCss(hue, saturation) }}
               />
             }

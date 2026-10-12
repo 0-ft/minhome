@@ -13,17 +13,17 @@
   --color-blood-800:  #510f0b;
   --color-blood-900:  #3a0a08;
 
-  /* ── Sand (warm neutral) scale ─────────── */
-  --color-sand-50:    #fefcf9;
-  --color-sand-100:   #faf6f1;
-  --color-sand-200:   #f0e6d8;
-  --color-sand-300:   #e7d7c1;
-  --color-sand-400:   #cfc0ab;
-  --color-sand-500:   #b5a38e;
-  --color-sand-600:   #a78a7f;
-  --color-sand-700:   #8d7368;
-  --color-sand-800:   #735751;
-  --color-sand-900:   #3a2520;
+  /* ── Grey (neutral) scale ─────────────── */
+  --color-grey-50:    #fafafb;
+  --color-grey-100:   #f3f3f5;
+  --color-grey-200:   #e8e8ec;
+  --color-grey-300:   #dadadf;
+  --color-grey-400:   #b8b8c0;
+  --color-grey-500:   #8d8d96;
+  --color-grey-600:   #6a6a73;
+  --color-grey-700:   #4c4c54;
+  --color-grey-800:   #323238;
+  --color-grey-900:   #1c1c20;
 
   /* ── Teal (complement) scale ───────────── */
   --color-teal-50:    #eef9f7;
@@ -38,11 +38,11 @@
   --color-teal-900:   #071f1c;
 
   /* ── Semantic aliases ──────────────────── */
-  --color-background:           var(--color-sand-100);
-  --color-foreground:           var(--color-sand-900);
+  --color-background:           var(--color-grey-100);
+  --color-foreground:           var(--color-grey-900);
   --color-card:                 var(--color-blood-400);
-  --color-card-foreground:      var(--color-sand-50);
-  --color-primary:              var(--color-sand-50);
+  --color-card-foreground:      var(--color-grey-50);
+  --color-primary:              var(--color-grey-50);
   --color-primary-foreground:   var(--color-blood-600);
   --color-secondary:            var(--color-blood-500);
   --color-secondary-foreground: var(--color-blood-100);
@@ -56,7 +56,7 @@
   --color-input:                var(--color-blood-600);
   --color-ring:                 var(--color-teal-300);
   --color-success:              var(--color-teal-400);
-  --color-success-foreground:   var(--color-sand-50);
+  --color-success-foreground:   var(--color-grey-50);
 
   /* ── Radii ─────────────────────────────── */
   --radius-sm: 0.25rem;
@@ -79,7 +79,7 @@ body {
 
 ::selection {
   background-color: var(--color-teal-200);
-  color: var(--color-sand-900);
+  color: var(--color-grey-900);
 }
 
 /* ── Slider ──────────────────────────────── */
@@ -93,33 +93,34 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.12);
+  /* Follows the text colour, so it shows on light and dark card colours */
+  background: color-mix(in srgb, currentColor 22%, transparent);
 }
 input[type="range"]::-moz-range-track {
   height: 6px;
   border-radius: 9999px;
-  background: rgba(0, 0, 0, 0.12);
+  background: color-mix(in srgb, currentColor 22%, transparent);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #2a9d8f; /* teal-400 accent */
-  border: 2px solid #fefcf9;
-  margin-top: -4px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  margin-top: -5px;
   cursor: pointer;
   transition: transform 0.1s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #2a9d8f;
-  border: 2px solid #fefcf9;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 input[type="range"]:active::-webkit-slider-thumb {
   transform: scale(1.25);

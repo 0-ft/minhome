@@ -17,8 +17,8 @@ const itemVariants = cva(
   {
     variants: {
       pressed: {
-        true: "bg-sand-50 text-sand-900 shadow-sm",
-        false: "text-sand-500 hover:text-sand-700 hover:bg-sand-100/60",
+        true: "bg-grey-50 text-grey-900 shadow-sm",
+        false: "text-grey-500 hover:text-grey-700 hover:bg-grey-100/60",
       },
     },
     defaultVariants: {
@@ -42,7 +42,7 @@ export function ToggleGroup({
 }) {
   return (
     <ToggleGroupContext.Provider value={{ type, value, onValueChange }}>
-      <div className={cn("inline-flex gap-0.5 rounded-lg bg-sand-200 p-0.5", className)}>
+      <div className={cn("inline-flex gap-0.5 rounded-lg bg-grey-200 p-0.5", className)}>
         {children}
       </div>
     </ToggleGroupContext.Provider>

@@ -39,10 +39,10 @@ export function ItemFilterRow({
         </ToggleGroup>
       )}
       <div className="flex-1 relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-sand-400 pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-grey-400 pointer-events-none" />
         <input
           type="text"
-          className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-sand-100 border border-sand-300 text-sm text-sand-800 placeholder:text-sand-400 focus:outline-none focus:bg-sand-50 transition-colors"
+          className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-grey-100 border border-grey-300 text-sm text-grey-800 placeholder:text-grey-400 focus:outline-none focus:bg-grey-50 transition-colors"
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
           placeholder="Filter items..."

@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Pencil, Plus, Sparkles } from "lucide-react";
 import { useApplyVibe, useCaptureVibe, useVibes } from "../../api.js";
-import type { DeviceData, Vibe } from "../../types.js";
-import { vibeMatches } from "../../lib/vibes.js";
+import type { Vibe } from "../../types.js";
 import { cn } from "../../lib/utils.js";
 import { LucideIcon } from "../lists/LucideIcon.js";
 import { PromptDialog } from "../ui/PromptDialog.js";
@@ -12,7 +11,7 @@ import { VibeBackground } from "./VibeBackground.js";
 export const vibeEditorPath = (id: string) => `/entities/vibes/${encodeURIComponent(id)}`;
 
 /** Horizontally scrolling row of vibe cards shown above the entities grid. */
-export function VibeStrip({ devices }: { devices: DeviceData[] }) {
+export function VibeStrip() {
   const { data: vibes } = useVibes();
   const applyVibe = useApplyVibe();
   const captureVibe = useCaptureVibe();
@@ -26,7 +25,7 @@ export function VibeStrip({ devices }: { devices: DeviceData[] }) {
           <VibeCard
             key={vibe.id}
             vibe={vibe}
-            active={vibeMatches(vibe, devices)}
+            active={!!vibe.active}
             pending={applyVibe.isPending && applyVibe.variables === vibe.id}
             onApply={() => applyVibe.mutate(vibe.id)}
             onEdit={() => navigate(vibeEditorPath(vibe.id))}
@@ -35,7 +34,7 @@ export function VibeStrip({ devices }: { devices: DeviceData[] }) {
         <button
           type="button"
           onClick={() => setSavePromptOpen(true)}
-          className="shrink-0 w-36 h-28 rounded-xl border-2 border-dashed border-sand-400 text-sand-600 hover:border-teal-400 hover:text-teal-700 transition-colors flex flex-col items-center justify-center gap-1.5"
+          className="shrink-0 w-36 h-28 rounded-xl border-2 border-dashed border-grey-400 text-grey-600 hover:border-teal-400 hover:text-teal-700 transition-colors flex flex-col items-center justify-center gap-1.5"
         >
           <Plus className="h-5 w-5" />
           <span className="text-xs font-medium">Save current</span>
@@ -67,7 +66,7 @@ function VibeCard({ vibe, active, pending, onApply, onEdit }: {
     <div
       className={cn(
         "group relative shrink-0 w-44 h-28 rounded-xl overflow-hidden shadow-sm transition-shadow",
-        active ? "ring-2 ring-teal-400 ring-offset-2 ring-offset-sand-100 shadow-lg" : "hover:shadow-md",
+        active ? "ring-2 ring-teal-400 ring-offset-2 ring-offset-grey-100 shadow-lg" : "hover:shadow-md",
       )}
     >
       <VibeBackground vibe={vibe} />

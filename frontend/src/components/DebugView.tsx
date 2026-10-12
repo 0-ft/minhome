@@ -47,7 +47,7 @@ const TYPE_META: Record<string, TypeMeta> = {
   automation_updated:  { label: "Automation Updated", color: "bg-yellow-50",   textColor: "text-yellow-600",  icon: Zap,           group: "automation" },
   automation_deleted:  { label: "Automation Deleted", color: "bg-red-100",     textColor: "text-red-700",     icon: Zap,           group: "automation" },
   vibe_applied:        { label: "Vibe Applied",       color: "bg-fuchsia-100", textColor: "text-fuchsia-700", icon: Zap,           group: "automation" },
-  api_request:         { label: "API Request",        color: "bg-sand-200",    textColor: "text-sand-700",    icon: Zap,           group: "api" },
+  api_request:         { label: "API Request",        color: "bg-grey-200",    textColor: "text-grey-700",    icon: Zap,           group: "api" },
   device_control:      { label: "Device Control",     color: "bg-teal-100",    textColor: "text-teal-700",    icon: Radio,         group: "mqtt" },
   display_setup:      { label: "Display Setup",      color: "bg-indigo-100",  textColor: "text-indigo-700",  icon: Monitor,       group: "display" },
   display_poll:       { label: "Display Poll",       color: "bg-indigo-50",   textColor: "text-indigo-600",  icon: Monitor,       group: "display" },
@@ -68,8 +68,8 @@ const GROUPS = [
 function getMeta(type: string): TypeMeta {
   return TYPE_META[type] ?? {
     label: type,
-    color: "bg-sand-200",
-    textColor: "text-sand-700",
+    color: "bg-grey-200",
+    textColor: "text-grey-700",
     icon: Zap,
     group: "other",
   };
@@ -87,7 +87,7 @@ function JsonView({ data }: { data: unknown }) {
   }, [data]);
 
   return (
-    <pre className="text-xs font-mono text-sand-800 bg-sand-100 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap break-all border border-sand-200">
+    <pre className="text-xs font-mono text-grey-800 bg-grey-100 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap break-all border border-grey-200">
       {text}
     </pre>
   );
@@ -107,15 +107,15 @@ function LogRow({ entry, isExpanded, onToggle }: {
   const msStr = `.${String(ts.getMilliseconds()).padStart(3, "0")}`;
 
   return (
-    <div className={`border-b border-sand-200 last:border-b-0 transition-colors ${isExpanded ? "bg-sand-50" : "hover:bg-sand-50/60"}`}>
+    <div className={`border-b border-grey-200 last:border-b-0 transition-colors ${isExpanded ? "bg-grey-50" : "hover:bg-grey-50/60"}`}>
       {/* Summary row */}
       <button
         onClick={onToggle}
         className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer group"
       >
         {/* Timestamp */}
-        <span className="shrink-0 text-[11px] font-mono text-sand-500 tabular-nums w-[90px]">
-          {timeStr}<span className="text-sand-400">{msStr}</span>
+        <span className="shrink-0 text-[11px] font-mono text-grey-500 tabular-nums w-[90px]">
+          {timeStr}<span className="text-grey-400">{msStr}</span>
         </span>
 
         {/* Type badge */}
@@ -125,17 +125,17 @@ function LogRow({ entry, isExpanded, onToggle }: {
         </span>
 
         {/* Summary */}
-        <span className="flex-1 text-sm text-sand-800 truncate">
+        <span className="flex-1 text-sm text-grey-800 truncate">
           {entry.summary}
         </span>
 
         {/* Entry ID */}
-        <span className="shrink-0 text-[10px] font-mono text-sand-400">
+        <span className="shrink-0 text-[10px] font-mono text-grey-400">
           #{entry.id}
         </span>
 
         {/* Expand chevron */}
-        <ChevronDown className={`shrink-0 h-3.5 w-3.5 text-sand-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+        <ChevronDown className={`shrink-0 h-3.5 w-3.5 text-grey-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
       </button>
 
       {/* Expanded detail */}
@@ -146,7 +146,7 @@ function LogRow({ entry, isExpanded, onToggle }: {
       )}
       {isExpanded && entry.data == null && (
         <div className="px-4 pb-3 pt-0">
-          <p className="text-xs text-sand-400 italic">No additional data.</p>
+          <p className="text-xs text-grey-400 italic">No additional data.</p>
         </div>
       )}
     </div>
@@ -270,7 +270,7 @@ export function DebugView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
+      <div className="flex items-center gap-2 text-sm text-grey-600 py-12 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading debug logs...
       </div>
@@ -283,8 +283,8 @@ export function DebugView() {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-sand-900">Debug Log</h2>
-            <p className="text-xs text-sand-500 font-mono mt-0.5">
+            <h2 className="text-lg font-semibold text-grey-900">Debug Log</h2>
+            <p className="text-xs text-grey-500 font-mono mt-0.5">
               {logs.length} entries{filteredLogs.length !== logs.length && ` (${filteredLogs.length} shown)`}
               {paused && " \u00b7 paused"}
             </p>
@@ -296,7 +296,7 @@ export function DebugView() {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 paused
                   ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                  : "bg-sand-200 text-sand-600 hover:bg-sand-300"
+                  : "bg-grey-200 text-grey-600 hover:bg-grey-300"
               }`}
               title={paused ? "Resume streaming" : "Pause streaming"}
             >
@@ -306,7 +306,7 @@ export function DebugView() {
 
             <button
               onClick={scrollToTop}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sand-200 text-sand-600 hover:bg-sand-300 text-xs font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-grey-200 text-grey-600 hover:bg-grey-300 text-xs font-medium transition-colors cursor-pointer"
               title="Scroll to newest"
             >
               <ArrowUp className="h-3 w-3" />
@@ -326,15 +326,15 @@ export function DebugView() {
         {/* Filters */}
         <div className="flex items-center gap-3">
           {/* Group filter */}
-          <div className="flex gap-0.5 bg-sand-200 rounded-lg p-0.5">
+          <div className="flex gap-0.5 bg-grey-200 rounded-lg p-0.5">
             {GROUPS.map((g) => (
               <button
                 key={g.id}
                 onClick={() => setActiveGroup(g.id)}
                 className={`px-3 py-1 rounded-md text-[11px] font-mono uppercase tracking-wider transition-all cursor-pointer ${
                   activeGroup === g.id
-                    ? "bg-sand-50 text-sand-900 shadow-sm"
-                    : "text-sand-500 hover:text-sand-700 hover:bg-sand-100/60"
+                    ? "bg-grey-50 text-grey-900 shadow-sm"
+                    : "text-grey-500 hover:text-grey-700 hover:bg-grey-100/60"
                 }`}
               >
                 {g.label}
@@ -344,13 +344,13 @@ export function DebugView() {
 
           {/* Search */}
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-sand-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-grey-400 pointer-events-none" />
             <input
               type="text"
               placeholder="Filter logs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-sand-50 border border-sand-300 text-sm text-sand-800 placeholder:text-sand-400 focus:outline-none focus:bg-sand-100 transition-colors"
+              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-grey-50 border border-grey-300 text-sm text-grey-800 placeholder:text-grey-400 focus:outline-none focus:bg-grey-100 transition-colors"
             />
           </div>
         </div>
@@ -360,13 +360,13 @@ export function DebugView() {
       <div
         ref={listRef}
         onScroll={handleScroll}
-        className="rounded-xl bg-white border border-sand-200 shadow-sm overflow-y-auto"
+        className="rounded-xl bg-white border border-grey-200 shadow-sm overflow-y-auto"
         style={{ maxHeight: "calc(100vh - 280px)" }}
       >
         {filteredLogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <Filter className="h-6 w-6 text-sand-300" />
-            <p className="text-sm text-sand-500">
+            <Filter className="h-6 w-6 text-grey-300" />
+            <p className="text-sm text-grey-500">
               {logs.length === 0
                 ? "No events recorded yet. Interact with the system to see logs."
                 : "No matching events."}
@@ -383,12 +383,12 @@ export function DebugView() {
           ))
         )}
         {isFetchingNextPage && (
-          <div className="py-3 text-center text-xs text-sand-500 font-mono border-t border-sand-200">
+          <div className="py-3 text-center text-xs text-grey-500 font-mono border-t border-grey-200">
             Loading older entries...
           </div>
         )}
         {hasNextPage === false && filteredLogs.length > 0 && (
-          <div className="py-3 text-center text-xs text-sand-400 font-mono border-t border-sand-200">
+          <div className="py-3 text-center text-xs text-grey-400 font-mono border-t border-grey-200">
             Start of log history
           </div>
         )}

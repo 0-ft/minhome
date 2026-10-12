@@ -49,31 +49,31 @@ export function ListSettingsView({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-sm text-sand-700 hover:text-sand-900 cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm text-grey-700 hover:text-grey-900 cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to lists
           </button>
         ) : <div />}
         {saving && (
-          <span className="text-xs text-sand-500">Saving…</span>
+          <span className="text-xs text-grey-500">Saving…</span>
         )}
       </div>
 
       <div>
-        <label className="block text-[11px] uppercase tracking-wider text-sand-500 mb-1">
+        <label className="block text-[11px] uppercase tracking-wider text-grey-500 mb-1">
           List name
         </label>
         <Input
           value={listName}
           onChange={(e) => onListNameChange(e.target.value)}
           placeholder="List name"
-          className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
+          className="bg-grey-50 text-grey-900 border-grey-300 focus-visible:bg-grey-50"
         />
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-sand-100/70 border border-sand-300 px-3 py-2">
-        <span className="text-sm text-sand-800">Include in AI prompt</span>
+      <div className="flex items-center justify-between rounded-lg bg-grey-100/70 border border-grey-300 px-3 py-2">
+        <span className="text-sm text-grey-800">Include in AI prompt</span>
         <Toggle
           checked={includeInPrompt}
           onCheckedChange={onIncludeInPromptChange}
@@ -82,12 +82,12 @@ export function ListSettingsView({
       </div>
 
       <div className="space-y-2">
-        <div className="text-[11px] uppercase tracking-wider text-sand-500">
+        <div className="text-[11px] uppercase tracking-wider text-grey-500">
           Columns
         </div>
         <div className="space-y-2">
           {columns.map((column, idx) => (
-            <div key={idx} className="rounded-md border border-sand-300 bg-sand-100/40 p-2 space-y-2">
+            <div key={idx} className="rounded-md border border-grey-300 bg-grey-100/40 p-2 space-y-2">
               <div className="grid grid-cols-[1fr_180px_auto] gap-2 items-center">
                 <Input
                   value={column.name}
@@ -95,7 +95,7 @@ export function ListSettingsView({
                     onColumnsChange(columns.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c)));
                   }}
                   placeholder="Status"
-                  className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
+                  className="bg-grey-50 text-grey-900 border-grey-300 focus-visible:bg-grey-50"
                 />
                 <IconPicker
                   value={column.icon}
@@ -109,7 +109,7 @@ export function ListSettingsView({
                   onClick={() => {
                     onColumnsChange(columns.filter((_, i) => i !== idx));
                   }}
-                  className="h-8 w-8 inline-flex items-center justify-center rounded-md text-blood-300 hover:text-blood-500 hover:bg-sand-200 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-md text-blood-300 hover:text-blood-500 hover:bg-grey-200 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   title="Remove column"
                   aria-label="Remove column"
                 >
@@ -124,7 +124,7 @@ export function ListSettingsView({
             value={newColumnStatus}
             onChange={(e) => onNewColumnStatusChange(e.target.value)}
             placeholder="Add column status"
-            className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
+            className="bg-grey-50 text-grey-900 border-grey-300 focus-visible:bg-grey-50"
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
               const next = newColumnStatus.trim();

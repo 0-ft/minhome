@@ -295,7 +295,7 @@ export function ListsView() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center gap-2 text-sm text-sand-600 justify-center">
+      <div className="h-full flex items-center gap-2 text-sm text-grey-600 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading lists...
       </div>
@@ -341,7 +341,7 @@ export function ListsView() {
               <button
                 type="button"
                 onClick={() => navigate(backToListsPath)}
-                className="inline-flex items-center gap-1.5 text-sm text-sand-700 hover:text-sand-900 cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-sm text-grey-700 hover:text-grey-900 cursor-pointer"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to lists
@@ -444,7 +444,7 @@ export function ListsView() {
                   <button
                     type="button"
                     onClick={() => addPlaceholderItem(statusFilter[0] ?? statusOptionIds[0])}
-                    className="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-lg bg-sand-200 text-sand-600 hover:bg-sand-300 hover:text-sand-800 transition-colors cursor-pointer"
+                    className="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-lg bg-grey-200 text-grey-600 hover:bg-grey-300 hover:text-grey-800 transition-colors cursor-pointer"
                     title="Add item"
                   >
                     <Plus className="h-4 w-4" />
@@ -454,16 +454,16 @@ export function ListsView() {
                 {viewMode === "list" ? (
                   <div className="flex-1 min-h-0 flex flex-col gap-2">
                     {filteredListItems.length === 0 ? (
-                      <div className="flex-1 min-h-0 overflow-y-auto text-center py-12 text-sm text-sand-600 rounded-xl border border-sand-300 bg-sand-50">
+                      <div className="flex-1 min-h-0 overflow-y-auto text-center py-12 text-sm text-grey-600 rounded-xl border border-grey-300 bg-grey-50">
                         No matching items.
                       </div>
                     ) : (
-                      <div className="h-full min-h-0 rounded-xl border border-sand-300 bg-sand-50 overflow-hidden flex flex-col">
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 border-b border-sand-300 bg-sand-100/70 text-[10px] uppercase tracking-wider text-sand-500">
+                      <div className="h-full min-h-0 rounded-xl border border-grey-300 bg-grey-50 overflow-hidden flex flex-col">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 border-b border-grey-300 bg-grey-100/70 text-[10px] uppercase tracking-wider text-grey-500">
                           <span>Issue</span>
                           <span className="pr-0.5">Status</span>
                         </div>
-                        <div className="divide-y divide-sand-300 overflow-y-auto min-h-0">
+                        <div className="divide-y divide-grey-300 overflow-y-auto min-h-0">
                           {filteredListItems.map((item) => (
                             <ListItemCard
                               key={`${activeList.id}:${item.id}`}
@@ -580,11 +580,11 @@ export function ListsView() {
                       <div className="hidden md:block">
                         <DragOverlay dropAnimation={null}>
                           {draggedKanbanItem ? (
-                            <div className="w-72 rounded-md bg-sand-50 border border-sand-300 p-2 shadow-lg opacity-95">
-                              <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-sand-500 mb-1">
+                            <div className="w-72 rounded-md bg-grey-50 border border-grey-300 p-2 shadow-lg opacity-95">
+                              <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-grey-500 mb-1">
                                 <span>{draggedKanbanItem.id}</span>
                               </div>
-                              <div className="text-sm leading-snug font-medium text-sand-900 whitespace-pre-wrap break-words">
+                              <div className="text-sm leading-snug font-medium text-grey-900 whitespace-pre-wrap break-words">
                                 {draggedKanbanItem.title}
                               </div>
                             </div>
@@ -596,7 +596,7 @@ export function ListsView() {
                 )}
               </>
             ) : (
-              <div className="flex-1 min-h-0 overflow-y-auto text-sm text-sand-600 py-10 text-center rounded-xl border border-sand-300 bg-sand-50">
+              <div className="flex-1 min-h-0 overflow-y-auto text-sm text-grey-600 py-10 text-center rounded-xl border border-grey-300 bg-grey-50">
                 No lists yet. Open settings to create one.
                 <div className="mt-3">
                   <Button variant="outline" size="sm" onClick={() => navigate("/lists/settings")}>

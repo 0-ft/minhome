@@ -38,6 +38,8 @@ export interface DeviceData {
   type: string;
   vendor: string | null;
   model: string | null;
+  /** Zigbee model description, e.g. "E27 bulb RGBW". */
+  description?: string | null;
   state: Record<string, unknown>;
   entities: Entity[];
   exposes?: unknown[];
@@ -70,4 +72,6 @@ export interface Vibe {
   entities: VibeEntitySetting[];
   createdAt: string;
   updatedAt: string;
+  /** Whether the lights currently match this vibe (computed by the server). */
+  active?: boolean;
 }

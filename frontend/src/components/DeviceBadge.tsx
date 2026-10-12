@@ -45,7 +45,7 @@ export function EntityBadge({ id, device: deviceId, children }: { id?: string; d
   return (
     <span
       className="entity-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium
-        bg-sand-200 text-sand-700 border border-sand-300 align-baseline whitespace-nowrap"
+        bg-grey-200 text-grey-700 border border-grey-300 align-baseline whitespace-nowrap"
       title={id && deviceId ? `${id}@${deviceId}` : undefined}
     >
       <Icon className="h-3 w-3 shrink-0" />

@@ -45,7 +45,7 @@ export function MobileTabBar({
   };
 
   return (
-    <nav className="md:hidden shrink-0 border-t border-sand-300 bg-sand-100/95 backdrop-blur px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1.5">
+    <nav className="md:hidden shrink-0 border-t border-grey-300 bg-grey-100/95 backdrop-blur px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1.5">
       <div className="grid grid-cols-5 gap-1">
         {VISIBLE_MOBILE_TABS.map((tab) => {
           const { Icon, label } = TAB_META[tab];
@@ -55,10 +55,10 @@ export function MobileTabBar({
               : chatVoiceStatus === "responding"
                 ? "bg-blood-200 text-blood-700"
                 : chatVoiceIsActive
-                  ? "bg-blood-400 text-sand-50"
+                  ? "bg-blood-400 text-grey-50"
                   : activeTab === tab
                     ? "bg-blood-100 text-blood-700"
-                    : "text-sand-600 hover:bg-sand-200";
+                    : "text-grey-600 hover:bg-grey-200";
             const chatButtonStyle = {
               transition: "background-color 220ms ease, color 220ms ease",
             } as const;
@@ -122,7 +122,7 @@ export function MobileTabBar({
               className={`h-11 rounded-md inline-flex items-center justify-center transition-colors cursor-pointer ${
                 activeTab === tab
                   ? "bg-blood-100 text-blood-700"
-                  : "text-sand-600 hover:bg-sand-200"
+                  : "text-grey-600 hover:bg-grey-200"
               }`}
               title={label}
               aria-label={label}

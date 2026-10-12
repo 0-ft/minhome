@@ -36,17 +36,17 @@ function KanbanCard({
   };
 
   const cardBody = (
-    <div className={`rounded-md bg-sand-50 border border-sand-300 p-2 transition-colors duration-200 transition-shadow duration-200 ${isDragging ? "shadow-lg" : "shadow-sm"} hover:bg-sand-100`}>
+    <div className={`rounded-md bg-grey-50 border border-grey-300 p-2 transition-colors duration-200 transition-shadow duration-200 ${isDragging ? "shadow-lg" : "shadow-sm"} hover:bg-grey-100`}>
       <div
-        className="w-full text-left cursor-pointer hover:text-sand-700"
+        className="w-full text-left cursor-pointer hover:text-grey-700"
         onClick={(e) => {
           e.stopPropagation();
           onOpen();
         }}
       >
         {titleViewTransitionName ? (
-          <div className="text-sand-900 min-w-0">
-            <div className="inline-flex items-center gap-1.5 text-[10px] leading-none uppercase tracking-wider text-sand-500 mb-1">
+          <div className="text-grey-900 min-w-0">
+            <div className="inline-flex items-center gap-1.5 text-[10px] leading-none uppercase tracking-wider text-grey-500 mb-1">
               <LucideIcon name={statusIcon} className="h-3 w-3" />
               <span className="leading-none">{item.id}</span>
             </div>
@@ -55,13 +55,13 @@ function KanbanCard({
                 value={item.title}
                 onSave={onSaveTitle}
                 fullWidth={false}
-                textClassName="text-sm leading-snug font-medium text-sand-900"
+                textClassName="text-sm leading-snug font-medium text-grey-900"
               />
             </ViewTransition>
           </div>
         ) : (
-          <div className="text-sand-900 min-w-0">
-            <div className="inline-flex items-center gap-1.5 text-[10px] leading-none uppercase tracking-wider text-sand-500 mb-1">
+          <div className="text-grey-900 min-w-0">
+            <div className="inline-flex items-center gap-1.5 text-[10px] leading-none uppercase tracking-wider text-grey-500 mb-1">
               <LucideIcon name={statusIcon} className="h-3 w-3" />
               <span className="leading-none">{item.id}</span>
             </div>
@@ -69,7 +69,7 @@ function KanbanCard({
               value={item.title}
               onSave={onSaveTitle}
               fullWidth={false}
-              textClassName="text-sm leading-snug font-medium text-sand-900"
+              textClassName="text-sm leading-snug font-medium text-grey-900"
             />
           </div>
         )}
@@ -138,12 +138,12 @@ export function KanbanColumn({
       <div
         ref={setNodeRef}
         className={`h-full min-h-[320px] w-12 shrink-0 rounded-lg transition-colors ${
-          isOver ? "bg-teal-100" : "bg-sand-200/50"
+          isOver ? "bg-teal-100" : "bg-grey-200/50"
         }`}
       >
         <button
           type="button"
-          className="h-full w-full flex items-center justify-center cursor-pointer text-sand-700 hover:text-sand-900"
+          className="h-full w-full flex items-center justify-center cursor-pointer text-grey-700 hover:text-grey-900"
           onClick={() => onToggleCollapse(statusId)}
           title={`Expand ${label}`}
         >
@@ -161,27 +161,27 @@ export function KanbanColumn({
     <div
       ref={setNodeRef}
       className={`${mobileCarousel ? "w-full" : "w-80"} h-full min-h-0 shrink-0 rounded-lg p-3 transition-colors flex flex-col ${
-        isOver ? "bg-teal-100" : "bg-sand-200/50"
+        isOver ? "bg-teal-100" : "bg-grey-200/50"
       }`}
     >
       <div className="flex items-center justify-between mb-2 shrink-0">
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-sand-900 cursor-pointer hover:text-sand-700"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-grey-900 cursor-pointer hover:text-grey-700"
           onClick={() => onToggleCollapse(statusId)}
         >
           <LucideIcon name={icon} className="h-4 w-4" />
           <span>{label}</span>
           {mobileCarousel && collapsed ? (
-            <span className="text-[10px] uppercase tracking-wider text-sand-500">(collapsed)</span>
+            <span className="text-[10px] uppercase tracking-wider text-grey-500">(collapsed)</span>
           ) : null}
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-sand-600">{items.length}</span>
+          <span className="text-xs text-grey-600">{items.length}</span>
           <button
             type="button"
             onClick={() => onAddItem(statusId)}
-            className="h-6 w-6 inline-flex items-center justify-center rounded-md bg-sand-200 text-sand-600 hover:bg-sand-300 hover:text-sand-800 transition-colors cursor-pointer"
+            className="h-6 w-6 inline-flex items-center justify-center rounded-md bg-grey-200 text-grey-600 hover:bg-grey-300 hover:text-grey-800 transition-colors cursor-pointer"
             title={`Add item to ${label}`}
           >
             <Plus className="h-3.5 w-3.5" />

@@ -97,11 +97,11 @@ export function IconPicker({
           }}
           placeholder={placeholder}
           className={cn(
-            "h-8 w-full rounded-md border border-sand-300 bg-sand-50 pl-8 pr-8 text-sm text-sand-900 focus-visible:outline-none focus-visible:bg-sand-100 transition-colors",
+            "h-8 w-full rounded-md border border-grey-300 bg-grey-50 pl-8 pr-8 text-sm text-grey-900 focus-visible:outline-none focus-visible:bg-grey-100 transition-colors",
             className,
           )}
         />
-        <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-sand-500">
+        <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-grey-500">
           <IconPreview name={value} />
         </span>
         {(value || query.length > 0) && (
@@ -113,7 +113,7 @@ export function IconPicker({
               setQuery("");
               setOpen(false);
             }}
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded text-sand-500 hover:text-sand-700 hover:bg-sand-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded text-grey-500 hover:text-grey-700 hover:bg-grey-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             title="Clear icon"
             aria-label="Clear icon"
           >
@@ -123,7 +123,7 @@ export function IconPicker({
       </div>
 
       {open && !disabled && (
-        <div className="absolute z-30 mt-1 w-max max-h-64 max-w-[min(32rem,calc(100vw-2rem))] overflow-x-hidden overflow-y-auto scrollbar-float rounded-md border border-sand-300 bg-sand-50 shadow-lg p-1">
+        <div className="absolute z-30 mt-1 w-max max-h-64 max-w-[min(32rem,calc(100vw-2rem))] overflow-x-hidden overflow-y-auto scrollbar-float rounded-md border border-grey-300 bg-grey-50 shadow-lg p-1">
           {matches.length > 0 ? (
             matches.map((name) => (
               <button
@@ -135,8 +135,8 @@ export function IconPicker({
                   setOpen(false);
                 }}
                 className={cn(
-                  "w-full px-2 py-1.5 rounded text-left text-xs font-mono text-sand-800 hover:bg-sand-100 flex items-center gap-2 cursor-pointer whitespace-nowrap",
-                  name === value && "bg-sand-200",
+                  "w-full px-2 py-1.5 rounded text-left text-xs font-mono text-grey-800 hover:bg-grey-100 flex items-center gap-2 cursor-pointer whitespace-nowrap",
+                  name === value && "bg-grey-200",
                 )}
               >
                 <IconPreview name={name} />
@@ -144,7 +144,7 @@ export function IconPicker({
               </button>
             ))
           ) : (
-            <div className="px-2 py-2 text-xs text-sand-500">No matching icons</div>
+            <div className="px-2 py-2 text-xs text-grey-500">No matching icons</div>
           )}
         </div>
       )}
@@ -154,11 +154,11 @@ export function IconPicker({
 
 function IconPreview({ name }: { name?: string }) {
   if (!name || !KEBAB_ICON_NAME_RE.test(name)) {
-    return <span className="inline-block h-4 w-4 rounded-sm border border-sand-300" />;
+    return <span className="inline-block h-4 w-4 rounded-sm border border-grey-300" />;
   }
   const iconsByName = LucideIcons as Record<string, LucideComponent>;
   const Icon = iconsByName[kebabToPascalCase(name)];
-  if (!Icon) return <span className="inline-block h-4 w-4 rounded-sm border border-sand-300" />;
+  if (!Icon) return <span className="inline-block h-4 w-4 rounded-sm border border-grey-300" />;
   return <Icon className="h-4 w-4" strokeWidth={2} />;
 }
 

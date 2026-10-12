@@ -1,4 +1,4 @@
-import type { DeviceData, Entity, Vibe, VibeEntitySetting } from "../types.js";
+import type { DeviceData, Entity } from "../types.js";
 
 // ── Entities a vibe can control ──────────────────────────
 
@@ -53,60 +53,6 @@ export function readCanonicalState(entity: Entity): CanonicalState {
     result.color_temp = colorTemp;
   }
   return result;
-}
-
-// ── Is a vibe currently active? ──────────────────────────
-
-const BRIGHTNESS_TOLERANCE = 6;
-const COLOR_TEMP_TOLERANCE = 10;
-const HUE_TOLERANCE = 6;
-const SATURATION_TOLERANCE = 6;
-
-function hueDistance(a: number, b: number): number {
-  const d = Math.abs(a - b) % 360;
-  return Math.min(d, 360 - d);
-}
-
-function settingMatches(entity: Entity, setting: VibeEntitySetting): boolean {
-  const current = readCanonicalState(entity);
-  if (current.state !== setting.state) return false;
-  if (setting.state === "OFF") return true;
-
-  const { features } = entity;
-  if (setting.brightness !== undefined && features.brightnessProperty) {
-    if (current.brightness === undefined || Math.abs(current.brightness - setting.brightness) > BRIGHTNESS_TOLERANCE) return false;
-  }
-  if (setting.color && features.colorProperty) {
-    if (!current.color) return false;
-    if (hueDistance(current.color.hue, setting.color.hue) > HUE_TOLERANCE) return false;
-    if (Math.abs(current.color.saturation - setting.color.saturation) > SATURATION_TOLERANCE) return false;
-  }
-  if (setting.color_temp !== undefined && features.colorTempProperty) {
-    if (current.color_temp === undefined || Math.abs(current.color_temp - setting.color_temp) > COLOR_TEMP_TOLERANCE) return false;
-  }
-  return true;
-}
-
-/** Whether the room currently matches a vibe, within small tolerances. */
-export function vibeMatches(vibe: Vibe, devices: DeviceData[]): boolean {
-  const controllable = new Map(
-    listControllableEntities(devices).map((c) => [settingKey(c.device.id, c.entity.key), c.entity]),
-  );
-  const specified = new Set<string>();
-  for (const setting of vibe.entities) {
-    const key = settingKey(setting.device, setting.entity);
-    const entity = controllable.get(key);
-    if (!entity) continue; // device gone — applying skips it too
-    specified.add(key);
-    if (!settingMatches(entity, setting)) return false;
-  }
-  if (specified.size === 0) return false;
-  if (vibe.offUnspecified) {
-    for (const [key, entity] of controllable) {
-      if (!specified.has(key) && readCanonicalState(entity).state !== "OFF") return false;
-    }
-  }
-  return true;
 }
 
 /** Fixed colours of non-colour lights (e.g. a pink lamp on a plug), keyed by settingKey. */

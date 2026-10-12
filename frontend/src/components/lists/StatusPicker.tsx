@@ -45,13 +45,13 @@ export function StatusPicker({
         {active?.label ?? value}
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 z-20 min-w-28 rounded-md border border-sand-300 bg-sand-50 shadow-lg p-1">
+        <div className="absolute right-0 mt-1 z-20 min-w-28 rounded-md border border-grey-300 bg-grey-50 shadow-lg p-1">
           {options.map((option) => (
             <button
               key={option.id}
               type="button"
               className={`w-full text-left px-2 py-1 rounded text-xs cursor-pointer inline-flex items-center gap-1.5 ${
-                option.id === value ? "bg-sand-200 text-sand-900" : "text-sand-700 hover:bg-sand-100"
+                option.id === value ? "bg-grey-200 text-grey-900" : "text-grey-700 hover:bg-grey-100"
               }`}
               onClick={() => {
                 onChange(option.id);

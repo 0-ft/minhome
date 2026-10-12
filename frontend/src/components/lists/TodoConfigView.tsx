@@ -114,8 +114,8 @@ export function ListsConfigView({
 
   if (lists.length === 0) {
     return (
-      <div className="rounded-xl border border-sand-300 bg-sand-50 p-6 text-center space-y-3">
-        <p className="text-sm text-sand-700">No lists configured.</p>
+      <div className="rounded-xl border border-grey-300 bg-grey-50 p-6 text-center space-y-3">
+        <p className="text-sm text-grey-700">No lists configured.</p>
         <Button onClick={onCreateListRequested} className="gap-1.5">
           <Plus className="h-4 w-4" />
           Add list
@@ -132,7 +132,7 @@ export function ListsConfigView({
         return (
           <div
             key={list.id}
-            className={`rounded-xl border border-sand-300 px-5 py-4 transition-colors ${isExpanded ? "bg-sand-100/70" : "bg-sand-50"}`}
+            className={`rounded-xl border border-grey-300 px-5 py-4 transition-colors ${isExpanded ? "bg-grey-100/70" : "bg-grey-50"}`}
           >
             <div
               className="flex items-center justify-between cursor-pointer select-none"
@@ -145,14 +145,14 @@ export function ListsConfigView({
               }}
             >
               <div className="flex items-center gap-3">
-                <div className={`h-2 w-2 rounded-full ${activeListId === list.id ? "bg-teal-400" : "bg-sand-400"}`} />
-                <span className="text-sm font-medium text-sand-900">{list.name}</span>
+                <div className={`h-2 w-2 rounded-full ${activeListId === list.id ? "bg-teal-400" : "bg-grey-400"}`} />
+                <span className="text-sm font-medium text-grey-900">{list.name}</span>
               </div>
               <div className="flex items-center gap-2">
                 {!isExpanded && (
                   <button
                     type="button"
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blood-300 hover:text-blood-500 hover:bg-sand-200 transition-colors cursor-pointer"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blood-300 hover:text-blood-500 hover:bg-grey-200 transition-colors cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!window.confirm(`Delete "${list.name}" and all its items?`)) return;
@@ -163,16 +163,16 @@ export function ListsConfigView({
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
-                <ChevronDown className={`h-4 w-4 text-sand-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                <ChevronDown className={`h-4 w-4 text-grey-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
               </div>
             </div>
 
             {!isExpanded && (
               <div className="flex gap-4 mt-2 ml-5">
-                <span className="text-[10px] text-sand-500 uppercase tracking-wider">
+                <span className="text-[10px] text-grey-500 uppercase tracking-wider">
                   columns: {columnsSummary}
                 </span>
-                <span className="text-[10px] text-sand-500 uppercase tracking-wider">
+                <span className="text-[10px] text-grey-500 uppercase tracking-wider">
                   items: {list.items.length}
                 </span>
               </div>

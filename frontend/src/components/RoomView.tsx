@@ -498,7 +498,7 @@ function LightOrb({
       {/* Name label on hover (hidden during drag) */}
       <Html position={[0, radius + 0.15, 0]} center style={{ pointerEvents: "none" }}>
         <div
-          className={`px-2 py-0.5 rounded bg-blood-500/90 text-sand-50 text-[10px] font-mono whitespace-nowrap shadow-lg transition-all duration-200 ${
+          className={`px-2 py-0.5 rounded bg-blood-500/90 text-grey-50 text-[10px] font-mono whitespace-nowrap shadow-lg transition-all duration-200 ${
             showLabel && !dragState ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
           }`}
         >
@@ -689,7 +689,7 @@ function SensorOrb({
       {/* Name + state label on hover */}
       <Html position={[0, 0.2, 0]} center style={{ pointerEvents: "none" }}>
         <div
-          className={`px-2 py-0.5 rounded bg-blood-500/90 text-sand-50 text-[10px] font-mono whitespace-nowrap shadow-lg transition-all duration-200 ${
+          className={`px-2 py-0.5 rounded bg-blood-500/90 text-grey-50 text-[10px] font-mono whitespace-nowrap shadow-lg transition-all duration-200 ${
             showLabel ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
           }`}
         >
@@ -851,7 +851,7 @@ export function RoomView() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center gap-2 text-sm text-sand-600 justify-center">
+      <div className="h-full flex items-center gap-2 text-sm text-grey-600 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading room…
       </div>
@@ -860,7 +860,7 @@ export function RoomView() {
 
   if (!roomConfig) {
     return (
-      <div className="h-full flex items-center justify-center text-sm text-sand-500 font-mono">
+      <div className="h-full flex items-center justify-center text-sm text-grey-500 font-mono">
         Room not configured
       </div>
     );

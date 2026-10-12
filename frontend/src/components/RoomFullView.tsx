@@ -141,7 +141,7 @@ export function RoomFullView() {
 
       {/* Not configured message */}
       {!loading && !roomConfig && (
-        <div className="absolute inset-0 flex items-center justify-center text-sand-500/50 font-mono text-sm">
+        <div className="absolute inset-0 flex items-center justify-center text-grey-500/50 font-mono text-sm">
           Room not configured
         </div>
       )}
@@ -162,7 +162,7 @@ export function RoomFullView() {
               <button
                 type="button"
                 onClick={() => setHistoryOpen(true)}
-                className="shrink-0 p-2.5 rounded-lg bg-white/[0.04] backdrop-blur-sm border border-white/[0.08] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08] transition-all cursor-pointer"
+                className="shrink-0 p-2.5 rounded-lg bg-white/[0.04] backdrop-blur-sm border border-white/[0.08] text-grey-500 hover:text-grey-100 hover:bg-white/[0.08] transition-all cursor-pointer"
                 title="Chat history"
               >
                 <History className="h-4 w-4" />
@@ -191,7 +191,7 @@ export function RoomFullView() {
             {messages.length === 0 && (
               <div className="animate-float-in mt-4">
                 <p
-                  className="text-sand-500/30 text-[15px] font-mono"
+                  className="text-grey-500/30 text-[15px] font-mono"
                   style={{ textShadow: "0 1px 8px rgba(0,0,0,0.6)" }}
                 >
                   Ask me anything about your room…
@@ -210,7 +210,7 @@ export function RoomFullView() {
             ))}
 
             {isLoading && messages.length > 0 && (
-              <div className="animate-float-in flex items-center gap-2 text-sm text-sand-500/50 mb-4">
+              <div className="animate-float-in flex items-center gap-2 text-sm text-grey-500/50 mb-4">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 <span className="font-mono">thinking…</span>
               </div>
@@ -237,7 +237,7 @@ export function RoomFullView() {
               onKeyDown={handleKeyDown}
               placeholder="Ask anything…"
               rows={1}
-              className="flex-1 resize-none rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/[0.07] px-4 py-3 text-[15px] text-sand-200 placeholder:text-sand-600/40 focus:outline-none focus:bg-white/[0.06] min-h-[44px] max-h-[120px] transition-all"
+              className="flex-1 resize-none rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/[0.07] px-4 py-3 text-[15px] text-grey-200 placeholder:text-grey-600/40 focus:outline-none focus:bg-white/[0.06] min-h-[44px] max-h-[120px] transition-all"
               style={{ fieldSizing: "content" } as React.CSSProperties}
             />
             {isLoading ? (
@@ -270,7 +270,7 @@ export function RoomFullView() {
           className={`p-2 rounded-lg backdrop-blur-sm border transition-all cursor-pointer ${
             cameraSaved
               ? "bg-teal-400/15 border-teal-400/20 text-teal-300"
-              : "bg-white/[0.04] border-white/[0.06] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08]"
+              : "bg-white/[0.04] border-white/[0.06] text-grey-500 hover:text-grey-100 hover:bg-white/[0.08]"
           }`}
           title="Save camera position"
         >
@@ -278,7 +278,7 @@ export function RoomFullView() {
         </button>
         <button
           onClick={() => navigate("/room")}
-          className="p-2 rounded-lg bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] text-sand-500 hover:text-sand-100 hover:bg-white/[0.08] transition-all cursor-pointer"
+          className="p-2 rounded-lg bg-white/[0.04] backdrop-blur-sm border border-white/[0.06] text-grey-500 hover:text-grey-100 hover:bg-white/[0.08] transition-all cursor-pointer"
           title="Back to home"
         >
           <Home className="h-4 w-4" />

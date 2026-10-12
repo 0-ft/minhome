@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Camera, Lightbulb, Play, Plug, Power, Sparkles, Trash2, X } from "lucide-react";
 import { useApplyVibe, useDeleteVibe, useDevices, useUpdateVibe, useVibes } from "../../api.js";
 import type { DeviceData, Entity, Vibe, VibeEntitySetting } from "../../types.js";
-import { listControllableEntities, readCanonicalState, settingKey, vibeMatches } from "../../lib/vibes.js";
+import { listControllableEntities, readCanonicalState, settingKey } from "../../lib/vibes.js";
 import { cn } from "../../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
@@ -46,7 +46,7 @@ export function VibeEditorView() {
 
   if (!vibe) {
     return (
-      <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
+      <div className="flex items-center gap-2 text-sm text-grey-600 py-12 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading vibe…
       </div>
@@ -97,7 +97,7 @@ function VibeEditor({ vibe, devices }: { vibe: Vibe; devices: DeviceData[] }) {
   const knownKeys = new Set(controllable.map((c) => settingKey(c.device.id, c.entity.key)));
   const orphans = draft.entities.filter((s) => !knownKeys.has(settingKey(s.device, s.entity)));
   const byDevice = groupByDevice(controllable);
-  const active = vibeMatches({ ...vibe, ...draft }, devices);
+  const active = !!vibe.active;
 
   const setSetting = (key: string, next: VibeEntitySetting | null) => edit((d) => {
     const rest = d.entities.filter((s) => settingKey(s.device, s.entity) !== key);
@@ -121,7 +121,7 @@ function VibeEditor({ vibe, devices }: { vibe: Vibe; devices: DeviceData[] }) {
       <button
         type="button"
         onClick={() => navigate("/entities")}
-        className="self-start inline-flex items-center gap-1.5 text-sm text-sand-600 hover:text-sand-900"
+        className="self-start inline-flex items-center gap-1.5 text-sm text-grey-600 hover:text-grey-900"
       >
         <ArrowLeft className="h-4 w-4" /> Entities
       </button>
@@ -145,12 +145,12 @@ function VibeEditor({ vibe, devices }: { vibe: Vibe; devices: DeviceData[] }) {
       </div>
 
       {/* Settings + actions */}
-      <div className="rounded-xl border border-sand-300 bg-sand-50 px-5 py-4 flex flex-col gap-4">
+      <div className="rounded-xl border border-grey-300 bg-grey-50 px-5 py-4 flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="w-56">
             <IconPicker value={draft.icon} onChange={(icon) => edit((d) => ({ ...d, icon }))} placeholder="Icon" />
           </div>
-          <label className="flex items-center gap-2.5 text-sm text-sand-800">
+          <label className="flex items-center gap-2.5 text-sm text-grey-800">
             <Toggle
               checked={draft.offUnspecified}
               onCheckedChange={(offUnspecified) => edit((d) => ({ ...d, offUnspecified }))}
@@ -176,7 +176,7 @@ function VibeEditor({ vibe, devices }: { vibe: Vibe; devices: DeviceData[] }) {
         {byDevice.map(({ device, entities }) => (
           <section key={device.id} className="flex flex-col gap-2">
             {entities.length > 1 && (
-              <h3 className="text-[11px] uppercase tracking-wider text-sand-500 px-1">{device.name}</h3>
+              <h3 className="text-[11px] uppercase tracking-wider text-grey-500 px-1">{device.name}</h3>
             )}
             <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
               {entities.map((entity) => {
@@ -198,9 +198,9 @@ function VibeEditor({ vibe, devices }: { vibe: Vibe; devices: DeviceData[] }) {
 
         {orphans.length > 0 && (
           <section className="flex flex-col gap-2">
-            <h3 className="text-[11px] uppercase tracking-wider text-sand-500 px-1">Missing devices</h3>
+            <h3 className="text-[11px] uppercase tracking-wider text-grey-500 px-1">Missing devices</h3>
             {orphans.map((s) => (
-              <div key={settingKey(s.device, s.entity)} className="flex items-center gap-2 rounded-lg bg-sand-300/60 px-3 py-2 text-xs font-mono text-sand-700">
+              <div key={settingKey(s.device, s.entity)} className="flex items-center gap-2 rounded-lg bg-grey-300/60 px-3 py-2 text-xs font-mono text-grey-700">
                 <span className="flex-1 truncate">{s.device} · {s.entity} · {s.state}</span>
                 <Button size="icon" variant="ghost" aria-label="Remove setting" onClick={() => setSetting(settingKey(s.device, s.entity), null)}>
                   <X className="h-3.5 w-3.5" />
@@ -293,7 +293,7 @@ function EntitySettingCard({ device, entity, setting, offUnspecified, onChange }
   return (
     <div className={cn(
       "flex flex-col gap-2.5 rounded-lg p-3 transition-colors",
-      !included ? "bg-sand-300/40 text-sand-600" : isOn ? "bg-sand-200 text-sand-800" : "bg-sand-300/60 text-sand-700",
+      !included ? "bg-grey-300/40 text-grey-600" : isOn ? "bg-grey-200 text-grey-800" : "bg-grey-300/60 text-grey-700",
     )}>
       <div className="flex items-start gap-2.5">
         <input
@@ -305,7 +305,7 @@ function EntitySettingCard({ device, entity, setting, offUnspecified, onChange }
         />
         <div className={cn(
           "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
-          included && isOn ? "bg-teal-200/60 text-teal-700" : "bg-sand-400/50 text-sand-600",
+          included && isOn ? "bg-teal-200/60 text-teal-700" : "bg-grey-400/50 text-grey-600",
         )}>
           <EntityIcon className="h-4 w-4" />
         </div>
@@ -314,15 +314,15 @@ function EntitySettingCard({ device, entity, setting, offUnspecified, onChange }
             <span className="truncate">{entity.name}</span>
             {entity.fixedColor && (
               <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full border border-sand-400/60"
+                className="h-2.5 w-2.5 shrink-0 rounded-full border border-grey-400/60"
                 style={{ background: entity.fixedColor }}
                 title={`Gives off ${entity.fixedColor}`}
               />
             )}
           </div>
           {entity.description
-            ? <div className="text-[11px] leading-snug text-sand-600">{entity.description}</div>
-            : <div className="text-[10px] font-mono truncate text-sand-500">{device.name}{entity.key !== "main" ? ` · ${entity.key}` : ""}</div>}
+            ? <div className="text-[11px] leading-snug text-grey-600">{entity.description}</div>
+            : <div className="text-[10px] font-mono truncate text-grey-500">{device.name}{entity.key !== "main" ? ` · ${entity.key}` : ""}</div>}
         </div>
         {included ? (
           <Button
@@ -335,7 +335,7 @@ function EntitySettingCard({ device, entity, setting, offUnspecified, onChange }
             <span className="font-mono text-[10px] uppercase">{isOn ? "on" : "off"}</span>
           </Button>
         ) : (
-          <span className="shrink-0 pt-1.5 text-[10px] font-mono uppercase text-sand-500">
+          <span className="shrink-0 pt-1.5 text-[10px] font-mono uppercase text-grey-500">
             {offUnspecified ? "turns off" : "untouched"}
           </span>
         )}
@@ -357,7 +357,6 @@ function EntitySettingCard({ device, entity, setting, offUnspecified, onChange }
           }}
           values={values}
           serverValues={values}
-          active
           onChange={(next) => {
             // Sliders echo their synced value back on mount; only real changes count as edits
             if (next.brightness !== undefined && next.brightness !== values.brightness) update({ brightness: next.brightness });

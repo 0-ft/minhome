@@ -61,7 +61,7 @@ function parsePayload(raw: unknown): Record<string, unknown> {
 function StatusIcon({ state }: { state: string }) {
   if (state === "output-available") return <Check className="h-3 w-3 text-teal-600" />;
   if (state === "output-error") return <X className="h-3 w-3 text-blood-500" />;
-  return <Loader2 className="h-3 w-3 animate-spin text-sand-500" />;
+  return <Loader2 className="h-3 w-3 animate-spin text-grey-500" />;
 }
 
 // ── Per-tool summary renderers ───────────────────────────
@@ -88,7 +88,7 @@ function ControlDeviceSummary({ input, devices }: { input: ToolInput; devices?: 
         <span key={key} className="flex items-center gap-1.5">
           <PayloadIcon prop={key} value={value} />
           {deviceId && <DeviceBadge id={deviceId}>{device?.name ?? deviceId}</DeviceBadge>}
-          <span className="text-sand-500">→</span>
+          <span className="text-grey-500">→</span>
           <PayloadValue prop={key} value={value} />
         </span>
       ))}
@@ -103,7 +103,7 @@ function PayloadIcon({ prop, value }: { prop: string; value: unknown }) {
   }
   if (prop === "brightness") return <Sun className="h-3 w-3 text-amber-500" />;
   if (prop === "color_temp") return <Thermometer className="h-3 w-3 text-orange-500" />;
-  return <Wrench className="h-3 w-3 text-sand-500" />;
+  return <Wrench className="h-3 w-3 text-grey-500" />;
 }
 
 function PayloadValue({ prop, value }: { prop: string; value: unknown }) {
@@ -117,12 +117,12 @@ function PayloadValue({ prop, value }: { prop: string; value: unknown }) {
   }
   if (prop === "brightness") {
     const pct = Math.round((Number(value) / 254) * 100);
-    return <span className="text-sand-700">{pct}%</span>;
+    return <span className="text-grey-700">{pct}%</span>;
   }
   if (prop === "color_temp") {
-    return <span className="text-sand-700">{String(value)} mireds</span>;
+    return <span className="text-grey-700">{String(value)} mireds</span>;
   }
-  return <span className="text-sand-700">{String(value)}</span>;
+  return <span className="text-grey-700">{String(value)}</span>;
 }
 
 function GetDeviceSummary({ input, devices }: { input: ToolInput; devices?: DeviceData[] }) {
@@ -130,7 +130,7 @@ function GetDeviceSummary({ input, devices }: { input: ToolInput; devices?: Devi
   const device = deviceId ? findDevice(devices, deviceId) : undefined;
   return (
     <span className="flex items-center gap-1.5">
-      <Search className="h-3 w-3 text-sand-500" />
+      <Search className="h-3 w-3 text-grey-500" />
       <span>Inspecting</span>
       {deviceId && <DeviceBadge id={deviceId}>{device?.name ?? deviceId}</DeviceBadge>}
     </span>
@@ -143,12 +143,12 @@ function RenameDeviceSummary({ input, devices }: { input: ToolInput; devices?: D
   const newName = input.name as string | undefined;
   return (
     <span className="flex items-center gap-1.5">
-      <Pencil className="h-3 w-3 text-sand-500" />
+      <Pencil className="h-3 w-3 text-grey-500" />
       <span>Rename</span>
       {deviceId && <DeviceBadge id={deviceId}>{device?.name ?? deviceId}</DeviceBadge>}
       {newName && <>
-        <span className="text-sand-500">→</span>
-        <span className="font-semibold text-sand-700">{newName}</span>
+        <span className="text-grey-500">→</span>
+        <span className="font-semibold text-grey-700">{newName}</span>
       </>}
     </span>
   );
@@ -161,14 +161,14 @@ function RenameEntitySummary({ input, devices }: { input: ToolInput; devices?: D
   const newName = input.name as string | undefined;
   return (
     <span className="flex items-center gap-1.5">
-      <Pencil className="h-3 w-3 text-sand-500" />
+      <Pencil className="h-3 w-3 text-grey-500" />
       <span>Rename</span>
-      <span className="font-mono text-sand-600">{entityId}</span>
-      {device && <span className="text-sand-400">on</span>}
+      <span className="font-mono text-grey-600">{entityId}</span>
+      {device && <span className="text-grey-400">on</span>}
       {deviceId && <DeviceBadge id={deviceId}>{device?.name ?? deviceId}</DeviceBadge>}
       {newName && <>
-        <span className="text-sand-500">→</span>
-        <span className="font-semibold text-sand-700">{newName}</span>
+        <span className="text-grey-500">→</span>
+        <span className="font-semibold text-grey-700">{newName}</span>
       </>}
     </span>
   );
@@ -177,7 +177,7 @@ function RenameEntitySummary({ input, devices }: { input: ToolInput; devices?: D
 function SimpleSummary({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <Icon className="h-3 w-3 text-sand-500" />
+      <Icon className="h-3 w-3 text-grey-500" />
       <span>{label}</span>
     </span>
   );
@@ -211,7 +211,7 @@ function ToolSummary({ part, devices }: { part: ToolPart; devices?: DeviceData[]
     default:
       return (
         <span className="flex items-center gap-1.5">
-          <Wrench className="h-3 w-3 text-sand-500" />
+          <Wrench className="h-3 w-3 text-grey-500" />
           <span className="font-mono">{name}</span>
         </span>
       );
@@ -230,7 +230,7 @@ export function ToolCallPart({ part }: { part: ToolPart }) {
       ? "border-teal-200"
       : isError
         ? "border-blood-300"
-        : "border-sand-300";
+        : "border-grey-300";
   const bgColor = isError ? "bg-blood-50/40" : "";
 
   return (
@@ -239,7 +239,7 @@ export function ToolCallPart({ part }: { part: ToolPart }) {
       <button
         onClick={() => setExpanded(!expanded)}
         className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-[11px] transition-colors cursor-pointer ${
-          isError ? "hover:bg-blood-100/40" : "hover:bg-sand-100/60"
+          isError ? "hover:bg-blood-100/40" : "hover:bg-grey-100/60"
         }`}
       >
         <StatusIcon state={part.state} />
@@ -250,17 +250,17 @@ export function ToolCallPart({ part }: { part: ToolPart }) {
           )}
         </div>
         <ChevronDown
-          className={`h-3 w-3 shrink-0 text-sand-400 transition-transform ${expanded ? "rotate-180" : ""}`}
+          className={`h-3 w-3 shrink-0 text-grey-400 transition-transform ${expanded ? "rotate-180" : ""}`}
         />
       </button>
 
       {/* Expandable raw details */}
       {expanded && (
-        <div className="px-2.5 pb-2 pt-1 border-t border-sand-200 font-mono text-[10px] leading-relaxed overflow-auto max-h-40 space-y-1">
+        <div className="px-2.5 pb-2 pt-1 border-t border-grey-200 font-mono text-[10px] leading-relaxed overflow-auto max-h-40 space-y-1">
           {part.input != null && (
             <div>
-              <span className="text-sand-400">input </span>
-              <pre className="text-sand-600 whitespace-pre-wrap break-all">
+              <span className="text-grey-400">input </span>
+              <pre className="text-grey-600 whitespace-pre-wrap break-all">
                 {typeof part.input === "string"
                   ? part.input
                   : JSON.stringify(part.input, null, 2)}
@@ -269,8 +269,8 @@ export function ToolCallPart({ part }: { part: ToolPart }) {
           )}
           {part.output != null && (
             <div>
-              <span className="text-sand-400">output </span>
-              <pre className="text-sand-600 whitespace-pre-wrap break-all">
+              <span className="text-grey-400">output </span>
+              <pre className="text-grey-600 whitespace-pre-wrap break-all">
                 {typeof part.output === "string"
                   ? part.output
                   : JSON.stringify(part.output, null, 2)}

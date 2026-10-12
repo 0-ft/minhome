@@ -32,7 +32,7 @@ export function ConfirmDialog({
         aria-label="Close confirmation dialog"
       />
       <div className="relative w-full max-w-md rounded-xl border border-blood-300/50 bg-blood-500 p-5 shadow-2xl">
-        <h3 className="text-base font-semibold text-sand-50">{title}</h3>
+        <h3 className="text-base font-semibold text-grey-50">{title}</h3>
         <p className="mt-2 text-sm text-blood-100">{message}</p>
         <div className="mt-5 flex items-center justify-end gap-2">
           <Button variant="outline" onClick={onCancel} disabled={pending}>

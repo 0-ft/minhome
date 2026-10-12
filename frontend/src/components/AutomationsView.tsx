@@ -58,10 +58,10 @@ function defaultAction(type: string = "device_set"): Action {
 
 // ── Shared styling ────────────────────────────────────────
 
-const fieldCls = "w-full rounded-lg bg-sand-100 border border-sand-300 px-3 py-1.5 text-sm text-sand-900 focus:outline-none focus:bg-sand-50 transition-colors";
+const fieldCls = "w-full rounded-lg bg-grey-100 border border-grey-300 px-3 py-1.5 text-sm text-grey-900 focus:outline-none focus:bg-grey-50 transition-colors";
 const selectCls = fieldCls + " appearance-none cursor-pointer";
-const labelCls = "text-[11px] font-mono text-sand-500 uppercase tracking-wider mb-1";
-const removeBtnCls = "h-6 w-6 inline-flex items-center justify-center rounded text-sand-400 hover:text-blood-500 hover:bg-sand-200 transition-colors cursor-pointer shrink-0";
+const labelCls = "text-[11px] font-mono text-grey-500 uppercase tracking-wider mb-1";
+const removeBtnCls = "h-6 w-6 inline-flex items-center justify-center rounded text-grey-400 hover:text-blood-500 hover:bg-grey-200 transition-colors cursor-pointer shrink-0";
 const addBtnCls = "inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700 cursor-pointer transition-colors py-1";
 
 // ── Shared field components ───────────────────────────────
@@ -147,8 +147,8 @@ function SectionHeader({ icon: Icon, label, onAdd }: { icon: React.ComponentType
   return (
     <div className="flex items-center justify-between mb-2">
       <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-sand-500" />
-        <span className="text-xs font-semibold text-sand-700 uppercase tracking-wider">{label}</span>
+        <Icon className="h-3.5 w-3.5 text-grey-500" />
+        <span className="text-xs font-semibold text-grey-700 uppercase tracking-wider">{label}</span>
       </div>
       <button type="button" onClick={onAdd} className={addBtnCls}>
         <Plus className="h-3 w-3" /> Add
@@ -157,15 +157,15 @@ function SectionHeader({ icon: Icon, label, onAdd }: { icon: React.ComponentType
   );
 }
 
-function ItemCard({ children, onRemove, accent = "sand" }: { children: React.ReactNode; onRemove: () => void; accent?: string }) {
+function ItemCard({ children, onRemove, accent = "grey" }: { children: React.ReactNode; onRemove: () => void; accent?: string }) {
   const accentColors: Record<string, string> = {
     teal: "border-l-teal-400",
     amber: "border-l-amber-400",
-    sand: "border-l-sand-400",
+    grey: "border-l-grey-400",
     blood: "border-l-blood-300",
   };
   return (
-    <div className={`relative rounded-lg border border-sand-200 bg-sand-50/50 p-3 pl-4 border-l-[3px] ${accentColors[accent] ?? accentColors.sand}`}>
+    <div className={`relative rounded-lg border border-grey-200 bg-grey-50/50 p-3 pl-4 border-l-[3px] ${accentColors[accent] ?? accentColors.grey}`}>
       <button type="button" onClick={onRemove} className={`${removeBtnCls} absolute top-2 right-2`} title="Remove">
         <X className="h-3 w-3" />
       </button>
@@ -314,7 +314,7 @@ function ConditionEditor({ condition, onChange, onRemove, devices }: {
                     className={`px-2.5 py-1 rounded-md text-xs font-mono uppercase cursor-pointer transition-colors ${
                       active
                         ? "bg-teal-400 text-teal-900"
-                        : "bg-sand-200 text-sand-500 hover:bg-sand-300"
+                        : "bg-grey-200 text-grey-500 hover:bg-grey-300"
                     }`}
                   >
                     {day}
@@ -426,7 +426,7 @@ function ActionEditor({ action, onChange, onRemove, devices, depth = 0 }: {
   const changeType = (type: string) => onChange(defaultAction(type));
 
   return (
-    <ItemCard onRemove={onRemove} accent={depth > 0 ? "blood" : "sand"}>
+    <ItemCard onRemove={onRemove} accent={depth > 0 ? "blood" : "grey"}>
       <div className="flex flex-col gap-3">
         <Field label="Type">
           <TypeSelect value={action.type} options={ACTION_TYPES} onChange={changeType} />
@@ -501,7 +501,7 @@ function ActionEditor({ action, onChange, onRemove, devices, depth = 0 }: {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="h-3 w-3 text-amber-500" />
-                <span className="text-[11px] font-semibold text-sand-600 uppercase tracking-wider">If condition</span>
+                <span className="text-[11px] font-semibold text-grey-600 uppercase tracking-wider">If condition</span>
               </div>
               <ConditionEditor
                 condition={action.condition}
@@ -617,7 +617,7 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
             className={`px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider cursor-pointer transition-colors ${
               draft.enabled
                 ? "bg-teal-400 text-teal-900"
-                : "bg-sand-200 text-sand-500"
+                : "bg-grey-200 text-grey-500"
             }`}
           >
             {draft.enabled ? "Enabled" : "Disabled"}
@@ -628,7 +628,7 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
       {/* ID (read-only) */}
       <div className="flex items-center gap-2">
         <span className={labelCls}>ID</span>
-        <code className="text-xs font-mono text-sand-600 bg-sand-100 px-2 py-0.5 rounded">{draft.id}</code>
+        <code className="text-xs font-mono text-grey-600 bg-grey-100 px-2 py-0.5 rounded">{draft.id}</code>
       </div>
 
       {/* Max runs */}
@@ -647,13 +647,13 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
                   onChange({ ...draft, max_runs: v === "" ? undefined : Math.max(1, parseInt(v, 10) || 1) } as any);
                 }}
               />
-              <span className="text-xs text-sand-500">
+              <span className="text-xs text-grey-500">
                 {(draft as any).max_runs
                   ? `Auto-removes after ${(draft as any).max_runs} run${(draft as any).max_runs === 1 ? "" : "s"}`
                   : "Unlimited (runs forever)"}
               </span>
               {(draft as any).run_count > 0 && (
-                <span className="text-xs text-sand-400 ml-2">
+                <span className="text-xs text-grey-400 ml-2">
                   ({(draft as any).run_count} so far)
                 </span>
               )}
@@ -670,7 +670,7 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
             <TriggerEditor key={i} trigger={t} onChange={(v) => updateTrigger(i, v)} onRemove={() => removeTrigger(i)} devices={devices} />
           ))}
           {triggers.length === 0 && (
-            <p className="text-xs text-sand-400 italic py-2">No triggers. Add at least one.</p>
+            <p className="text-xs text-grey-400 italic py-2">No triggers. Add at least one.</p>
           )}
         </div>
       </section>
@@ -683,7 +683,7 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
             <ConditionEditor key={i} condition={c} onChange={(v) => updateCondition(i, v)} onRemove={() => removeCondition(i)} devices={devices} />
           ))}
           {conditions.length === 0 && (
-            <p className="text-xs text-sand-400 italic py-2">No conditions — automation always runs when triggered.</p>
+            <p className="text-xs text-grey-400 italic py-2">No conditions — automation always runs when triggered.</p>
           )}
         </div>
       </section>
@@ -696,13 +696,13 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
             <ActionEditor key={i} action={a} onChange={(v) => updateAction(i, v)} onRemove={() => removeAction(i)} devices={devices} />
           ))}
           {actions.length === 0 && (
-            <p className="text-xs text-sand-400 italic py-2">No actions. Add at least one.</p>
+            <p className="text-xs text-grey-400 italic py-2">No actions. Add at least one.</p>
           )}
         </div>
       </section>
 
       {/* Save / Cancel */}
-      <div className="flex gap-2 pt-2 border-t border-sand-200">
+      <div className="flex gap-2 pt-2 border-t border-grey-200">
         <button
           type="button"
           onClick={onSave}
@@ -715,7 +715,7 @@ function AutomationEditor({ draft, onChange, onSave, onCancel, isSaving, devices
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sand-200 text-sand-700 text-sm font-medium hover:bg-sand-300 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-grey-200 text-grey-700 text-sm font-medium hover:bg-grey-300 transition-colors cursor-pointer"
         >
           Cancel
         </button>
@@ -758,7 +758,7 @@ export function AutomationsView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
+      <div className="flex items-center gap-2 text-sm text-grey-600 py-12 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading automations…
       </div>
@@ -768,8 +768,8 @@ export function AutomationsView() {
   if (!automations || !Array.isArray(automations) || automations.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-sm text-sand-700">No automations configured.</p>
-        <p className="text-xs font-mono text-sand-500 mt-1">Use the AI chat or API to create one.</p>
+        <p className="text-sm text-grey-700">No automations configured.</p>
+        <p className="text-xs font-mono text-grey-500 mt-1">Use the AI chat or API to create one.</p>
       </div>
     );
   }
@@ -782,7 +782,7 @@ export function AutomationsView() {
         return (
           <div
             key={a.id}
-            className={`rounded-xl border border-sand-300 px-5 py-4 transition-all ${isExpanded ? "bg-sand-100/70" : "bg-sand-50"}`}
+            className={`rounded-xl border border-grey-300 px-5 py-4 transition-all ${isExpanded ? "bg-grey-100/70" : "bg-grey-50"}`}
           >
             {/* Header row */}
             <div
@@ -790,34 +790,34 @@ export function AutomationsView() {
               onClick={() => isExpanded ? collapse() : expand(a)}
             >
               <div className="flex items-center gap-3">
-                <div className={`h-2 w-2 rounded-full ${a.enabled ? "bg-teal-400" : "bg-sand-400"}`} />
-                <span className="text-sm font-medium text-sand-900">{a.name}</span>
+                <div className={`h-2 w-2 rounded-full ${a.enabled ? "bg-teal-400" : "bg-grey-400"}`} />
+                <span className="text-sm font-medium text-grey-900">{a.name}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono font-medium uppercase tracking-wider ${
-                  a.enabled ? "bg-teal-50 text-teal-600" : "bg-sand-200 text-sand-500"
+                  a.enabled ? "bg-teal-50 text-teal-600" : "bg-grey-200 text-grey-500"
                 }`}>
                   {a.enabled ? "Active" : "Off"}
                 </span>
                 {!isExpanded && (
                   <button
-                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blood-300 hover:text-blood-500 hover:bg-sand-200 transition-colors cursor-pointer"
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blood-300 hover:text-blood-500 hover:bg-grey-200 transition-colors cursor-pointer"
                     onClick={(e) => { e.stopPropagation(); deleteAuto.mutate(a.id); }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
-                <ChevronDown className={`h-4 w-4 text-sand-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                <ChevronDown className={`h-4 w-4 text-grey-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
               </div>
             </div>
 
             {/* Summary (collapsed) */}
             {!isExpanded && (
               <div className="flex gap-4 mt-2 ml-5">
-                <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
+                <span className="text-[10px] font-mono text-grey-500 uppercase tracking-wider">
                   triggers: {a.triggers.map((t: { type: string }) => t.type).join(", ")}
                 </span>
-                <span className="text-[10px] font-mono text-sand-500 uppercase tracking-wider">
+                <span className="text-[10px] font-mono text-grey-500 uppercase tracking-wider">
                   actions: {a.actions.map((act: { type: string }) => act.type).join(", ")}
                 </span>
               </div>

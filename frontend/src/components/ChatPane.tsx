@@ -119,19 +119,19 @@ export function ChatPane({
   };
 
   return (
-    <div className="flex flex-col h-full bg-sand-100">
+    <div className="flex flex-col h-full bg-grey-100">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-sand-300">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-grey-300">
         <div>
-          <h2 className="text-sm font-semibold text-sand-800">AI Assistant</h2>
-          <p className="text-[10px] font-mono text-sand-500 mt-0.5">
+          <h2 className="text-sm font-semibold text-grey-800">AI Assistant</h2>
+          <p className="text-[10px] font-mono text-grey-500 mt-0.5">
             {isLoading ? "thinking…" : chatInfo?.model ?? "…"}
           </p>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setHistoryOpen(true)}
-            className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-grey-500 hover:text-grey-800 hover:bg-grey-200 transition-colors cursor-pointer"
             title="Chat history"
           >
             <History className="h-4 w-4" />
@@ -139,7 +139,7 @@ export function ChatPane({
           {showCloseButton && (
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md text-sand-500 hover:text-sand-800 hover:bg-sand-200 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-grey-500 hover:text-grey-800 hover:bg-grey-200 transition-colors cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -151,8 +151,8 @@ export function ChatPane({
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-sm text-sand-600">Ask me anything about your smart home.</p>
-            <p className="text-xs font-mono text-sand-500 mt-1">
+            <p className="text-sm text-grey-600">Ask me anything about your smart home.</p>
+            <p className="text-xs font-mono text-grey-500 mt-1">
               I can control devices, create automations, and more.
             </p>
           </div>
@@ -181,7 +181,7 @@ export function ChatPane({
         )}
 
         {isLoading && messages.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-sand-500 pl-1">
+          <div className="flex items-center gap-2 text-xs text-grey-500 pl-1">
             <Loader2 className="h-3 w-3 animate-spin" />
             <span className="font-mono">thinking…</span>
           </div>
@@ -198,12 +198,12 @@ export function ChatPane({
       {/* Input */}
       <form
         onSubmit={handleSubmit}
-        className="border-t border-sand-300 px-4 py-3 bg-sand-50"
+        className="border-t border-grey-300 px-4 py-3 bg-grey-50"
       >
         <div className="flex gap-2 items-stretch">
           {isVoiceActive ? (
-            <div className="flex-1 rounded-lg bg-sand-200 px-3 py-2 min-h-[36px] inline-flex items-center">
-              <p className="text-xs font-mono text-sand-700 truncate">
+            <div className="flex-1 rounded-lg bg-grey-200 px-3 py-2 min-h-[36px] inline-flex items-center">
+              <p className="text-xs font-mono text-grey-700 truncate">
                 voice: {voice.status}
                 {voice.error ? ` - ${voice.error}` : ""}
               </p>
@@ -216,7 +216,7 @@ export function ChatPane({
               onKeyDown={handleKeyDown}
               placeholder="Type a message…"
               rows={1}
-              className="flex-1 resize-none rounded-lg bg-sand-200 px-3 py-2 text-sm text-sand-900 placeholder:text-sand-500 focus:outline-none focus:bg-sand-100 transition-colors min-h-[36px] max-h-[120px]"
+              className="flex-1 resize-none rounded-lg bg-grey-200 px-3 py-2 text-sm text-grey-900 placeholder:text-grey-500 focus:outline-none focus:bg-grey-100 transition-colors min-h-[36px] max-h-[120px]"
               style={{ fieldSizing: "content" } as React.CSSProperties}
             />
           )}
@@ -236,8 +236,8 @@ export function ChatPane({
                 : voice.status === "responding"
                   ? "bg-blood-200 text-blood-700"
                 : isVoiceActive
-                  ? "bg-blood-400 text-sand-50"
-                  : "bg-sand-300 text-sand-700 hover:bg-sand-200"
+                  ? "bg-blood-400 text-grey-50"
+                  : "bg-grey-300 text-grey-700 hover:bg-grey-200"
             }`}
             style={{
               transform:
@@ -266,7 +266,7 @@ export function ChatPane({
             <button
               type="button"
               onClick={stop}
-              className="shrink-0 h-9 w-9 rounded-lg bg-blood-400 text-sand-50 hover:bg-blood-500 transition-colors cursor-pointer inline-flex items-center justify-center"
+              className="shrink-0 h-9 w-9 rounded-lg bg-blood-400 text-grey-50 hover:bg-blood-500 transition-colors cursor-pointer inline-flex items-center justify-center"
               title="Stop generating"
             >
               <X className="h-4 w-4" />
@@ -335,9 +335,9 @@ export function ChatPane({
 function ExtraInstructionsBanner({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="inline-flex items-start gap-1.5 rounded-md bg-sand-200/70 border border-sand-300/60 px-2.5 py-1.5 max-w-[85%]">
-        <Info className="h-3 w-3 text-sand-500 mt-0.5 shrink-0" />
-        <p className="text-[11px] leading-snug text-sand-600 italic break-words">
+      <div className="inline-flex items-start gap-1.5 rounded-md bg-grey-200/70 border border-grey-300/60 px-2.5 py-1.5 max-w-[85%]">
+        <Info className="h-3 w-3 text-grey-500 mt-0.5 shrink-0" />
+        <p className="text-[11px] leading-snug text-grey-600 italic break-words">
           {text}
         </p>
       </div>
@@ -356,7 +356,7 @@ function MessageBubble({ id, role, text }: { id: string; role: "user" | "assista
         className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
           isUser
             ? "bg-teal-400 text-teal-900 rounded-br-sm"
-            : "bg-sand-200 text-sand-800 rounded-bl-sm"
+            : "bg-grey-200 text-grey-800 rounded-bl-sm"
         }`}
       >
         {isUser ? (

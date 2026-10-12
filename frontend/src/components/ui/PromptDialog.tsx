@@ -46,14 +46,14 @@ export function PromptDialog({
         aria-label="Close dialog"
       />
       <div className="relative w-full max-w-md rounded-xl border border-blood-300/50 bg-blood-500 p-5 shadow-2xl">
-        <h3 className="text-base font-semibold text-sand-50">{title}</h3>
+        <h3 className="text-base font-semibold text-grey-50">{title}</h3>
         {message && <p className="mt-1 text-sm text-blood-100">{message}</p>}
         <div className="mt-4">
           <Input
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
-            className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
+            className="bg-grey-50 text-grey-900 border-grey-300 focus-visible:bg-grey-50"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();

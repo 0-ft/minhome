@@ -22,7 +22,7 @@ export function AppTopHeader({
               <button
                 key={tab}
                 onClick={() => onNavigate(tab)}
-                className="px-3.5 py-1.5 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
+                className="px-3.5 py-1.5 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer text-blood-100 hover:text-grey-50 hover:bg-blood-400/40"
               >
                 {tab}
               </button>
@@ -32,7 +32,7 @@ export function AppTopHeader({
           {showLogout && (
             <button
               onClick={onLogout}
-              className="p-2 rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
+              className="p-2 rounded-lg bg-blood-400/60 text-blood-100 hover:text-grey-50 hover:bg-blood-400/80 transition-all cursor-pointer"
               title="Sign out"
               aria-label="Sign out"
             >

@@ -27,11 +27,11 @@ export function ListItemCard({
 
   const cardBody = (
     <div
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-sand-100/60 cursor-pointer"
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 transition-colors duration-150 hover:bg-grey-100/60 cursor-pointer"
       onClick={onOpen}
     >
       <div className="min-w-0">
-        <div className="inline-flex items-center gap-1.5 text-[10px] leading-none uppercase tracking-wider text-sand-500 mb-1">
+        <div className="inline-flex items-center gap-1.5 text-[10px] leading-none uppercase tracking-wider text-grey-500 mb-1">
           <LucideIcon name={activeStatus?.icon} className="h-3 w-3" />
           <span className="leading-none">{item.id}</span>
         </div>
@@ -41,7 +41,7 @@ export function ListItemCard({
               value={item.title}
               onSave={onSaveTitle}
               fullWidth={false}
-              textClassName="text-sm leading-snug font-medium text-sand-900"
+              textClassName="text-sm leading-snug font-medium text-grey-900"
             />
           </ViewTransition>
         ) : (
@@ -49,7 +49,7 @@ export function ListItemCard({
             value={item.title}
             onSave={onSaveTitle}
             fullWidth={false}
-            textClassName="text-sm leading-snug font-medium text-sand-900"
+            textClassName="text-sm leading-snug font-medium text-grey-900"
           />
         )}
       </div>

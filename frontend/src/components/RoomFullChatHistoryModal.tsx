@@ -31,8 +31,8 @@ export function RoomFullChatHistoryModal({
       <div className="relative w-full max-w-xl rounded-xl border border-white/[0.1] bg-[#13100d]/95 shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-sand-100">Chat history</h3>
-            <p className="text-[11px] font-mono text-sand-500/90 mt-0.5">
+            <h3 className="text-sm font-semibold text-grey-100">Chat history</h3>
+            <p className="text-[11px] font-mono text-grey-500/90 mt-0.5">
               Resume saved room chats
             </p>
           </div>
@@ -48,7 +48,7 @@ export function RoomFullChatHistoryModal({
             </button>
             <button
               type="button"
-              className="p-1.5 rounded-md text-sand-500 hover:text-sand-100 hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-grey-500 hover:text-grey-100 hover:bg-white/[0.06] transition-colors cursor-pointer"
               onClick={onClose}
             >
               <X className="h-4 w-4" />

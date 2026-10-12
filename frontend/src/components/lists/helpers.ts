@@ -24,7 +24,7 @@ export function statusPillClass(statusId: string): string {
   if (hash === 0) return "bg-teal-100 text-teal-800 border border-teal-200";
   if (hash === 1) return "bg-blue-100 text-blue-700 border border-blue-200";
   if (hash === 2) return "bg-violet-100 text-violet-700 border border-violet-200";
-  return "bg-sand-200 text-sand-700 border border-sand-300";
+  return "bg-grey-200 text-grey-700 border border-grey-300";
 }
 
 export function sanitizeColumns(columns: ListColumn[]): ListColumn[] {

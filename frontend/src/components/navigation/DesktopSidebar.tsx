@@ -18,7 +18,7 @@ export function DesktopSidebar({
   onLogout: () => void;
 }) {
   return (
-    <aside className="hidden md:flex w-56 shrink-0 border-r border-sand-300 bg-blood-300/80 backdrop-blur-lg p-4 flex-col gap-4">
+    <aside className="hidden md:flex w-56 shrink-0 border-r border-grey-300 bg-blood-300/80 backdrop-blur-lg p-4 flex-col gap-4">
       <div className="px-1">
         <Logo />
       </div>
@@ -32,8 +32,8 @@ export function DesktopSidebar({
               onClick={() => onNavigate(tab)}
               className={`w-full text-left px-3 py-2 rounded-md text-xs uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === tab
-                  ? "bg-sand-50/90 text-blood-600"
-                  : "text-blood-100 hover:text-sand-50 hover:bg-blood-400/40"
+                  ? "bg-grey-50/90 text-blood-600"
+                  : "text-blood-100 hover:text-grey-50 hover:bg-blood-400/40"
               }`}
             >
               <span className="inline-flex items-center gap-2">
@@ -51,7 +51,7 @@ export function DesktopSidebar({
           className={`h-9 w-9 inline-flex items-center justify-center rounded-lg transition-all cursor-pointer ${
             chatOpen
               ? "bg-teal-400 text-teal-900"
-              : "bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80"
+              : "bg-blood-400/60 text-blood-100 hover:text-grey-50 hover:bg-blood-400/80"
           }`}
           title={chatOpen ? "Close AI chat" : "Open AI chat"}
           aria-label={chatOpen ? "Close AI chat" : "Open AI chat"}
@@ -62,7 +62,7 @@ export function DesktopSidebar({
         {showLogout && (
           <button
             onClick={onLogout}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-lg bg-blood-400/60 text-blood-100 hover:text-sand-50 hover:bg-blood-400/80 transition-all cursor-pointer"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-lg bg-blood-400/60 text-blood-100 hover:text-grey-50 hover:bg-blood-400/80 transition-all cursor-pointer"
             title="Sign out"
             aria-label="Sign out"
           >

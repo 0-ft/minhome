@@ -52,12 +52,12 @@ export function ToolCallGroup({
             ? "border-teal-400/25 bg-teal-400/10 text-teal-200"
             : errored
               ? "border-blood-400/30 bg-blood-500/10 text-blood-300"
-              : "border-white/[0.12] bg-white/[0.04] text-sand-300"
+              : "border-white/[0.12] bg-white/[0.04] text-grey-300"
           : done
             ? "border-teal-300 bg-teal-100/70 text-teal-800"
             : errored
               ? "border-blood-300 bg-blood-100/50 text-blood-700"
-              : "border-sand-300 bg-sand-50 text-sand-700";
+              : "border-grey-300 bg-grey-50 text-grey-700";
         const chipHover = isRoomFull
           ? done
             ? "hover:bg-teal-400/16"
@@ -68,7 +68,7 @@ export function ToolCallGroup({
             ? "hover:bg-teal-100"
             : errored
               ? "hover:bg-blood-100/70"
-              : "hover:bg-sand-100";
+              : "hover:bg-grey-100";
         const seamTop = isRoomFull
           ? done
             ? "border-t-teal-400/25"
@@ -79,7 +79,7 @@ export function ToolCallGroup({
             ? "border-t-teal-300"
             : errored
               ? "border-t-blood-300"
-              : "border-t-sand-300";
+              : "border-t-grey-300";
         return (
           <div key={key} className={`flex flex-col min-w-0 w-fit ${expanded ? "basis-full" : ""}`}>
             <button
@@ -105,19 +105,19 @@ export function ToolCallGroup({
               <div
                 className={`w-full rounded-md rounded-t-none border ${seamTop} px-2 py-1.5 text-[10px] font-mono leading-relaxed whitespace-pre-wrap break-all ${
                   isRoomFull
-                    ? "border-white/[0.12] bg-black/25 text-sand-300"
-                    : "border-sand-300 bg-sand-50 text-sand-700"
+                    ? "border-white/[0.12] bg-black/25 text-grey-300"
+                    : "border-grey-300 bg-grey-50 text-grey-700"
                 }`}
               >
                 {input && (
                   <div className="mb-1">
-                    <span className={isRoomFull ? "text-sand-500" : "text-sand-500"}>input </span>
+                    <span className={isRoomFull ? "text-grey-500" : "text-grey-500"}>input </span>
                     <pre>{input}</pre>
                   </div>
                 )}
                 {output && (
                   <div className="mb-1">
-                    <span className={isRoomFull ? "text-sand-500" : "text-sand-500"}>output </span>
+                    <span className={isRoomFull ? "text-grey-500" : "text-grey-500"}>output </span>
                     <pre>{output}</pre>
                   </div>
                 )}

@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation, useNavigate, Routes, Route, Navigate, Link } from "react-router-dom";
 import { useRealtimeUpdates, useAuthCheck, useLogout, useConfig } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
 import { EntitiesView } from "./components/EntitiesView.js";
 import { VibeEditorView } from "./components/vibes/VibeEditorView.js";
+import { EntityDetailView } from "./components/entities/EntityDetailView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { RoomView } from "./components/RoomView.js";
 import { RoomFullView } from "./components/RoomFullView.js";
@@ -39,17 +40,27 @@ function AuthenticatedApp({ showLogout }: { showLogout: boolean }) {
   );
 }
 
+const CHAT_OPEN_KEY = "minhome.chatOpen";
+
+/** The chat pane starts closed and remembers whether it was left open. */
+function readChatOpen(): boolean {
+  try { return localStorage.getItem(CHAT_OPEN_KEY) === "1"; } catch { return false; }
+}
+
 function MainLayout({ showLogout }: { showLogout: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const activeTab = getActiveTab(location.pathname);
+  // Canvas-like pages sit in a framed panel; content pages sit on the page itself
+  const boxed = activeTab === "room" || activeTab === "chat";
   const logout = useLogout();
   const { data: config } = useConfig();
   const configuredVoiceChatId = String(config?.voice?.chat_id ?? "").trim() || null;
   const mobileVoice = useBrowserVoiceWs(configuredVoiceChatId);
-  const [chatOpen, setChatOpen] = useState(
-    () => window.matchMedia("(min-width: 768px)").matches,
-  );
+  const [chatOpen, setChatOpen] = useState(readChatOpen);
+  useEffect(() => {
+    try { localStorage.setItem(CHAT_OPEN_KEY, chatOpen ? "1" : "0"); } catch { /* storage unavailable */ }
+  }, [chatOpen]);
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
   const dragging = useRef(false);
 
@@ -80,7 +91,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
   }, [chatWidth]);
 
   return (
-    <div className="h-screen flex flex-col md:flex-row bg-sand-100 md:bg-sand-50">
+    <div className="h-screen flex flex-col md:flex-row bg-grey-100">
       <DesktopSidebar
         activeTab={activeTab}
         showLogout={showLogout}
@@ -92,12 +103,16 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
 
       <div className="flex-1 min-w-0 min-h-0 flex">
         <div className="flex-1 min-w-0 min-h-0 overflow-hidden">
-          <main className="h-full overflow-hidden p-0 md:p-4">
-            <div className="w-full h-full overflow-hidden md:min-h-[500px] md:rounded-xl md:bg-sand-100 md:border md:border-sand-300">
+          <main className={`h-full overflow-hidden p-0 ${boxed ? "md:p-4" : ""}`}>
+            <div className={`w-full h-full overflow-hidden ${boxed ? "md:min-h-[500px] md:rounded-xl md:bg-grey-50 md:border md:border-grey-300" : ""}`}>
               <Routes>
                 <Route
                   path="entities"
                   element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div></div>}
+                />
+                <Route
+                  path="entities/:deviceId/:entityKey"
+                  element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><EntityDetailView /></div></div>}
                 />
                 <Route
                   path="entities/vibes/:vibeId"
@@ -121,7 +136,7 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
         </div>
 
         {chatOpen && (
-          <aside className="hidden md:block shrink-0 relative border-l border-sand-300 shadow-lg bg-sand-100" style={{ width: chatWidth }}>
+          <aside className="hidden md:block shrink-0 relative border-l border-grey-300 shadow-lg bg-grey-100" style={{ width: chatWidth }}>
             <div
               onMouseDown={onResizeStart}
               className="absolute top-0 left-0 w-1.5 h-full cursor-col-resize hover:bg-teal-300/40 active:bg-teal-300/60 transition-colors z-10"
@@ -149,7 +164,7 @@ function DebugLayout({ showLogout }: { showLogout: boolean }) {
   const logout = useLogout();
 
   return (
-    <div className="h-screen flex flex-col bg-sand-100">
+    <div className="h-screen flex flex-col bg-grey-100">
       <AppTopHeader
         showLogout={showLogout}
         onNavigate={(tab) => navigate(`/${tab}`)}
@@ -167,8 +182,8 @@ function DebugLayout({ showLogout }: { showLogout: boolean }) {
 function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-3">
-      <span className="text-5xl font-bold font-mono text-sand-400">404</span>
-      <p className="text-sm text-sand-600">Page not found.</p>
+      <span className="text-5xl font-bold font-mono text-grey-400">404</span>
+      <p className="text-sm text-grey-600">Page not found.</p>
       <Link to="/entities" className="text-sm text-teal-500 hover:text-teal-400 underline underline-offset-2">
         Go home
       </Link>
@@ -181,7 +196,7 @@ function NotFoundPage({ showLogout }: { showLogout: boolean }) {
   const logout = useLogout();
 
   return (
-    <div className="h-screen flex flex-col bg-sand-100">
+    <div className="h-screen flex flex-col bg-grey-100">
       <AppTopHeader
         showLogout={showLogout}
         onNavigate={(tab) => navigate(`/${tab}`)}

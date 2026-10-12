@@ -28,7 +28,7 @@ export function DevicesView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-sand-600 py-12 justify-center">
+      <div className="flex items-center gap-2 text-sm text-grey-600 py-12 justify-center">
         <div className="h-3 w-3 rounded-full bg-teal-300 animate-pulse" />
         Loading devices…
       </div>
@@ -38,8 +38,8 @@ export function DevicesView() {
   if (!devices || !Array.isArray(devices) || devices.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-sm text-sand-700">No devices found.</p>
-        <p className="text-xs font-mono text-sand-500 mt-1">Pair Zigbee devices via Z2M to get started.</p>
+        <p className="text-sm text-grey-700">No devices found.</p>
+        <p className="text-xs font-mono text-grey-500 mt-1">Pair Zigbee devices via Z2M to get started.</p>
       </div>
     );
   }
@@ -90,7 +90,7 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
                 <EditableText
                   value={device.name}
                   onSave={onRename}
-                  textClassName="text-sm font-semibold leading-none tracking-tight text-sand-50"
+                  textClassName="text-sm font-semibold leading-none tracking-tight text-grey-50"
                 />
               </CardTitle>
               <CardDescription>
@@ -139,7 +139,7 @@ function DeviceCard({ device, onSet, onRename, onRenameEntity }: {
                 {Object.entries(device.state).map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-3">
                     <span className="text-blood-200">{k}</span>
-                    <span className="text-sand-50 font-medium">{String(v)}</span>
+                    <span className="text-grey-50 font-medium">{String(v)}</span>
                   </div>
                 ))}
               </div>
@@ -209,7 +209,7 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
             return (
               <div key={sp.property} className="flex items-center gap-1.5">
                 <span className="text-[10px] font-mono text-blood-200">{sp.name}</span>
-                <span className="text-xs font-mono font-medium text-sand-50">
+                <span className="text-xs font-mono font-medium text-grey-50">
                   {String(val)}{sp.unit ? ` ${sp.unit}` : ""}
                 </span>
               </div>
@@ -225,7 +225,7 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
 
   return (
     <div className={`flex flex-col gap-2 rounded-lg p-3 transition-colors ${
-      isOn ? "bg-sand-200 text-sand-800" : "bg-blood-500/40 text-blood-100"
+      isOn ? "bg-grey-200 text-grey-800" : "bg-blood-500/40 text-blood-100"
     }`}>
       <div className="flex items-center gap-2.5">
         {/* Entity label (always show for multi-entity, hidden for single-entity) */}
@@ -235,7 +235,7 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
             onSave={(nextName) => onRenameEntity(entity.key, nextName)}
             className="min-w-8"
             textClassName={`text-[10px] font-mono font-medium uppercase tracking-wider ${
-              isOn ? "text-teal-600 hover:text-teal-700" : "text-blood-200 hover:text-sand-50"
+              isOn ? "text-teal-600 hover:text-teal-700" : "text-blood-200 hover:text-grey-50"
             }`}
           />
         )}
@@ -254,7 +254,7 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
         {/* Status dot / colour swatch */}
         {features.colorProperty && isOn ? (
           <div
-            className="h-3 w-3 rounded-full border border-sand-400/60 transition-colors"
+            className="h-3 w-3 rounded-full border border-grey-400/60 transition-colors"
             style={{ background: hslCss(hue, saturation) }}
           />
         ) : (
@@ -305,7 +305,7 @@ function EntityControlRow({ entity, device, showLabel, onSet, onRenameEntity }: 
             onCommit={(val) => onSet({ [features.colorProperty!]: { hue, saturation: val } })}
             label={
               <div
-                className="h-3.5 w-3.5 rounded-full border border-sand-400/40"
+                className="h-3.5 w-3.5 rounded-full border border-grey-400/40"
                 style={{ background: hslCss(hue, saturation) }}
               />
             }

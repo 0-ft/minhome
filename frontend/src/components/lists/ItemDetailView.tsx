@@ -57,24 +57,24 @@ export function ItemDetailView({
   };
 
   const detailCard = (
-    <div className="rounded-xl border border-sand-300 bg-sand-50 p-4 space-y-2 h-fit">
+    <div className="rounded-xl border border-grey-300 bg-grey-50 p-4 space-y-2 h-fit">
       <div>
         <div className="flex items-start justify-between gap-3 py-1">
           <div className="flex items-baseline gap-3 min-w-0 flex-1">
-            <span className="text-3xl md:text-4xl font-normal text-sand-500">{item.id}</span>
+            <span className="text-3xl md:text-4xl font-normal text-grey-500">{item.id}</span>
             {titleViewTransitionName ? (
               <ViewTransition name={titleViewTransitionName} share={titleViewTransitionName}>
                 <EditableText
                   value={item.title}
                   onSave={(nextTitle) => onSavePatch({ title: nextTitle })}
-                  textClassName="text-3xl md:text-4xl leading-tight font-normal text-sand-900"
+                  textClassName="text-3xl md:text-4xl leading-tight font-normal text-grey-900"
                 />
               </ViewTransition>
             ) : (
               <EditableText
                 value={item.title}
                 onSave={(nextTitle) => onSavePatch({ title: nextTitle })}
-                textClassName="text-3xl md:text-4xl leading-tight font-normal text-sand-900"
+                textClassName="text-3xl md:text-4xl leading-tight font-normal text-grey-900"
               />
             )}
           </div>
@@ -110,7 +110,7 @@ export function ItemDetailView({
             }}
             rows={1}
             autoFocus
-            className="w-full resize-none overflow-hidden bg-transparent py-1 pb-2 text-sm text-sand-900 focus-visible:outline-none"
+            className="w-full resize-none overflow-hidden bg-transparent py-1 pb-2 text-sm text-grey-900 focus-visible:outline-none"
           />
         ) : (
           <button
@@ -118,13 +118,13 @@ export function ItemDetailView({
             onClick={() => setIsEditingBody(true)}
             className="w-full text-left py-1 cursor-text"
           >
-            <div className="prose-chat text-sand-900 pb-2">
+            <div className="prose-chat text-grey-900 pb-2">
               {bodyDraft.trim().length > 0 ? (
                 <MarkdownHooks rehypePlugins={markdownRehypePlugins} fallback={<pre className="whitespace-pre-wrap">{bodyDraft}</pre>}>
                   {bodyDraft}
                 </MarkdownHooks>
               ) : (
-                <span className="text-sand-500 text-sm">Click to add markdown body...</span>
+                <span className="text-grey-500 text-sm">Click to add markdown body...</span>
               )}
             </div>
           </button>
@@ -139,7 +139,7 @@ export function ItemDetailView({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-sm text-sand-700 hover:text-sand-900 cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-sm text-grey-700 hover:text-grey-900 cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to list
@@ -156,7 +156,7 @@ export function ItemDetailView({
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-1.5 text-sm text-sand-700 hover:text-sand-900 cursor-pointer"
+        className="inline-flex items-center gap-1.5 text-sm text-grey-700 hover:text-grey-900 cursor-pointer"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to list
