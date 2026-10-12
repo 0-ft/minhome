@@ -16,7 +16,8 @@ import { z } from "zod";
 import type { UIMessage } from "ai";
 import { createTools, type ToolContext } from "./tools.js";
 import { createAutomationTools } from "./automation-tools.js";
-import { buildSystemPromptParts } from "./chat/context.js";
+import { buildSystemPromptParts, buildLiveStateNote, withSentTime } from "./chat/context.js";
+import { getCreatedAt } from "./config/chats.js";
 import { debugLog } from "./debug-log.js";
 import { createStreamingWavHeader, resample24to48 } from "./audio-utils.js";
 import { VoiceAudioCapture } from "./voice-audio-capture.js";
@@ -282,7 +283,6 @@ You are a voice-first smart-home assistant. Success means understanding the user
 # Verbosity
 - Direct answers: one short sentence.
 - Confirmations after a successful action: one short sentence (for example, "Done — the kitchen light is on").
-- If the requested state is already true, say so briefly and stop.
 - Do not add sign-offs or filler such as "let me know if you need anything else", "feel free to ask", or "anything else".
 
 # Reasoning
@@ -370,7 +370,7 @@ You are a voice-first smart-home assistant. Success means understanding the user
               item: {
                 type: "message",
                 role: "user",
-                content: [{ type: "input_text", text: part.text }],
+                content: [{ type: "input_text", text: withSentTime(part.text, getCreatedAt(msg)) }],
               } as any,
             });
             injected++;
@@ -433,6 +433,22 @@ You are a voice-first smart-home assistant. Success means understanding the user
     console.log(`[realtime] Injected extra instructions for session ${this.sessionId}: ${this.extraInstructions}`);
   }
 
+  /**
+   * Inject the current device state after the history, so it is the latest
+   * context the model sees and outranks stale state in earlier turns.
+   */
+  private injectLiveState(): void {
+    if (!this.rt) return;
+    this.rt.send({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "system",
+        content: [{ type: "input_text", text: buildLiveStateNote(this.toolCtx.bridge, this.toolCtx.config) }],
+      } as any,
+    });
+  }
+
   private bindEvents(): void {
     if (!this.rt) return;
 
@@ -446,6 +462,7 @@ You are a voice-first smart-home assistant. Success means understanding the user
       this.connected = true;
       this.injectChatHistory();
       this.injectExtraInstructions();
+      this.injectLiveState();
       this.flushPendingAudio();
     });
 

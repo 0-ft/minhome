@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage, validateUIMessages, createIdGenerator } from "ai";
-import { buildSystemPrompt } from "./context.js";
+import { buildSystemPrompt, buildLiveStateNote, withSentTime } from "./context.js";
+import { getCreatedAt } from "../config/chats.js";
 import { createTools, type ToolContext } from "../tools.js";
 import { createAutomationTools } from "../automation-tools.js";
 import { openai, modelId, buildAiTools } from "./ai.js";
@@ -28,6 +29,7 @@ export function createChatRoute(ctx: ToolContext) {
       toolCount: Object.keys(tools).length,
       tools: tools,
       systemPrompt: system,
+      liveStateNote: buildLiveStateNote(bridge, config),
     });
   });
 
@@ -95,7 +97,14 @@ export function createChatRoute(ctx: ToolContext) {
     });
 
     const system = buildSystemPrompt(bridge, config, lists, automations, voiceDevices);
-    const modelMessages = await convertToModelMessages(validatedMessages);
+    const modelMessages = await convertToModelMessages(withHistoryTimestamps(validatedMessages, chats.get(chatId)?.messages ?? []));
+    // Live state goes right before the latest user message, so it outranks
+    // stale state in the history. It is model input only, never persisted.
+    const lastUserIndex = modelMessages.map((m) => m.role).lastIndexOf("user");
+    modelMessages.splice(lastUserIndex === -1 ? modelMessages.length : lastUserIndex, 0, {
+      role: "system",
+      content: buildLiveStateNote(bridge, config),
+    });
 
     // // Wrap tools to intercept tool calls and results
     // const instrumentedTools = Object.fromEntries(
@@ -161,6 +170,20 @@ export function createChatRoute(ctx: ToolContext) {
 }
 
 // ── Helpers ──────────────────────────────────────────────
+
+/** Prefix earlier user messages with the time they were sent, from the stored chat. */
+function withHistoryTimestamps(messages: UIMessage[], stored: UIMessage[]): UIMessage[] {
+  const sentAt = new Map(stored.map((msg) => [msg.id, getCreatedAt(msg)]));
+  return messages.map((msg) => {
+    if (msg.role !== "user") return msg;
+    const createdAt = sentAt.get(msg.id);
+    if (!createdAt) return msg;
+    return {
+      ...msg,
+      parts: msg.parts.map((part) => part.type === "text" ? { ...part, text: withSentTime(part.text, createdAt) } : part),
+    };
+  });
+}
 
 function truncate(s: string, max: number): string {
   if (!s) return "(empty)";

@@ -53,6 +53,48 @@ export function buildSystemPrompt(
   return `${base}\n\n${inlineReferences}`;
 }
 
+const TIME_ZONE = "Europe/London";
+
+/** Format a timestamp for the model, e.g. "Mon, 12 Oct 2026, 14:21". */
+export function formatPromptTime(date: Date): string {
+  const day = date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: TIME_ZONE });
+  const time = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE });
+  return `${day}, ${time}`;
+}
+
+/**
+ * Timestamped snapshot of every entity's current state. Injected just before
+ * the latest user message (and never persisted) so the model weighs it above
+ * anything in the conversation history.
+ */
+export function buildLiveStateNote(bridge: MqttBridge, config: ConfigStore): string {
+  const devices = [...bridge.devices.values()]
+    .filter((d) => d.type !== "Coordinator")
+    .map((d) => {
+      const custom = config.getDevice(d.ieee_address);
+      const state = bridge.states.get(d.ieee_address) ?? {};
+      const extracted = extractEntitiesFromExposes(d.definition?.exposes ?? []);
+      const deviceName = custom?.name ?? d.friendly_name;
+      const entities = buildEntityResponses(extracted, deviceName, custom?.entities, state);
+      return {
+        id: d.ieee_address,
+        name: deviceName,
+        entities: entities.map((e) => ({ key: e.key, name: e.name, state: e.state })),
+      };
+    });
+
+  return `Live device state as of ${formatPromptTime(new Date())} (${TIME_ZONE}). This is the current time and the current state of every device; it supersedes anything earlier in the conversation. An empty state means the device has not reported yet.
+${JSON.stringify(devices)}`;
+}
+
+/** Prefix a history message's text with the time it was sent, when known. */
+export function withSentTime(text: string, createdAt: unknown): string {
+  if (typeof createdAt !== "string") return text;
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return text;
+  return `[${formatPromptTime(date)}] ${text}`;
+}
+
 function buildBaseSystemPrompt(
   bridge: MqttBridge,
   config: ConfigStore,
@@ -77,7 +119,6 @@ function buildBaseSystemPrompt(
           key: e.key,
           name: e.name,
           type: e.type,
-          state: e.state,
           ...(e.sensorProperties ? { sensorProperties: e.sensorProperties } : {}),
         })),
         type: d.type,
@@ -105,16 +146,10 @@ function buildBaseSystemPrompt(
     })),
   }));
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("en-GB", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Europe/London" });
-  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
-
   return `You are a smart home assistant for minhome, a Zigbee-based room control system.
 You can view and control smart home devices and automations using the tools available to you.
 
-Current date and time: ${dateStr}, ${timeStr} (Europe/London).
-
-Current devices and their entities:
+Devices and their entities:
 ${JSON.stringify(devices, null, 2)}
 
 Current automations:
@@ -128,6 +163,12 @@ Connected voice devices:
 ${JSON.stringify([...voiceDevices.entries()].map(([id, info]) => ({ id, name: info.name, model: info.model })), null, 2)}
 You can send spoken announcements to these devices using the announce tool. Omit device_id to announce on all devices, or provide a specific device_id to target one.
 ` : ""}
+Device state:
+- Live device state is provided in a "Live device state" note immediately before the latest user message. It is read directly from the devices and is the only reliable source of current state.
+- Devices change outside this conversation (wall switches, the dashboard, automations). Earlier messages and tool results describe the past, not the present: never conclude a device's current state from them.
+- When asked to change a device, always send the command, even if the live state suggests it is already in that state. Commands are idempotent.
+- Earlier user messages may be prefixed with the time they were sent, e.g. "[Mon, 12 Oct 2026, 14:21]". Use these to judge how old earlier context is. Never include such prefixes in your replies.
+
 Guidelines:
 - Be concise, direct, and helpful. Avoid unnecessary filler or repetitive closings.
 - When controlling devices, ALWAYS use control_entity with the entity key and canonical property names (state, brightness, color_temp, color). The server resolves actual MQTT property names automatically. For colour-changing lights, set colour with: {"color":{"hue":N,"saturation":N}} (hue 0-360, saturation 0-100) or {"color":{"hex":"#RRGGBB"}}.

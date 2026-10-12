@@ -38,6 +38,18 @@ export interface ChatListItem {
   lastDeviceId?: string;
 }
 
+/** The time a message was sent, stored as `metadata.createdAt` (ISO string). */
+export function getCreatedAt(message: UIMessage | undefined): string | undefined {
+  const createdAt = (message?.metadata as { createdAt?: unknown } | undefined)?.createdAt;
+  return typeof createdAt === "string" ? createdAt : undefined;
+}
+
+function stampCreatedAt(message: UIMessage, createdAt: string): UIMessage {
+  if (getCreatedAt(message)) return message;
+  const metadata = message.metadata && typeof message.metadata === "object" ? message.metadata : {};
+  return { ...message, metadata: { ...metadata, createdAt } };
+}
+
 export class ChatStore {
   private data: ChatsFile;
   private changeListeners = new Set<() => void>();
@@ -96,7 +108,7 @@ export class ChatStore {
       createdAt: now,
       updatedAt: now,
       lastDeviceId: args.lastDeviceId,
-      messages: args.messages ?? [],
+      messages: (args.messages ?? []).map((msg) => stampCreatedAt(msg, now)),
     });
     this.data.chats.push(chat);
     this.save();
@@ -130,8 +142,14 @@ export class ChatStore {
     if (!existing) {
       return this.create(args);
     }
-    existing.messages = ChatMessagesSchema.parse(args.messages);
-    existing.updatedAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    // Clients don't round-trip message metadata, so carry over the sent time
+    // of messages we already have and stamp the new ones.
+    const previous = new Map(existing.messages.map((msg) => [msg.id, msg]));
+    existing.messages = ChatMessagesSchema.parse(args.messages).map((msg) =>
+      stampCreatedAt(msg, getCreatedAt(previous.get(msg.id)) ?? now),
+    );
+    existing.updatedAt = now;
     if (!existing.title && args.title) {
       existing.title = args.title;
     }
@@ -160,8 +178,9 @@ export class ChatStore {
         messages: [args.message],
       });
     }
-    existing.messages.push(UIMessageSchema.parse(args.message));
-    existing.updatedAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    existing.messages.push(stampCreatedAt(UIMessageSchema.parse(args.message), now));
+    existing.updatedAt = now;
     if (!existing.title && args.title) {
       existing.title = args.title;
     }

@@ -307,7 +307,8 @@ export function createTools(): Record<string, ToolDef> {
 
         const resolved = resolveEntityPayload(entityDef, payload);
         bridge.setDeviceState(id, resolved);
-        return { ok: true };
+        // Dated, so replayed history reads as a past command, not current state
+        return { ok: true, sent: payload, at: new Date().toISOString() };
       },
     },
 
