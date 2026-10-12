@@ -9,6 +9,7 @@ import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
 import type { VibeStore } from "./config/vibes.js";
 import { applyVibe, captureVibeSettings, findUnknownSettings, fixedEntityColors, normalizeSettingInput, VibeSettingInputSchema, watchActiveVibes, withActivity } from "./vibes.js";
 import { renderVibeArt } from "./vibe-art.js";
+import { CHECKPOINT_MAX_TTL_SECONDS, CheckpointStore } from "./checkpoints.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
@@ -57,7 +58,9 @@ export function createApp(
   const vibeActivityListeners = new Set<() => void>();
   watchActiveVibes(bridge, vibes, () => vibeActivityListeners.forEach((fn) => fn()));
 
-  const toolCtx: ToolContext = { bridge, config, chats, lists, vibes, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
+  const checkpoints = new CheckpointStore(bridge);
+
+  const toolCtx: ToolContext = { bridge, config, chats, lists, vibes, checkpoints, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
 
   // --- Auth (no-ops when AUTH_PASSWORD_HASH is unset) ---
   app.route("/", authRoutes());
@@ -549,6 +552,62 @@ export function createApp(
       }).safeParse(await c.req.json().catch(() => ({})));
       if (!body.success) return c.json({ error: body.error.message }, 400);
       return c.json(applyVibe(bridge, vibe, body.data));
+    })
+
+    // --- Checkpoints: temporary snapshots of light states, e.g. for previews ---
+    .get("/api/checkpoints", (c) => c.json(checkpoints.list()))
+
+    .post("/api/checkpoints",
+      zValidator("json", z.object({
+        /** Lifetime in seconds (default 1 hour). */
+        ttl: z.number().min(1).max(CHECKPOINT_MAX_TTL_SECONDS).optional(),
+        /** "restore" returns the lights to the checkpoint when it expires; "discard" (default) just drops it. */
+        onExpiry: z.enum(["restore", "discard"]).optional(),
+        label: z.string().max(100).optional(),
+      })),
+      (c) => {
+        const body = c.req.valid("json");
+        return c.json(checkpoints.create({ ttlSeconds: body.ttl, onExpiry: body.onExpiry, label: body.label }), 201);
+      },
+    )
+
+    .get("/api/checkpoints/:id", (c) => {
+      const checkpoint = checkpoints.get(c.req.param("id"));
+      if (!checkpoint) return c.json({ error: "Checkpoint not found" }, 404);
+      return c.json(checkpoint);
+    })
+
+    // Optional JSON body: { "ttl": seconds } to change the lifetime from now
+    .post("/api/checkpoints/:id/keepalive", async (c) => {
+      const body = z.object({ ttl: z.number().min(1).max(CHECKPOINT_MAX_TTL_SECONDS).optional() })
+        .safeParse(await c.req.json().catch(() => ({})));
+      if (!body.success) return c.json({ error: body.error.message }, 400);
+      try {
+        return c.json(checkpoints.keepalive(c.req.param("id"), body.data.ttl));
+      } catch (e: unknown) {
+        return c.json({ error: (e as Error).message }, 404);
+      }
+    })
+
+    // Optional JSON body: { "transition": seconds }
+    .post("/api/checkpoints/:id/restore", async (c) => {
+      const body = z.object({ transition: z.number().min(0).max(60).optional() })
+        .safeParse(await c.req.json().catch(() => ({})));
+      if (!body.success) return c.json({ error: body.error.message }, 400);
+      try {
+        return c.json(checkpoints.restore(c.req.param("id"), body.data));
+      } catch (e: unknown) {
+        return c.json({ error: (e as Error).message }, 404);
+      }
+    })
+
+    .delete("/api/checkpoints/:id", (c) => {
+      try {
+        checkpoints.discard(c.req.param("id"));
+        return c.json({ ok: true });
+      } catch (e: unknown) {
+        return c.json({ error: (e as Error).message }, 404);
+      }
     })
 
     // --- WebSocket ---

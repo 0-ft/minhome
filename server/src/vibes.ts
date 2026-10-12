@@ -78,12 +78,16 @@ function settingPayload(entity: ExtractedEntity, setting: VibeEntitySetting): Re
   };
 }
 
-export interface ApplyVibeResult {
+export interface ApplyVibeResult extends ApplySettingsResult {
   ok: true;
   vibe: string;
-  /** Entities the vibe sets (whether or not they needed a command). */
+  at: string;
+}
+
+export interface ApplySettingsResult {
+  /** Entities the settings cover (whether or not they needed a command). */
   applied: number;
-  /** Unlisted entities switched off by off_unspecified. */
+  /** Unlisted entities switched off by offUnspecified. */
   turnedOff: number;
   /** Entities already in their target state, so no command was sent. */
   unchanged: number;
@@ -91,22 +95,20 @@ export interface ApplyVibeResult {
   forced: boolean;
   /** Settings whose device or entity no longer exists. */
   skipped: Array<{ device: string; entity: string }>;
-  at: string;
 }
 
 /**
- * Apply a vibe: send every setting, plus OFF to all other controllable
- * entities when `offUnspecified` is set. Payloads are merged so each device
- * gets a single MQTT publish. Lights fade over `transition` seconds.
+ * Bring entities to the given settings, sending only what differs from their
+ * reported state unless `force`. With `offUnspecified`, every other light and
+ * switch is turned off. Payloads are merged so each device gets a single MQTT
+ * publish, and lights fade over `transition` seconds.
  */
-export function applyVibe(
+export function applySettings(
   bridge: MqttBridge,
-  vibe: Vibe,
-  options: { transition?: number; force?: boolean } = {},
-): ApplyVibeResult {
-  // Re-applying a vibe that already looks active is how to fix lights whose
-  // reported state is stale, so that sends everything
-  const force = options.force ?? isVibeActive(bridge, vibe);
+  settings: VibeEntitySetting[],
+  options: { offUnspecified: boolean; force: boolean; transition?: number },
+): ApplySettingsResult {
+  const { force } = options;
   const controllable = new Map(listControllableEntities(bridge).map((c) => [entityId(c.deviceId, c.entity.key), c]));
   const perDevice = new Map<string, { payload: Record<string, unknown>; entities: ExtractedEntity[] }>();
   const send = (deviceId: string, entity: ExtractedEntity, payload: Record<string, unknown>) => {
@@ -118,9 +120,9 @@ export function applyVibe(
   };
 
   const specified = new Set<string>();
-  const skipped: ApplyVibeResult["skipped"] = [];
+  const skipped: ApplySettingsResult["skipped"] = [];
   let unchanged = 0;
-  for (const setting of vibe.entities) {
+  for (const setting of settings) {
     const id = entityId(setting.device, setting.entity);
     const target = controllable.get(id);
     if (!target) {
@@ -136,7 +138,7 @@ export function applyVibe(
   }
 
   let turnedOff = 0;
-  if (vibe.offUnspecified) {
+  if (options.offUnspecified) {
     for (const [id, target] of controllable) {
       if (specified.has(id)) continue;
       if (!force && readCanonicalEntityState(target.entity, target.deviceState).state === "OFF") {
@@ -153,14 +155,27 @@ export function applyVibe(
     bridge.setDeviceState(deviceId, withTransition(entities, payload, options.transition));
   }
 
+  return { applied: specified.size, turnedOff, unchanged, forced: force, skipped };
+}
+
+/**
+ * Apply a vibe. Only lights that differ from it get commands, except that
+ * re-applying a vibe that already looks active sends everything — the way to
+ * fix lights whose reported state is stale.
+ */
+export function applyVibe(
+  bridge: MqttBridge,
+  vibe: Vibe,
+  options: { transition?: number; force?: boolean } = {},
+): ApplyVibeResult {
   const result: ApplyVibeResult = {
     ok: true,
     vibe: vibe.id,
-    applied: specified.size,
-    turnedOff,
-    unchanged,
-    forced: force,
-    skipped,
+    ...applySettings(bridge, vibe.entities, {
+      offUnspecified: vibe.offUnspecified,
+      force: options.force ?? isVibeActive(bridge, vibe),
+      transition: options.transition,
+    }),
     at: new Date().toISOString(),
   };
   debugLog.add("vibe_applied", `Vibe applied: ${vibe.name}`, result);

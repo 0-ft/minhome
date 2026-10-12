@@ -33,6 +33,7 @@ export type DebugLogType =
   | "automation_updated"
   | "automation_deleted"
   | "vibe_applied"
+  | "checkpoint_restored"
   | "api_request"
   | "device_control"
   | "display_setup"

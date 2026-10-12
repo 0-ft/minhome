@@ -6,6 +6,7 @@ import type { ChatStore } from "./config/chats.js";
 import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
 import type { AutomationEngine } from "./automations.js";
 import type { VibeStore } from "./config/vibes.js";
+import type { CheckpointStore } from "./checkpoints.js";
 import { applyVibe, captureVibeSettings, findUnknownSettings, normalizeSettingInput, VibeSettingInputSchema, withActivity } from "./vibes.js";
 import {
   RoomDimensionsSchema,
@@ -35,6 +36,8 @@ export interface ToolContext {
   chats: ChatStore;
   lists: ListStore;
   vibes: VibeStore;
+  /** Temporary in-memory snapshots of light states (for previews). */
+  checkpoints: CheckpointStore;
   automations: AutomationEngine;
   /** Send a JSON message to the connected voice bridge. */
   sendToBridge?: (msg: object) => void;
@@ -350,6 +353,31 @@ export const toolSchemas = {
       id: z.string().describe("Vibe id"),
     }),
   },
+  create_checkpoint: {
+    description:
+      "Save the current state of every light and switch temporarily, so it can be put back later with " +
+      "restore_checkpoint. Use for previews: create a checkpoint, make changes (e.g. apply_vibe), then restore. " +
+      "With on_expiry 'restore' the lights go back automatically after ttl_seconds.",
+    parameters: z.object({
+      ttl_seconds: z.number().min(1).max(86400).optional().describe("Lifetime in seconds (default 3600)"),
+      on_expiry: z.enum(["restore", "discard"]).optional()
+        .describe("What happens when it expires: 'restore' puts the lights back, 'discard' (default) just forgets it"),
+      label: z.string().max(100).optional().describe("Short note on what it's for, e.g. 'before underwater preview'"),
+    }),
+  },
+  restore_checkpoint: {
+    description: "Return all lights and switches to a checkpoint's saved state, then remove the checkpoint.",
+    parameters: z.object({
+      id: z.string().describe("Checkpoint id from create_checkpoint"),
+      transition: TransitionSchema,
+    }),
+  },
+  discard_checkpoint: {
+    description: "Forget a checkpoint without changing any lights (e.g. the user wants to keep a previewed vibe).",
+    parameters: z.object({
+      id: z.string().describe("Checkpoint id"),
+    }),
+  },
 } as const satisfies Record<string, { description: string; parameters: z.ZodType }>;
 
 // ── All tool definitions (excluding automation-management tools) ──
@@ -630,6 +658,27 @@ export function createTools(): Record<string, ToolDef> {
       ...toolSchemas.delete_vibe,
       execute: async ({ id }, { vibes }) => {
         vibes.delete(id);
+        return { ok: true };
+      },
+    },
+
+    // --- Checkpoints ---
+
+    create_checkpoint: {
+      ...toolSchemas.create_checkpoint,
+      execute: async ({ ttl_seconds, on_expiry, label }, { checkpoints }) =>
+        checkpoints.create({ ttlSeconds: ttl_seconds, onExpiry: on_expiry, label }),
+    },
+
+    restore_checkpoint: {
+      ...toolSchemas.restore_checkpoint,
+      execute: async ({ id, transition }, { checkpoints }) => checkpoints.restore(id, { transition }),
+    },
+
+    discard_checkpoint: {
+      ...toolSchemas.discard_checkpoint,
+      execute: async ({ id }, { checkpoints }) => {
+        checkpoints.discard(id);
         return { ok: true };
       },
     },
