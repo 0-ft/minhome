@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { Zap as ZapIcon } from "lucide-react";
 import { useDevices, useConfig, useRefreshStates, useSetDevice, useDeviceEvent } from "../api.js";
 import type { DeviceData, Entity } from "../types.js";
+import { miredToRgb } from "../lib/color.js";
 
 // ── Types matching server config/room.ts ─────────────────
 export interface RoomDimensions {
@@ -58,12 +59,7 @@ const LIGHT_OFF_COLOR = "#3a3530";
 
 // ── Color temp (mired) → warm/cool white ────────────────
 function miredToColor(mired: number): THREE.Color {
-  const t = Math.max(0, Math.min(1, (mired - 142) / (500 - 142)));
-  return new THREE.Color(
-    1.0,
-    Math.max(0.55, 0.95 - t * 0.35),
-    Math.max(0.25, 0.85 - t * 0.55),
-  );
+  return new THREE.Color(...miredToRgb(mired));
 }
 
 // ── Room shell ──────────────────────────────────────────

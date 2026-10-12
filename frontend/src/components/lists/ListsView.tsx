@@ -23,7 +23,7 @@ import {
   useUpsertListItem,
 } from "../../api.js";
 import { Button } from "../ui/button.js";
-import { Input } from "../ui/input.js";
+import { PromptDialog } from "../ui/PromptDialog.js";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.js";
 import { KanbanColumn } from "./KanbanColumn.js";
 import { ListItemCard } from "./ListItemCard.js";
@@ -69,7 +69,6 @@ export function ListsView() {
   const setListItemStatus = useSetListItemStatus();
   const deleteListItem = useDeleteListItem();
 
-  const [newListName, setNewListName] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [draggedKanbanItem, setDraggedKanbanItem] = useState<{ id: number; title: string } | null>(null);
@@ -180,7 +179,6 @@ export function ListsView() {
     [groupedByColumn],
   );
 
-  const createListDisabled = createList.isPending || newListName.trim().length === 0;
 
   const getTitleTransitionName = useCallback(
     (listId: string, itemId: number) => `list-title-${listId}-${itemId}`,
@@ -609,80 +607,32 @@ export function ListsView() {
             )}
           </>
         )}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/45 cursor-default"
-            onClick={() => setCreateModalOpen(false)}
-            aria-label="Close create list modal"
-          />
-          <div className="relative w-full max-w-md rounded-xl border border-blood-300/50 bg-blood-500 p-5 shadow-2xl">
-            <h3 className="text-base font-semibold text-sand-50">Create list</h3>
-            <p className="mt-1 text-sm text-blood-100">Give the list a name. ID is auto-generated from it.</p>
-            <div className="mt-4">
-              <Input
-                value={newListName}
-                onChange={(e) => setNewListName(e.target.value)}
-                placeholder="e.g. Weekend jobs"
-                className="bg-sand-50 text-sand-900 border-sand-300 focus-visible:bg-sand-50"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter" || createListDisabled) return;
-                  const name = newListName.trim();
-                  if (!name) return;
-                  const id = normalizeListId(name);
-                  if (!id) return;
-                  createList.mutate(
-                    { id, name, columns: DEFAULT_COLUMNS },
-                    {
-                      onSuccess: (list) => {
-                        setNewListName("");
-                        setCreateModalOpen(false);
-                        if (routeState.panel === "config") {
-                          navigate(`/lists/settings/${encodeURIComponent(list.id)}`);
-                        } else {
-                          navigate(`/lists/${encodeURIComponent(list.id)}`);
-                        }
-                      },
-                    },
-                  );
-                }}
-              />
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCreateModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                disabled={createListDisabled}
-                onClick={() => {
-                  const name = newListName.trim();
-                  if (!name) return;
-                  const id = normalizeListId(name);
-                  if (!id) return;
-                  createList.mutate(
-                    { id, name, columns: DEFAULT_COLUMNS },
-                    {
-                      onSuccess: (list) => {
-                        setNewListName("");
-                        setCreateModalOpen(false);
-                        if (routeState.panel === "config") {
-                          navigate(`/lists/settings/${encodeURIComponent(list.id)}`);
-                        } else {
-                          navigate(`/lists/${encodeURIComponent(list.id)}`);
-                        }
-                      },
-                    },
-                  );
-                }}
-              >
-                Create list
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PromptDialog
+        open={createModalOpen}
+        title="Create list"
+        message="Give the list a name. ID is auto-generated from it."
+        placeholder="e.g. Weekend jobs"
+        confirmLabel="Create list"
+        pending={createList.isPending}
+        onCancel={() => setCreateModalOpen(false)}
+        onSubmit={(name) => {
+          const id = normalizeListId(name);
+          if (!id) return;
+          createList.mutate(
+            { id, name, columns: DEFAULT_COLUMNS },
+            {
+              onSuccess: (list) => {
+                setCreateModalOpen(false);
+                if (routeState.panel === "config") {
+                  navigate(`/lists/settings/${encodeURIComponent(list.id)}`);
+                } else {
+                  navigate(`/lists/${encodeURIComponent(list.id)}`);
+                }
+              },
+            },
+          );
+        }}
+      />
     </div>
   );
 }

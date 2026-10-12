@@ -32,6 +32,7 @@ export type DebugLogType =
   | "automation_created"
   | "automation_updated"
   | "automation_deleted"
+  | "vibe_applied"
   | "api_request"
   | "device_control"
   | "display_setup"

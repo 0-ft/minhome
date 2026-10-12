@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { dirname, resolve } from "path";
 import { z } from "zod";
 import { DeviceConfigSchema, EntityConfigSchema, extractEntitiesFromExposes } from "./devices.js";
+import type { EntityConfig } from "./devices.js";
 import { RoomSchema, type FurnitureItem } from "./room.js";
 import { ScreenLayoutSchema } from "../display/layout.js";
 import { FRAMEWORK_DEVICES, FRAMEWORK_DEVICE_IDS } from "../display/device-profiles.js";
@@ -97,6 +98,17 @@ export type Config = z.infer<typeof ConfigSchema>;
 
 // ── Config store ─────────────────────────────────────────
 
+function mergeEntityConfigs(
+  existing: Record<string, EntityConfig> | undefined,
+  update: Record<string, EntityConfig> | undefined,
+): Record<string, EntityConfig> {
+  const merged = { ...existing };
+  for (const [key, value] of Object.entries(update ?? {})) {
+    merged[key] = { ...merged[key], ...value };
+  }
+  return merged;
+}
+
 export class ConfigStore {
   private data: Config;
 
@@ -137,8 +149,9 @@ export class ConfigStore {
     this.data.devices[id] = {
       ...existing,
       ...update,
-      // Deep-merge entities so setting one doesn't wipe others
-      entities: { ...existing.entities, ...update.entities },
+      // Deep-merge entities so setting one entity (or one field of it)
+      // doesn't wipe the others
+      entities: mergeEntityConfigs(existing.entities, update.entities),
     };
     this.save();
   }

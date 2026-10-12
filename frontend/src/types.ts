@@ -22,6 +22,8 @@ export interface SensorProperty {
 export interface Entity {
   key: string;
   name: string;
+  /** User-written note on what the entity is. */
+  description?: string;
   type: string;
   state: Record<string, unknown>;
   features: EntityFeatures;
@@ -37,4 +39,33 @@ export interface DeviceData {
   state: Record<string, unknown>;
   entities: Entity[];
   exposes?: unknown[];
+}
+
+// ── Vibes (matching server VibeSchema) ───────────────────
+
+export interface VibeColor {
+  hue: number;
+  saturation: number;
+}
+
+/** Target state for one entity, under canonical property names. */
+export interface VibeEntitySetting {
+  device: string;
+  entity: string;
+  state: "ON" | "OFF";
+  brightness?: number;
+  color_temp?: number;
+  color?: VibeColor;
+}
+
+export interface Vibe {
+  id: string;
+  name: string;
+  /** Lucide icon name (kebab-case). */
+  icon?: string;
+  /** Turn off every light/switch not in `entities` when applied. */
+  offUnspecified: boolean;
+  entities: VibeEntitySetting[];
+  createdAt: string;
+  updatedAt: string;
 }

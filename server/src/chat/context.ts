@@ -1,9 +1,10 @@
 import type { MqttBridge } from "../mqtt.js";
 import type { ConfigStore } from "../config/config.js";
 import type { ListStore } from "../config/lists.js";
+import type { VibeStore } from "../config/vibes.js";
 import type { AutomationEngine } from "../automations.js";
 import type { VoiceDeviceInfo } from "../tools.js";
-import { extractEntitiesFromExposes, buildEntityResponses } from "../config/devices.js";
+import { extractEntitiesFromExposes, buildEntityResponses, entityCapabilities } from "../config/devices.js";
 
 interface SystemPromptParts {
   base: string;
@@ -18,6 +19,8 @@ When you mention a specific entity on a device, use:
   <entity id="ENTITY_KEY" device="IEEE_ADDRESS">Entity Name</entity>
 When you mention an automation, use:
   <automation id="AUTOMATION_ID">Automation Name</automation>
+When you mention a vibe, use:
+  <vibe id="VIBE_ID">Vibe Name</vibe>
 For example: I turned off <device id="0xc890a81f1ffe0000">Ceiling Light</device>.
 Or: The <entity id="l3" device="0xa4c138d2b1cf1389">Sunrise Lamp</entity> is now on.
 Or: I created <automation id="morning-lights">Morning Lights</automation>.
@@ -28,11 +31,12 @@ export function buildSystemPromptParts(
   bridge: MqttBridge,
   config: ConfigStore,
   lists: ListStore,
+  vibes: VibeStore,
   automations: AutomationEngine,
   voiceDevices?: Map<string, VoiceDeviceInfo>,
 ): SystemPromptParts {
   const inlineReferences = buildInlineReferencesPrompt();
-  const base = buildBaseSystemPrompt(bridge, config, lists, automations, voiceDevices);
+  const base = buildBaseSystemPrompt(bridge, config, lists, vibes, automations, voiceDevices);
   return { base, inlineReferences };
 }
 
@@ -40,6 +44,7 @@ export function buildSystemPrompt(
   bridge: MqttBridge,
   config: ConfigStore,
   lists: ListStore,
+  vibes: VibeStore,
   automations: AutomationEngine,
   voiceDevices?: Map<string, VoiceDeviceInfo>,
 ): string {
@@ -47,6 +52,7 @@ export function buildSystemPrompt(
     bridge,
     config,
     lists,
+    vibes,
     automations,
     voiceDevices,
   );
@@ -79,7 +85,12 @@ export function buildLiveStateNote(bridge: MqttBridge, config: ConfigStore): str
       return {
         id: d.ieee_address,
         name: deviceName,
-        entities: entities.map((e) => ({ key: e.key, name: e.name, state: e.state })),
+        entities: entities.map((e) => ({
+          key: e.key,
+          name: e.name,
+          ...(e.description ? { description: e.description } : {}),
+          state: e.state,
+        })),
       };
     });
 
@@ -99,6 +110,7 @@ function buildBaseSystemPrompt(
   bridge: MqttBridge,
   config: ConfigStore,
   lists: ListStore,
+  vibes: VibeStore,
   automations: AutomationEngine,
   voiceDevices?: Map<string, VoiceDeviceInfo>,
 ): string {
@@ -115,16 +127,21 @@ function buildBaseSystemPrompt(
       return {
         id: d.ieee_address,
         name: deviceName,
-        entities: entities.map(e => ({
-          key: e.key,
-          name: e.name,
-          type: e.type,
-          ...(e.sensorProperties ? { sensorProperties: e.sensorProperties } : {}),
-        })),
+        entities: entities.map((e, i) => {
+          const capabilities = entityCapabilities(extracted[i]);
+          return {
+            key: e.key,
+            name: e.name,
+            ...(e.description ? { description: e.description } : {}),
+            type: e.type,
+            ...(capabilities.length > 0 ? { capabilities } : {}),
+            ...(e.sensorProperties ? { sensorProperties: e.sensorProperties } : {}),
+          };
+        }),
         type: d.type,
         vendor: d.definition?.vendor ?? null,
         model: d.definition?.model ?? null,
-        description: d.definition?.description ?? null,
+        modelDescription: d.definition?.description ?? null,
       };
     });
 
@@ -132,6 +149,12 @@ function buildBaseSystemPrompt(
     id: a.id,
     name: a.name,
     enabled: a.enabled,
+  }));
+  const allVibes = vibes.getAll().map((v) => ({
+    id: v.id,
+    name: v.name,
+    offUnspecified: v.offUnspecified,
+    entityCount: v.entities.length,
   }));
   const promptLists = lists.getPromptLists().map((list) => ({
     id: list.id,
@@ -154,6 +177,9 @@ ${JSON.stringify(devices, null, 2)}
 
 Current automations:
 ${JSON.stringify(allAutomations, null, 2)}
+
+Vibes (lighting presets; use get_vibe for their settings):
+${JSON.stringify(allVibes, null, 2)}
 ${promptLists.length > 0 ? `
 Current lists (outstanding items only):
 ${JSON.stringify(promptLists, null, 2)}
@@ -169,12 +195,25 @@ Device state:
 - When asked to change a device, always send the command, even if the live state suggests it is already in that state. Commands are idempotent.
 - Earlier user messages may be prefixed with the time they were sent, e.g. "[Mon, 12 Oct 2026, 14:21]". Use these to judge how old earlier context is. Never include such prefixes in your replies.
 
+Vibes:
+- A vibe is a saved lighting preset: per-entity settings (state, brightness, color or color_temp) plus off_unspecified, which turns off every light and switch the vibe doesn't list.
+- "Switch to / put on <vibe>" means apply_vibe.
+- "Save this as a vibe" means save_current_as_vibe.
+- When asked to create a vibe from a description (e.g. "an underwater vibe, blueish and dim"), design it yourself with create_vibe:
+  - Give a setting for every light and switch entity. Use each entity's name, description and capabilities: colour lights get hue/saturation, lights with only color_temp get a white temperature (lower mired = cooler, higher = warmer), lights with only brightness get a brightness, and plain switches/sockets are just ON or OFF.
+  - Turn OFF entities that don't suit the mood, including sockets whose description says they power something unrelated to lighting.
+  - Vary colours and brightness between lights so the room has depth, rather than setting everything identically.
+  - Default off_unspecified to true. Pick a fitting lucide icon.
+  - Apply it straight away with apply_vibe unless the user says not to, then tell them briefly.
+- To tweak a vibe ("make it dimmer", "more purple"), call get_vibe, then update_vibe with the full revised entities list, then apply_vibe if it is the active one.
+
 Guidelines:
 - Be concise, direct, and helpful. Avoid unnecessary filler or repetitive closings.
 - When controlling devices, ALWAYS use control_entity with the entity key and canonical property names (state, brightness, color_temp, color). The server resolves actual MQTT property names automatically. For colour-changing lights, set colour with: {"color":{"hue":N,"saturation":N}} (hue 0-360, saturation 0-100) or {"color":{"hex":"#RRGGBB"}}.
 - For single-entity devices, use entity key "main".
 - Only use control_device for device-level properties that don't belong to any entity (e.g. power_on_behavior).
 - Refer to devices by their friendly name, not their IEEE address.
+- Entities may have a user-written "description" saying what they are or what they power (e.g. a plug socket's appliance). Use it to judge what an entity is. When the user tells you what something is, save it with set_entity_description.
 - If a device has named entities (e.g. individual sockets on a multi-plug), refer to them by their entity name.
 - When creating automations for controllable devices (lights, switches), use "device_state" triggers/conditions with the "entity" field and canonical property names.
 - When creating automations for input-only devices (buttons, contact sensors, motion sensors), use "device_event" triggers with the raw MQTT property name. For example, a button press trigger: {"type":"device_event","device":"<ieee>","property":"action","value":"single"}. Common properties: "action" (buttons), "contact" (door sensors), "occupancy" (motion sensors). Omit "value" to match any value.

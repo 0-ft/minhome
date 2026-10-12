@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 import type { AppType } from "@minhome/server/app";
 import { useEffect, useRef, useCallback } from "react";
-import type { DeviceData } from "./types.js";
+import type { DeviceData, Vibe, VibeEntitySetting } from "./types.js";
 
 export const api: any = hc<AppType>("/");
 
@@ -406,6 +406,22 @@ export function useRenameEntity() {
   });
 }
 
+export function useSetEntityDescription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deviceId, entityId, description }: { deviceId: string; entityId: string; description: string }) => {
+      const res = await api.api.devices[":id"].config.$put({
+        param: { id: deviceId },
+        json: { entities: { [entityId]: { description } } },
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["devices"] });
+    },
+  });
+}
+
 export function useConfig() {
   return useQuery({
     queryKey: ["config"],
@@ -655,6 +671,109 @@ export function useDeleteList() {
       ],
     }),
     invalidateQueryKeys: (listId) => [["lists"], ["lists", listId]],
+  });
+}
+
+// --- Vibes ---
+
+export interface VibePatch {
+  name?: string;
+  icon?: string;
+  off_unspecified?: boolean;
+  entities?: VibeEntitySetting[];
+  /** Replace the settings with the current state of every entity. */
+  recapture?: boolean;
+}
+
+export function useVibes() {
+  return useQuery({
+    queryKey: ["vibes"],
+    queryFn: async () => {
+      const res = await api.api.vibes.$get();
+      if (!res.ok) throw new Error("Failed to fetch vibes");
+      return res.json() as Promise<Vibe[]>;
+    },
+  });
+}
+
+/** Save the current state of every light and switch as a new vibe. */
+export function useCaptureVibe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { name: string; icon?: string; off_unspecified?: boolean }) => {
+      const res = await api.api.vibes.capture.$post({ json: payload });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to save vibe");
+      return data as Vibe;
+    },
+    onSuccess: (vibe) => {
+      qc.setQueryData<Vibe[]>(["vibes"], (previous) => previous ? [...previous, vibe] : [vibe]);
+      qc.invalidateQueries({ queryKey: ["vibes"] });
+    },
+  });
+}
+
+export function useUpdateVibe() {
+  const qc = useQueryClient();
+  return createOptimisticMutation({
+    qc,
+    mutationFn: async ({ id, patch }: { id: string; patch: VibePatch }) => {
+      const res = await api.api.vibes[":id"].$patch({ param: { id }, json: patch });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to update vibe");
+      return data as Vibe;
+    },
+    optimistic: ({ id, patch }) => ({
+      patches: patch.recapture ? [] : [{
+        queryKey: ["vibes"],
+        updater: (previous) => {
+          if (!Array.isArray(previous)) return previous;
+          return (previous as Vibe[]).map((vibe) => vibe.id !== id ? vibe : {
+            ...vibe,
+            ...(patch.name !== undefined && { name: patch.name }),
+            ...(patch.icon !== undefined && { icon: patch.icon || undefined }),
+            ...(patch.off_unspecified !== undefined && { offUnspecified: patch.off_unspecified }),
+            ...(patch.entities !== undefined && { entities: patch.entities }),
+          });
+        },
+      }],
+    }),
+    invalidateQueryKeys: [["vibes"]],
+  });
+}
+
+export function useDeleteVibe() {
+  const qc = useQueryClient();
+  return createOptimisticMutation({
+    qc,
+    mutationFn: async (id: string) => {
+      const res = await api.api.vibes[":id"].$delete({ param: { id } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to delete vibe");
+      return data as { ok: true };
+    },
+    optimistic: (id) => ({
+      patches: [{
+        queryKey: ["vibes"],
+        updater: (previous) => {
+          if (!Array.isArray(previous)) return previous;
+          return (previous as Vibe[]).filter((vibe) => vibe.id !== id);
+        },
+      }],
+    }),
+    invalidateQueryKeys: [["vibes"]],
+  });
+}
+
+export function useApplyVibe() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.api.vibes[":id"].apply.$post({ param: { id } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Failed to apply vibe");
+      return data as { ok: true; applied: number; turnedOff: number };
+    },
+    // Device state arrives over the websocket as the lights report back.
   });
 }
 
@@ -960,6 +1079,9 @@ export function useRealtimeUpdates() {
         }
         if (msg.type === "lists_change") {
           qc.invalidateQueries({ queryKey: ["lists"] });
+        }
+        if (msg.type === "vibes_change") {
+          qc.invalidateQueries({ queryKey: ["vibes"] });
         }
         if (msg.type === "chats_change") {
           qc.invalidateQueries({ queryKey: ["chats"] });

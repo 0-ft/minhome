@@ -8,12 +8,18 @@ export function EditableText({
   fullWidth = true,
   className,
   textClassName,
+  placeholder,
+  allowEmpty = false,
 }: {
   value: string;
   onSave: (nextValue: string) => void;
   fullWidth?: boolean;
   className?: string;
   textClassName?: string;
+  /** Shown while the value is empty. */
+  placeholder?: string;
+  /** Allow committing an empty value (e.g. to clear an optional field). */
+  allowEmpty?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [displayValue, setDisplayValue] = useState(value);
@@ -49,7 +55,7 @@ export function EditableText({
   const commit = () => {
     const nextValue = getCurrentText();
     const trimmed = nextValue.trim();
-    if (trimmed.length === 0 || trimmed === value) {
+    if ((trimmed.length === 0 && !allowEmpty) || trimmed === value) {
       setPendingCommittedValue(null);
       setDisplayValue(value);
       if (editableRef.current) {
@@ -80,6 +86,7 @@ export function EditableText({
       aria-multiline="true"
       contentEditable={isEditing}
       suppressContentEditableWarning
+      data-placeholder={placeholder}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => {
         e.stopPropagation();
@@ -112,6 +119,7 @@ export function EditableText({
         fullWidth ? "w-full" : "w-fit max-w-full",
         "bg-transparent border-0 p-0 m-0 focus:outline-none cursor-text",
         "whitespace-pre-wrap break-words",
+        placeholder && "empty:before:content-[attr(data-placeholder)] empty:before:opacity-60",
         textClassName,
         className,
       )}

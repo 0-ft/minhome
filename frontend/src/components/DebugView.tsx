@@ -46,6 +46,7 @@ const TYPE_META: Record<string, TypeMeta> = {
   automation_created:  { label: "Automation Created", color: "bg-green-100",   textColor: "text-green-700",   icon: Zap,           group: "automation" },
   automation_updated:  { label: "Automation Updated", color: "bg-yellow-50",   textColor: "text-yellow-600",  icon: Zap,           group: "automation" },
   automation_deleted:  { label: "Automation Deleted", color: "bg-red-100",     textColor: "text-red-700",     icon: Zap,           group: "automation" },
+  vibe_applied:        { label: "Vibe Applied",       color: "bg-fuchsia-100", textColor: "text-fuchsia-700", icon: Zap,           group: "automation" },
   api_request:         { label: "API Request",        color: "bg-sand-200",    textColor: "text-sand-700",    icon: Zap,           group: "api" },
   device_control:      { label: "Device Control",     color: "bg-teal-100",    textColor: "text-teal-700",    icon: Radio,         group: "mqtt" },
   display_setup:      { label: "Display Setup",      color: "bg-indigo-100",  textColor: "text-indigo-700",  icon: Monitor,       group: "display" },

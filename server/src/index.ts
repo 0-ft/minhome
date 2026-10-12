@@ -7,6 +7,7 @@ import { createMqttBridge } from "./mqtt.js";
 import { ConfigStore } from "./config/config.js";
 import { ChatStore } from "./config/chats.js";
 import { ListStore } from "./config/lists.js";
+import { VibeStore } from "./config/vibes.js";
 import { TokenStore } from "./config/tokens.js";
 import { AutomationEngine } from "./automations.js";
 import { createTools } from "./tools.js";
@@ -27,6 +28,7 @@ const todosPath = resolve(DATA_DIR, "todos.json");
 const chatsPath = resolve(DATA_DIR, "chats.json");
 const tokensPath = resolve(DATA_DIR, "tokens.json");
 const automationsPath = resolve(DATA_DIR, "automations.json");
+const vibesPath = resolve(DATA_DIR, "vibes.json");
 const debugLogPath = resolve(DATA_DIR, "debug.jsonl");
 
 // Migrate todos.json -> lists.json if needed
@@ -44,6 +46,7 @@ console.log(`[server] Automations: ${automationsPath}`);
 const config = new ConfigStore(configPath);
 const chats = new ChatStore(chatsPath);
 const lists = new ListStore(listsPath);
+const vibes = new VibeStore(vibesPath);
 const tokens = new TokenStore(tokensPath);
 
 // Initialise file-backed debug log before anything else uses it
@@ -64,7 +67,7 @@ const automationEngine = new AutomationEngine(automationsPath, bridge, {
   },
 });
 
-const { app, injectWebSocket, toolCtx } = createApp(bridge, config, chats, lists, automationEngine, tokens);
+const { app, injectWebSocket, toolCtx } = createApp(bridge, config, chats, lists, vibes, automationEngine, tokens);
 
 // Mount in-process MCP server at /mcp (for Cursor IDE remote MCP)
 app.route("/", createMcpRoute(toolCtx));

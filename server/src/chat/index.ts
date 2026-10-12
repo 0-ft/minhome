@@ -11,7 +11,7 @@ import { debugLog } from "../debug-log.js";
 
 export function createChatRoute(ctx: ToolContext) {
   const chat = new Hono();
-  const { bridge, config, chats, lists, automations, voiceDevices } = ctx;
+  const { bridge, config, chats, lists, vibes, automations, voiceDevices } = ctx;
 
   chat.get("/api/chat/info", (c) => {
     return c.json({
@@ -21,7 +21,7 @@ export function createChatRoute(ctx: ToolContext) {
   });
 
   chat.get("/api/chat/debug", (c) => {
-    const system = buildSystemPrompt(bridge, config, lists, automations, voiceDevices);
+    const system = buildSystemPrompt(bridge, config, lists, vibes, automations, voiceDevices);
     const tools = buildAiTools(ctx);
 
     return c.json({
@@ -96,7 +96,7 @@ export function createChatRoute(ctx: ToolContext) {
       tools: rawTools as any,
     });
 
-    const system = buildSystemPrompt(bridge, config, lists, automations, voiceDevices);
+    const system = buildSystemPrompt(bridge, config, lists, vibes, automations, voiceDevices);
     const modelMessages = await convertToModelMessages(withHistoryTimestamps(validatedMessages, chats.get(chatId)?.messages ?? []));
     // Live state goes right before the latest user message, so it outranks
     // stale state in the history. It is model input only, never persisted.

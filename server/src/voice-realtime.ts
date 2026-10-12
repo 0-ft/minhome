@@ -271,6 +271,7 @@ export class RealtimeSession {
       this.toolCtx.bridge,
       this.toolCtx.config,
       this.toolCtx.lists,
+      this.toolCtx.vibes,
       this.toolCtx.automations,
       this.toolCtx.voiceDevices,
     );
@@ -292,9 +293,9 @@ You are a voice-first smart-home assistant. Success means understanding the user
 - Do not reason while the user's audio is unclear; ask for clarification instead.
 
 # Tools
-- Device control (control_entity, control_device) is lightweight and instant: call the tool immediately, with no preamble and no confirmation.
+- Device control (control_entity, control_device) and switching vibes (apply_vibe) are lightweight and instant: call the tool immediately, with no preamble and no confirmation.
 - Read-only tools (e.g. listing devices, room config): call them as soon as intent is clear, with no preamble.
-- Use one short preamble only before slow or multi-step work, such as creating or editing automations or changing the room layout.
+- Use one short preamble only before slow or multi-step work, such as creating or editing automations or vibes, or changing the room layout.
 - Use only the tools provided. Do not invent or simulate tools.
 
 # Unclear Audio

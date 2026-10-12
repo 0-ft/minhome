@@ -3,7 +3,7 @@ import {
   Trash2, Plus, ChevronDown, Save, X,
   Radio, Zap, Shield,
 } from "lucide-react";
-import { useAutomations, useUpdateAutomation, useDeleteAutomation, useDevices } from "../api.js";
+import { useAutomations, useUpdateAutomation, useDeleteAutomation, useDevices, useVibes } from "../api.js";
 import type { DeviceData } from "../types.js";
 import type { Automation, Trigger, Condition, Action } from "@minhome/server/automations";
 
@@ -19,6 +19,7 @@ const TOOL_NAMES = [
   "get_room_config", "set_room_dimensions", "set_room_lights",
   "update_room_furniture", "upsert_furniture_item", "remove_furniture_item",
   "set_voice", "announce",
+  "apply_vibe", "save_current_as_vibe", "get_vibe",
 ] as const;
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
@@ -80,6 +81,18 @@ function DeviceSelect({ value, onChange, devices }: { value: string; onChange: (
       <option value="">Select device…</option>
       {devices.map((d) => (
         <option key={d.id} value={d.id}>{d.name}</option>
+      ))}
+    </select>
+  );
+}
+
+function VibeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data: vibes } = useVibes();
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={selectCls}>
+      <option value="">Select vibe…</option>
+      {(vibes ?? []).map((v) => (
+        <option key={v.id} value={v.id}>{v.name}</option>
       ))}
     </select>
   );
@@ -465,12 +478,21 @@ function ActionEditor({ action, onChange, onRemove, devices, depth = 0 }: {
                 ))}
               </select>
             </Field>
+            {(action as any).tool === "apply_vibe" ? (
+              <Field label="Vibe">
+                <VibeSelect
+                  value={(action as any).params?.id ?? ""}
+                  onChange={(id) => onChange({ ...action, params: { id } } as any)}
+                />
+              </Field>
+            ) : (
             <Field label="Params">
               <PayloadEditor
                 payload={((action as any).params && typeof (action as any).params === "object") ? (action as any).params : {}}
                 onChange={(p) => onChange({ ...action, params: p } as any)}
               />
             </Field>
+            )}
           </>
         )}
 

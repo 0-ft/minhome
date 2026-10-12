@@ -6,6 +6,8 @@ import { CameraSchema, RoomSchema, RoomDimensionsSchema, RoomLightSchema, Furnit
 import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
 import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
+import type { VibeStore } from "./config/vibes.js";
+import { applyVibe, captureVibeSettings, findUnknownSettings, normalizeSettingInput, VibeSettingInputSchema } from "./vibes.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
 import { createNodeWebSocket } from "@hono/node-ws";
@@ -24,6 +26,7 @@ export function createApp(
   config: ConfigStore,
   chats: ChatStore,
   lists: ListStore,
+  vibes: VibeStore,
   automations: AutomationEngine,
   tokens: TokenStore,
 ) {
@@ -49,7 +52,7 @@ export function createApp(
     bridgeRef.current.send(JSON.stringify(msg));
   };
 
-  const toolCtx: ToolContext = { bridge, config, chats, lists, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
+  const toolCtx: ToolContext = { bridge, config, chats, lists, vibes, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
 
   // --- Auth (no-ops when AUTH_PASSWORD_HASH is unset) ---
   app.route("/", authRoutes());
@@ -408,6 +411,99 @@ export function createApp(
       return c.json({ ok: true });
     })
 
+    // --- Vibes ---
+    .get("/api/vibes", (c) => c.json(vibes.getAll()))
+
+    .get("/api/vibes/:id", (c) => {
+      const vibe = vibes.get(c.req.param("id"));
+      if (!vibe) return c.json({ error: "Vibe not found" }, 404);
+      return c.json(vibe);
+    })
+
+    .post("/api/vibes",
+      zValidator("json", z.object({
+        name: z.string().trim().min(1),
+        icon: z.string().optional(),
+        off_unspecified: z.boolean().optional(),
+        entities: z.array(VibeSettingInputSchema).default([]),
+      })),
+      (c) => {
+        const body = c.req.valid("json");
+        const entities = body.entities.map(normalizeSettingInput);
+        const unknown = findUnknownSettings(bridge, entities);
+        if (unknown.length > 0) return c.json({ error: `Unknown entities: ${unknown.join(", ")}` }, 400);
+        try {
+          return c.json(vibes.create({ name: body.name, icon: body.icon, offUnspecified: body.off_unspecified, entities }), 201);
+        } catch (e: unknown) {
+          return c.json({ error: (e as Error).message }, 400);
+        }
+      },
+    )
+
+    .post("/api/vibes/capture",
+      zValidator("json", z.object({
+        name: z.string().trim().min(1),
+        icon: z.string().optional(),
+        off_unspecified: z.boolean().optional(),
+      })),
+      (c) => {
+        const body = c.req.valid("json");
+        const vibe = vibes.create({
+          name: body.name,
+          icon: body.icon,
+          offUnspecified: body.off_unspecified,
+          entities: captureVibeSettings(bridge),
+        });
+        return c.json(vibe, 201);
+      },
+    )
+
+    .patch("/api/vibes/:id",
+      zValidator("json", z.object({
+        name: z.string().trim().min(1).optional(),
+        icon: z.string().optional(),
+        off_unspecified: z.boolean().optional(),
+        entities: z.array(VibeSettingInputSchema).optional(),
+        /** Replace the settings with the current state of every entity. */
+        recapture: z.boolean().optional(),
+      })),
+      (c) => {
+        const body = c.req.valid("json");
+        const entities = body.recapture
+          ? captureVibeSettings(bridge)
+          : body.entities?.map(normalizeSettingInput);
+        const unknown = entities ? findUnknownSettings(bridge, entities) : [];
+        if (unknown.length > 0) return c.json({ error: `Unknown entities: ${unknown.join(", ")}` }, 400);
+        try {
+          const vibe = vibes.update(c.req.param("id"), {
+            name: body.name,
+            icon: body.icon,
+            offUnspecified: body.off_unspecified,
+            entities,
+          });
+          return c.json(vibe);
+        } catch (e: unknown) {
+          const message = (e as Error).message;
+          return c.json({ error: message }, message.includes("not found") ? 404 : 400);
+        }
+      },
+    )
+
+    .delete("/api/vibes/:id", (c) => {
+      try {
+        vibes.delete(c.req.param("id"));
+        return c.json({ ok: true });
+      } catch (e: unknown) {
+        return c.json({ error: (e as Error).message }, 404);
+      }
+    })
+
+    .post("/api/vibes/:id/apply", (c) => {
+      const vibe = vibes.get(c.req.param("id"));
+      if (!vibe) return c.json({ error: "Vibe not found" }, 404);
+      return c.json(applyVibe(bridge, vibe));
+    })
+
     // --- WebSocket ---
     .get("/ws", upgradeWebSocket(() => {
       let cleanup: (() => void) | undefined;
@@ -419,6 +515,7 @@ export function createApp(
           const onAutomationsChange = () => ws.send(JSON.stringify({ type: "automations_change" }));
           const onListsChange = () => ws.send(JSON.stringify({ type: "lists_change" }));
           const onChatsChange = () => ws.send(JSON.stringify({ type: "chats_change" }));
+          const onVibesChange = () => ws.send(JSON.stringify({ type: "vibes_change" }));
 
           bridge.on("state_change", onStateChange);
           bridge.on("devices", onDevices);
@@ -426,6 +523,7 @@ export function createApp(
           automations.onChanged(onAutomationsChange);
           lists.onChanged(onListsChange);
           chats.onChanged(onChatsChange);
+          vibes.onChanged(onVibesChange);
 
           cleanup = () => {
             bridge.off("state_change", onStateChange);
@@ -434,6 +532,7 @@ export function createApp(
             automations.offChanged(onAutomationsChange);
             lists.offChanged(onListsChange);
             chats.offChanged(onChatsChange);
+            vibes.offChanged(onVibesChange);
             cleanup = undefined;
           };
         },

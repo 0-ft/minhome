@@ -4,6 +4,8 @@ import { z } from "zod";
 
 export const EntityConfigSchema = z.object({
   name: z.string().optional(),
+  /** User-written note on what the entity is, shown to agents. */
+  description: z.string().max(300).optional(),
 });
 
 export type EntityConfig = z.infer<typeof EntityConfigSchema>;
@@ -52,6 +54,7 @@ export interface ExtractedEntity {
 export interface EntityResponse {
   key: string;
   name: string;
+  description?: string;
   type: string;
   state: Record<string, unknown>;
   features: EntityFeatures;
@@ -160,11 +163,65 @@ export function buildEntityResponses(
   return extracted.map(e => ({
     key: e.key,
     name: entityConfigs?.[e.key]?.name ?? (isSingle ? deviceName : e.key),
+    ...(entityConfigs?.[e.key]?.description ? { description: entityConfigs[e.key].description } : {}),
     type: e.type,
     state: stateMap.get(e.key) ?? {},
     features: e.features,
     ...(e.sensorProperties ? { sensorProperties: e.sensorProperties } : {}),
   }));
+}
+
+/** Whether an entity can be switched (and so belongs in vibes). */
+export function isControllableEntity(entity: ExtractedEntity): boolean {
+  return entity.type === "light" || entity.type === "switch";
+}
+
+/** Canonical properties an entity supports beyond on/off, for prompts. */
+export function entityCapabilities(entity: ExtractedEntity): string[] {
+  const caps: string[] = [];
+  if (entity.features.brightnessProperty) caps.push("brightness");
+  if (entity.features.colorProperty) caps.push("color");
+  if (entity.features.colorTempProperty) caps.push("color_temp");
+  return caps;
+}
+
+export interface CanonicalEntityState {
+  state?: "ON" | "OFF";
+  brightness?: number;
+  color_temp?: number;
+  color?: { hue: number; saturation: number };
+}
+
+/**
+ * Read an entity's current state under canonical property names. Z2M keeps
+ * reporting the stale value of whichever colour mode is inactive, so only the
+ * active one (per color_mode) is returned.
+ */
+export function readCanonicalEntityState(
+  entity: ExtractedEntity,
+  deviceState: Record<string, unknown>,
+): CanonicalEntityState {
+  const { features } = entity;
+  const result: CanonicalEntityState = {};
+  const state = deviceState[features.stateProperty];
+  if (state === "ON" || state === "OFF") result.state = state;
+
+  const brightness = features.brightnessProperty ? deviceState[features.brightnessProperty] : undefined;
+  if (typeof brightness === "number") result.brightness = brightness;
+
+  const colorMode = features.colorProperty
+    ? deviceState[features.colorProperty.replace("color", "color_mode")]
+    : undefined;
+  const color = features.colorProperty ? deviceState[features.colorProperty] as { hue?: unknown; saturation?: unknown } | undefined : undefined;
+  const colorTemp = features.colorTempProperty ? deviceState[features.colorTempProperty] : undefined;
+  const hasColor = typeof color?.hue === "number" && typeof color?.saturation === "number";
+
+  if (hasColor && (colorMode === "hs" || colorMode === "xy" || (colorMode === undefined && typeof colorTemp !== "number"))) {
+    result.color = { hue: Math.round(color!.hue as number), saturation: Math.round(color!.saturation as number) };
+  } else if (typeof colorTemp === "number") {
+    result.color_temp = colorTemp;
+  }
+  return result;
 }
 
 /**

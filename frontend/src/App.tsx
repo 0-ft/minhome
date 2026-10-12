@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Routes, Route, Navigate, Link } from "react-r
 import { useRealtimeUpdates, useAuthCheck, useLogout, useConfig } from "./api.js";
 import { DevicesView } from "./components/DevicesView.js";
 import { EntitiesView } from "./components/EntitiesView.js";
+import { VibeEditorView } from "./components/vibes/VibeEditorView.js";
 import { AutomationsView } from "./components/AutomationsView.js";
 import { RoomView } from "./components/RoomView.js";
 import { RoomFullView } from "./components/RoomFullView.js";
@@ -97,6 +98,10 @@ function MainLayout({ showLogout }: { showLogout: boolean }) {
                 <Route
                   path="entities"
                   element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><EntitiesView /></div></div>}
+                />
+                <Route
+                  path="entities/vibes/:vibeId"
+                  element={<div className="h-full overflow-y-auto"><div className="max-w-5xl mx-auto px-6 py-8"><VibeEditorView /></div></div>}
                 />
                 <Route
                   path="devices"

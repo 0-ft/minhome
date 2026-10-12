@@ -1,5 +1,7 @@
-import { Lightbulb, Plug, Zap } from "lucide-react";
-import { useDevices, useAutomations } from "../api.js";
+import { Lightbulb, Plug, Sparkles, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useDevices, useAutomations, useVibes } from "../api.js";
+import { LucideIcon } from "./lists/LucideIcon.js";
 import type { DeviceData } from "../types.js";
 import type { ReactNode } from "react";
 
@@ -69,5 +71,27 @@ export function AutomationBadge({ id, children }: { id?: string; children?: Reac
       <Zap className="h-3 w-3 shrink-0" />
       <span>{children ?? automation?.name ?? id}</span>
     </span>
+  );
+}
+
+// ── VibeBadge ────────────────────────────────────────────
+
+export function VibeBadge({ id, children }: { id?: string; children?: ReactNode }) {
+  const { data: vibes } = useVibes();
+  const vibe = id ? vibes?.find((v) => v.id === id) : undefined;
+  const className = `vibe-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium
+    bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 align-baseline whitespace-nowrap`;
+  const content = (
+    <>
+      {vibe?.icon ? <LucideIcon name={vibe.icon} className="h-3 w-3 shrink-0" /> : <Sparkles className="h-3 w-3 shrink-0" />}
+      <span>{children ?? vibe?.name ?? id}</span>
+    </>
+  );
+
+  if (!vibe) return <span className={className} title={id ?? undefined}>{content}</span>;
+  return (
+    <Link to={`/entities/vibes/${encodeURIComponent(vibe.id)}`} className={`${className} hover:bg-fuchsia-200`} title="Edit vibe">
+      {content}
+    </Link>
   );
 }

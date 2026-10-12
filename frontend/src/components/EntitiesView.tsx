@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { useDevices, useSetEntity, useRenameEntity, useRefreshStates } from "../api.js";
+import { useDevices, useSetEntity, useRenameEntity, useSetEntityDescription, useRefreshStates } from "../api.js";
 import { Button } from "./ui/button.js";
-import { DebouncedSlider } from "./ui/slider.js";
+import { LightControls } from "./LightControls.js";
+import { VibeStrip } from "./vibes/VibeStrip.js";
 import { EditableText } from "./ui/editable-text.js";
-import { Lightbulb, Plug, Power, Thermometer, Sun, Radio, Palette } from "lucide-react";
+import { Lightbulb, Plug, Power, Radio } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
+import { hslCss } from "../lib/color.js";
 
 // ── Entities View ────────────────────────────────────────
 
@@ -17,6 +19,7 @@ export function EntitiesView() {
   const { data: devices, isLoading } = useDevices();
   const setEntity = useSetEntity();
   const renameEntity = useRenameEntity();
+  const setDescription = useSetEntityDescription();
   const refreshStates = useRefreshStates();
 
   const hasRefreshed = useRef(false);
@@ -59,41 +62,32 @@ export function EntitiesView() {
   }
 
   return (
-    <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
-      {allEntities.map(({ entity, device }) => (
-        <EntityCard
-          key={`${device.id}:${entity.key}`}
-          entity={entity}
-          device={device}
-          onSet={(payload) => setEntity.mutate({ deviceId: device.id, entityKey: entity.key, payload })}
-          onRename={(name) => renameEntity.mutate({ deviceId: device.id, entityId: entity.key, name })}
-        />
-      ))}
+    <div className="flex flex-col gap-5">
+      <VibeStrip devices={devices as DeviceData[]} />
+      <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
+        {allEntities.map(({ entity, device }) => (
+          <EntityCard
+            key={`${device.id}:${entity.key}`}
+            entity={entity}
+            device={device}
+            onSet={(payload) => setEntity.mutate({ deviceId: device.id, entityKey: entity.key, payload })}
+            onRename={(name) => renameEntity.mutate({ deviceId: device.id, entityId: entity.key, name })}
+            onDescribe={(description) => setDescription.mutate({ deviceId: device.id, entityId: entity.key, description })}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-// ── Colour helpers ───────────────────────────────────────
-
-/** Build a CSS hsl() string from hue (0-360) and saturation (0-100). */
-function hslCss(h: number, s: number, l = 50): string {
-  return `hsl(${h}, ${s}%, ${l}%)`;
-}
-
-const HUE_GRADIENT =
-  "linear-gradient(to right, hsl(0,100%,50%), hsl(60,100%,50%), hsl(120,100%,50%), hsl(180,100%,50%), hsl(240,100%,50%), hsl(300,100%,50%), hsl(360,100%,50%))";
-
-function saturationGradient(hue: number): string {
-  return `linear-gradient(to right, hsl(${hue},0%,80%), hsl(${hue},100%,50%))`;
-}
-
 // ── Entity Card ──────────────────────────────────────────
 
-function EntityCard({ entity, device, onSet, onRename }: {
+function EntityCard({ entity, device, onSet, onRename, onDescribe }: {
   entity: Entity;
   device: DeviceData;
   onSet: (payload: Record<string, unknown>) => void;
   onRename: (name: string) => void;
+  onDescribe: (description: string) => void;
 }) {
   const { features, state } = entity;
   const isSensor = entity.type === "sensor";
@@ -158,6 +152,13 @@ function EntityCard({ entity, device, onSet, onRename }: {
             <div className="text-[10px] font-mono truncate text-sand-500">
               {device.name}{entity.key !== "main" ? ` · ${entity.key}` : ""}
             </div>
+            <EditableText
+              value={entity.description ?? ""}
+              onSave={onDescribe}
+              allowEmpty
+              placeholder="Add description…"
+              textClassName="mt-0.5 text-[11px] leading-snug text-sand-600 hover:text-sand-800"
+            />
           </div>
         </div>
 
@@ -202,56 +203,28 @@ function EntityCard({ entity, device, onSet, onRename }: {
         </div>
       )}
 
-      {/* Sliders */}
-      {!isSensor && features.brightnessProperty && (
-        <DebouncedSlider
-          min={1} max={254}
-          serverValue={serverBrightness}
-          value={brightness}
-          onValueChange={setBrightness}
-          onCommit={(val) => onSet({ [features.brightnessProperty]: val })}
-          label={<Sun className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-sand-500"}`} />}
+      {!isSensor && (
+        <LightControls
+          show={{
+            brightness: !!features.brightnessProperty,
+            colorTemp: !!features.colorTempProperty,
+            color: !!features.colorProperty,
+          }}
+          values={{ brightness, colorTemp, hue, saturation }}
+          serverValues={{ brightness: serverBrightness, colorTemp: serverColorTemp, hue: serverHue, saturation: serverSaturation }}
+          active={isOn}
+          onChange={(next) => {
+            if (next.brightness !== undefined) setBrightness(next.brightness);
+            if (next.colorTemp !== undefined) setColorTemp(next.colorTemp);
+            if (next.hue !== undefined) setHue(next.hue);
+            if (next.saturation !== undefined) setSaturation(next.saturation);
+          }}
+          onCommit={(commit) => {
+            if ("brightness" in commit) onSet({ [features.brightnessProperty!]: commit.brightness });
+            else if ("color_temp" in commit) onSet({ [features.colorTempProperty!]: commit.color_temp });
+            else onSet({ [features.colorProperty!]: commit.color });
+          }}
         />
-      )}
-
-      {!isSensor && features.colorTempProperty && (
-        <DebouncedSlider
-          min={142} max={500}
-          serverValue={serverColorTemp}
-          value={colorTemp}
-          onValueChange={setColorTemp}
-          onCommit={(val) => onSet({ [features.colorTempProperty]: val })}
-          label={<Thermometer className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-sand-500"}`} />}
-        />
-      )}
-
-      {/* Colour sliders (hue + saturation) */}
-      {!isSensor && features.colorProperty && (
-        <>
-          <DebouncedSlider
-            min={0} max={360}
-            serverValue={serverHue}
-            value={hue}
-            onValueChange={setHue}
-            onCommit={(val) => onSet({ [features.colorProperty]: { hue: val, saturation } })}
-            label={<Palette className={`h-3.5 w-3.5 ${isOn ? "text-teal-600" : "text-sand-500"}`} />}
-            trackBackground={HUE_GRADIENT}
-          />
-          <DebouncedSlider
-            min={0} max={100}
-            serverValue={serverSaturation}
-            value={saturation}
-            onValueChange={setSaturation}
-            onCommit={(val) => onSet({ [features.colorProperty]: { hue, saturation: val } })}
-            label={
-              <div
-                className="h-3.5 w-3.5 rounded-full border border-sand-400/40"
-                style={{ background: hslCss(hue, saturation) }}
-              />
-            }
-            trackBackground={saturationGradient(hue)}
-          />
-        </>
       )}
     </div>
   );

@@ -5,6 +5,8 @@ import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
 import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
 import type { AutomationEngine } from "./automations.js";
+import type { VibeStore } from "./config/vibes.js";
+import { applyVibe, captureVibeSettings, findUnknownSettings, normalizeSettingInput, VibeSettingInputSchema } from "./vibes.js";
 import {
   RoomDimensionsSchema,
   RoomLightSchema,
@@ -30,6 +32,7 @@ export interface ToolContext {
   config: ConfigStore;
   chats: ChatStore;
   lists: ListStore;
+  vibes: VibeStore;
   automations: AutomationEngine;
   /** Send a JSON message to the connected voice bridge. */
   sendToBridge?: (msg: object) => void;
@@ -156,6 +159,16 @@ export const toolSchemas = {
       name: z.string().describe("New display name for the entity"),
     }),
   },
+  set_entity_description: {
+    description:
+      "Save a short note on what an entity is or what it powers (e.g. 'socket for the fish tank pump', " +
+      "'warm floor lamp behind the sofa'). Shown to agents to help pick entities. Empty string clears it.",
+    parameters: z.object({
+      id: z.string().describe("Device IEEE address"),
+      entity_id: z.string().describe("Entity key, e.g. 'main', 'l1'"),
+      description: z.string().max(300).describe("Brief description, or empty to clear"),
+    }),
+  },
   get_room_config: {
     description:
       "Read the current 3D room configuration (dimensions, furniture, lights). Always call this before making changes.",
@@ -261,6 +274,57 @@ export const toolSchemas = {
         .describe("Voice instructions for the TTS model, e.g. 'speak in an excited german accent'"),
     }),
   },
+  get_vibe: {
+    description: "Get a vibe (lighting preset) with its full per-entity settings.",
+    parameters: z.object({
+      id: z.string().describe("Vibe id"),
+    }),
+  },
+  apply_vibe: {
+    description:
+      "Switch to a vibe: set every entity it defines, and turn off all other lights and switches if the vibe has off_unspecified.",
+    parameters: z.object({
+      id: z.string().describe("Vibe id"),
+    }),
+  },
+  save_current_as_vibe: {
+    description: "Save the current state of every light and switch as a new vibe.",
+    parameters: z.object({
+      name: z.string().trim().min(1).describe("Vibe name, e.g. 'Cosy evening'"),
+      icon: z.string().optional().describe("Optional lucide icon name in kebab-case, e.g. 'moon', 'waves', 'flame'"),
+      off_unspecified: z.boolean().optional().describe("Turn off entities not in the vibe when applied (default true)"),
+    }),
+  },
+  create_vibe: {
+    description:
+      "Create a vibe from explicit per-entity settings. Give a setting for every light and switch: " +
+      "state, plus brightness/color/color_temp where the entity supports them.",
+    parameters: z.object({
+      name: z.string().trim().min(1).describe("Vibe name, e.g. 'Underwater'"),
+      icon: z.string().optional().describe("Optional lucide icon name in kebab-case, e.g. 'moon', 'waves', 'flame'"),
+      off_unspecified: z.boolean().default(true).describe("Turn off entities not listed when applied (default true)"),
+      entities: z.array(VibeSettingInputSchema).min(1).describe("Per-entity settings"),
+    }),
+  },
+  update_vibe: {
+    description:
+      "Change a vibe. Only provided fields change; entities, if given, replaces the whole settings list " +
+      "(call get_vibe first to edit individual settings). Set recapture to replace settings with the current state.",
+    parameters: z.object({
+      id: z.string().describe("Vibe id"),
+      name: z.string().trim().min(1).optional(),
+      icon: z.string().optional().describe("Lucide icon name in kebab-case, or empty to clear"),
+      off_unspecified: z.boolean().optional(),
+      entities: z.array(VibeSettingInputSchema).optional().describe("Full replacement settings list"),
+      recapture: z.boolean().optional().describe("Replace settings with the current state of every entity"),
+    }),
+  },
+  delete_vibe: {
+    description: "Delete a vibe.",
+    parameters: z.object({
+      id: z.string().describe("Vibe id"),
+    }),
+  },
 } as const satisfies Record<string, { description: string; parameters: z.ZodType }>;
 
 // ── All tool definitions (excluding automation-management tools) ──
@@ -333,6 +397,15 @@ export function createTools(): Record<string, ToolDef> {
       ...toolSchemas.rename_entity,
       execute: async ({ id, entity_id, name }, { config }) => {
         config.setDevice(id, { entities: { [entity_id]: { name } } });
+        return { ok: true };
+      },
+    },
+
+    set_entity_description: {
+      ...toolSchemas.set_entity_description,
+      execute: async ({ id, entity_id, description }, { config }) => {
+        const trimmed = description.trim();
+        config.setDevice(id, { entities: { [entity_id]: { description: trimmed || undefined } } });
         return { ok: true };
       },
     },
@@ -455,6 +528,67 @@ export function createTools(): Record<string, ToolDef> {
       execute: async ({ list_id, item_id }, { lists }) => {
         const removed = lists.deleteItem(list_id, item_id);
         if (!removed) throw new Error("List item not found");
+        return { ok: true };
+      },
+    },
+
+    // --- Vibes ---
+
+    get_vibe: {
+      ...toolSchemas.get_vibe,
+      execute: async ({ id }, { vibes }) => {
+        const vibe = vibes.get(id);
+        if (!vibe) throw new Error("Vibe not found");
+        return vibe;
+      },
+    },
+
+    apply_vibe: {
+      ...toolSchemas.apply_vibe,
+      execute: async ({ id }, { vibes, bridge }) => {
+        const vibe = vibes.get(id);
+        if (!vibe) throw new Error("Vibe not found");
+        return applyVibe(bridge, vibe);
+      },
+    },
+
+    save_current_as_vibe: {
+      ...toolSchemas.save_current_as_vibe,
+      execute: async ({ name, icon, off_unspecified }, { vibes, bridge }) => {
+        const vibe = vibes.create({ name, icon, offUnspecified: off_unspecified, entities: captureVibeSettings(bridge) });
+        return { ok: true, vibe };
+      },
+    },
+
+    create_vibe: {
+      ...toolSchemas.create_vibe,
+      execute: async ({ name, icon, off_unspecified, entities }, { vibes, bridge }) => {
+        const settings = entities.map(normalizeSettingInput);
+        const unknown = findUnknownSettings(bridge, settings);
+        if (unknown.length > 0) throw new Error(`Unknown or non-controllable entities: ${unknown.join(", ")}`);
+        const vibe = vibes.create({ name, icon, offUnspecified: off_unspecified, entities: settings });
+        return { ok: true, vibe };
+      },
+    },
+
+    update_vibe: {
+      ...toolSchemas.update_vibe,
+      execute: async ({ id, name, icon, off_unspecified, entities, recapture }, { vibes, bridge }) => {
+        let settings = entities?.map(normalizeSettingInput);
+        if (recapture) settings = captureVibeSettings(bridge);
+        if (settings) {
+          const unknown = findUnknownSettings(bridge, settings);
+          if (unknown.length > 0) throw new Error(`Unknown or non-controllable entities: ${unknown.join(", ")}`);
+        }
+        const vibe = vibes.update(id, { name, icon, offUnspecified: off_unspecified, entities: settings });
+        return { ok: true, vibe };
+      },
+    },
+
+    delete_vibe: {
+      ...toolSchemas.delete_vibe,
+      execute: async ({ id }, { vibes }) => {
+        vibes.delete(id);
         return { ok: true };
       },
     },

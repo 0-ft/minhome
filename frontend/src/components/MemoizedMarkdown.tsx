@@ -1,7 +1,7 @@
 import { marked } from "marked";
 import { memo, useMemo } from "react";
 import { MarkdownHooks } from "react-markdown";
-import { DeviceBadge, EntityBadge, AutomationBadge } from "./DeviceBadge.js";
+import { DeviceBadge, EntityBadge, AutomationBadge, VibeBadge } from "./DeviceBadge.js";
 import { markdownRehypePlugins } from "./markdownPlugins.js";
 
 function parseMarkdownIntoBlocks(markdown: string): string[] {
@@ -13,6 +13,7 @@ const markdownComponents = {
   device: DeviceBadge,
   entity: EntityBadge,
   automation: AutomationBadge,
+  vibe: VibeBadge,
 } as Record<string, React.ComponentType<Record<string, unknown>>>;
 
 const MemoizedMarkdownBlock = memo(

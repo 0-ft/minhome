@@ -7,19 +7,7 @@ import { DebouncedSlider } from "./ui/slider.js";
 import { EditableText } from "./ui/editable-text.js";
 import { Lightbulb, Plug, Power, Thermometer, Sun, ChevronRight, Radio, Palette } from "lucide-react";
 import type { DeviceData, Entity } from "../types.js";
-
-// ── Colour helpers ───────────────────────────────────────
-
-function hslCss(h: number, s: number, l = 50): string {
-  return `hsl(${h}, ${s}%, ${l}%)`;
-}
-
-const HUE_GRADIENT =
-  "linear-gradient(to right, hsl(0,100%,50%), hsl(60,100%,50%), hsl(120,100%,50%), hsl(180,100%,50%), hsl(240,100%,50%), hsl(300,100%,50%), hsl(360,100%,50%))";
-
-function saturationGradient(hue: number): string {
-  return `linear-gradient(to right, hsl(${hue},0%,80%), hsl(${hue},100%,50%))`;
-}
+import { hslCss, HUE_GRADIENT, saturationGradient } from "../lib/color.js";
 
 // ── Devices View ────────────────────────────────────────
 
