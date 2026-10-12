@@ -537,14 +537,18 @@ export function createApp(
       return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" });
     })
 
-    // Optional JSON body: { "transition": seconds } to override the default fade
+    // Optional JSON body: { "transition": seconds, "force": true }. Only lights that
+    // differ from the vibe get commands, unless forced or the vibe is already active.
     .post("/api/vibes/:id/apply", async (c) => {
       const vibe = vibes.get(c.req.param("id"));
       if (!vibe) return c.json({ error: "Vibe not found" }, 404);
-      const body = z.object({ transition: z.number().min(0).max(60).optional() })
-        .safeParse(await c.req.json().catch(() => ({})));
+      const body = z.object({
+        transition: z.number().min(0).max(60).optional(),
+        /** Send every setting even to lights already in their target state. */
+        force: z.boolean().optional(),
+      }).safeParse(await c.req.json().catch(() => ({})));
       if (!body.success) return c.json({ error: body.error.message }, 400);
-      return c.json(applyVibe(bridge, vibe, { transition: body.data.transition }));
+      return c.json(applyVibe(bridge, vibe, body.data));
     })
 
     // --- WebSocket ---

@@ -81,8 +81,14 @@ function settingPayload(entity: ExtractedEntity, setting: VibeEntitySetting): Re
 export interface ApplyVibeResult {
   ok: true;
   vibe: string;
+  /** Entities the vibe sets (whether or not they needed a command). */
   applied: number;
+  /** Unlisted entities switched off by off_unspecified. */
   turnedOff: number;
+  /** Entities already in their target state, so no command was sent. */
+  unchanged: number;
+  /** Every setting was sent regardless of current state. */
+  forced: boolean;
   /** Settings whose device or entity no longer exists. */
   skipped: Array<{ device: string; entity: string }>;
   at: string;
@@ -93,7 +99,14 @@ export interface ApplyVibeResult {
  * entities when `offUnspecified` is set. Payloads are merged so each device
  * gets a single MQTT publish. Lights fade over `transition` seconds.
  */
-export function applyVibe(bridge: MqttBridge, vibe: Vibe, options: { transition?: number } = {}): ApplyVibeResult {
+export function applyVibe(
+  bridge: MqttBridge,
+  vibe: Vibe,
+  options: { transition?: number; force?: boolean } = {},
+): ApplyVibeResult {
+  // Re-applying a vibe that already looks active is how to fix lights whose
+  // reported state is stale, so that sends everything
+  const force = options.force ?? isVibeActive(bridge, vibe);
   const controllable = new Map(listControllableEntities(bridge).map((c) => [entityId(c.deviceId, c.entity.key), c]));
   const perDevice = new Map<string, { payload: Record<string, unknown>; entities: ExtractedEntity[] }>();
   const send = (deviceId: string, entity: ExtractedEntity, payload: Record<string, unknown>) => {
@@ -106,6 +119,7 @@ export function applyVibe(bridge: MqttBridge, vibe: Vibe, options: { transition?
 
   const specified = new Set<string>();
   const skipped: ApplyVibeResult["skipped"] = [];
+  let unchanged = 0;
   for (const setting of vibe.entities) {
     const id = entityId(setting.device, setting.entity);
     const target = controllable.get(id);
@@ -114,13 +128,21 @@ export function applyVibe(bridge: MqttBridge, vibe: Vibe, options: { transition?
       continue;
     }
     specified.add(id);
-    send(target.deviceId, target.entity, settingPayload(target.entity, setting));
+    const payload = force
+      ? settingPayload(target.entity, setting)
+      : settingDelta(target.entity, target.deviceState, setting);
+    if (payload) send(target.deviceId, target.entity, payload);
+    else unchanged++;
   }
 
   let turnedOff = 0;
   if (vibe.offUnspecified) {
     for (const [id, target] of controllable) {
       if (specified.has(id)) continue;
+      if (!force && readCanonicalEntityState(target.entity, target.deviceState).state === "OFF") {
+        unchanged++;
+        continue;
+      }
       send(target.deviceId, target.entity, { state: "OFF" });
       turnedOff++;
     }
@@ -136,6 +158,8 @@ export function applyVibe(bridge: MqttBridge, vibe: Vibe, options: { transition?
     vibe: vibe.id,
     applied: specified.size,
     turnedOff,
+    unchanged,
+    forced: force,
     skipped,
     at: new Date().toISOString(),
   };
@@ -155,25 +179,43 @@ function hueDistance(a: number, b: number): number {
   return Math.min(d, 360 - d);
 }
 
-function settingMatches(entity: ExtractedEntity, deviceState: Record<string, unknown>, setting: VibeEntitySetting): boolean {
+/**
+ * The part of a setting the entity still needs, as a canonical payload, or
+ * null when it already matches (within tolerance). Unknown state counts as
+ * needing everything; a light that's already on only gets the properties that
+ * are off.
+ */
+function settingDelta(
+  entity: ExtractedEntity,
+  deviceState: Record<string, unknown>,
+  setting: VibeEntitySetting,
+): Record<string, unknown> | null {
+  const full = settingPayload(entity, setting);
   const current = readCanonicalEntityState(entity, deviceState);
-  if (current.state !== setting.state) return false;
-  if (setting.state === "OFF") return true;
+  if (current.state !== setting.state) return full;
+  if (setting.state === "OFF") return null;
 
-  const { features } = entity;
-  if (setting.brightness !== undefined && features.brightnessProperty) {
-    if (current.brightness === undefined || Math.abs(current.brightness - setting.brightness) > BRIGHTNESS_TOLERANCE) return false;
+  const delta: Record<string, unknown> = {};
+  const wanted = full as { brightness?: number; color?: { hue: number; saturation: number }; color_temp?: number };
+  if (wanted.brightness !== undefined
+    && (current.brightness === undefined || Math.abs(current.brightness - wanted.brightness) > BRIGHTNESS_TOLERANCE)) {
+    delta.brightness = wanted.brightness;
   }
-  if (setting.color && features.colorProperty) {
-    if (!current.color) return false;
-    if (hueDistance(current.color.hue, setting.color.hue) > HUE_TOLERANCE) return false;
-    if (Math.abs(current.color.saturation - setting.color.saturation) > SATURATION_TOLERANCE) return false;
+  if (wanted.color
+    && (!current.color
+      || hueDistance(current.color.hue, wanted.color.hue) > HUE_TOLERANCE
+      || Math.abs(current.color.saturation - wanted.color.saturation) > SATURATION_TOLERANCE)) {
+    delta.color = wanted.color;
   }
-  if (setting.color_temp !== undefined && features.colorTempProperty) {
-    if (current.color_temp === undefined || Math.abs(current.color_temp - setting.color_temp) > COLOR_TEMP_TOLERANCE) return false;
+  if (wanted.color_temp !== undefined
+    && (current.color_temp === undefined || Math.abs(current.color_temp - wanted.color_temp) > COLOR_TEMP_TOLERANCE)) {
+    delta.color_temp = wanted.color_temp;
   }
-  return true;
+  return Object.keys(delta).length > 0 ? delta : null;
 }
+
+const settingMatches = (entity: ExtractedEntity, deviceState: Record<string, unknown>, setting: VibeEntitySetting) =>
+  settingDelta(entity, deviceState, setting) === null;
 
 /**
  * Whether the room currently matches a vibe, within small tolerances (lights
@@ -189,7 +231,9 @@ export function isVibeActive(bridge: MqttBridge, vibe: Vibe): boolean {
     specified.add(id);
     if (!settingMatches(target.entity, target.deviceState, setting)) return false;
   }
-  if (specified.size === 0) return false;
+  // An empty vibe that leaves everything else alone has nothing to match;
+  // one that turns everything else off (e.g. "dark") matches when all is off
+  if (specified.size === 0 && !vibe.offUnspecified) return false;
   if (vibe.offUnspecified) {
     for (const [id, target] of controllable) {
       if (!specified.has(id) && readCanonicalEntityState(target.entity, target.deviceState).state !== "OFF") return false;
