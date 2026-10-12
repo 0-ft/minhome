@@ -7,7 +7,7 @@ import type { ConfigStore } from "./config/config.js";
 import type { ChatStore } from "./config/chats.js";
 import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
 import type { VibeStore } from "./config/vibes.js";
-import { applyVibe, captureVibeSettings, findUnknownSettings, fixedEntityColors, normalizeSettingInput, VibeSettingInputSchema } from "./vibes.js";
+import { applyVibe, captureVibeSettings, findUnknownSettings, fixedEntityColors, normalizeSettingInput, VibeSettingInputSchema, watchActiveVibes, withActivity } from "./vibes.js";
 import { renderVibeArt } from "./vibe-art.js";
 import type { AutomationEngine } from "./automations.js";
 import { AutomationSchema } from "./automations.js";
@@ -52,6 +52,10 @@ export function createApp(
     }
     bridgeRef.current.send(JSON.stringify(msg));
   };
+
+  // Notified when the set of active vibes changes (lights reached or left a vibe)
+  const vibeActivityListeners = new Set<() => void>();
+  watchActiveVibes(bridge, vibes, () => vibeActivityListeners.forEach((fn) => fn()));
 
   const toolCtx: ToolContext = { bridge, config, chats, lists, vibes, automations, sendToBridge, audioStreams, audioSources, voiceDevices };
 
@@ -413,12 +417,13 @@ export function createApp(
     })
 
     // --- Vibes ---
-    .get("/api/vibes", (c) => c.json(vibes.getAll()))
+    // Each vibe carries `active`: whether the lights currently match it
+    .get("/api/vibes", (c) => c.json(withActivity(bridge, vibes.getAll())))
 
     .get("/api/vibes/:id", (c) => {
       const vibe = vibes.get(c.req.param("id"));
       if (!vibe) return c.json({ error: "Vibe not found" }, 404);
-      return c.json(vibe);
+      return c.json(withActivity(bridge, [vibe])[0]);
     })
 
     .post("/api/vibes",
@@ -540,6 +545,7 @@ export function createApp(
           lists.onChanged(onListsChange);
           chats.onChanged(onChatsChange);
           vibes.onChanged(onVibesChange);
+          vibeActivityListeners.add(onVibesChange);
 
           cleanup = () => {
             bridge.off("state_change", onStateChange);
@@ -549,6 +555,7 @@ export function createApp(
             lists.offChanged(onListsChange);
             chats.offChanged(onChatsChange);
             vibes.offChanged(onVibesChange);
+            vibeActivityListeners.delete(onVibesChange);
             cleanup = undefined;
           };
         },

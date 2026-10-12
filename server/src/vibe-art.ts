@@ -31,9 +31,9 @@ export interface VibeArtOptions {
 
 // ── Colour maths ─────────────────────────────────────────
 
-type Rgb = [number, number, number]; // 0-255
+export type Rgb = [number, number, number]; // 0-255
 
-function hslToRgb(h: number, s: number, l: number): Rgb {
+export function hslToRgb(h: number, s: number, l: number): Rgb {
   const sat = s / 100;
   const light = l / 100;
   const k = (n: number) => (n + h / 30) % 12;
@@ -42,24 +42,24 @@ function hslToRgb(h: number, s: number, l: number): Rgb {
   return [f(0) * 255, f(8) * 255, f(4) * 255];
 }
 
-function hexToRgb(hex: string): Rgb {
+export function hexToRgb(hex: string): Rgb {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
 /** Same warm/cool white curve as the dashboard (mired 142 cool → 500 warm). */
-function miredToRgb(mired: number): Rgb {
+export function miredToRgb(mired: number): Rgb {
   const t = Math.max(0, Math.min(1, (mired - 142) / (500 - 142)));
   return [255, Math.max(0.55, 0.95 - t * 0.35) * 255, Math.max(0.25, 0.85 - t * 0.55) * 255];
 }
 
 /** Mix towards black or white; amount 0 = unchanged, 1 = fully black/white. */
-function mix(rgb: Rgb, towards: "black" | "white", amount: number): Rgb {
+export function mix(rgb: Rgb, towards: "black" | "white", amount: number): Rgb {
   const target = towards === "black" ? 0 : 255;
   return rgb.map((c) => c + (target - c) * amount) as Rgb;
 }
 
-function toHex(rgb: Rgb): string {
+export function toHex(rgb: Rgb): string {
   return "#" + rgb.map((c) => Math.round(Math.max(0, Math.min(255, c))).toString(16).padStart(2, "0")).join("");
 }
 

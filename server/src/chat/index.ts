@@ -29,7 +29,7 @@ export function createChatRoute(ctx: ToolContext) {
       toolCount: Object.keys(tools).length,
       tools: tools,
       systemPrompt: system,
-      liveStateNote: buildLiveStateNote(bridge, config),
+      liveStateNote: buildLiveStateNote(bridge, config, vibes),
     });
   });
 
@@ -103,7 +103,7 @@ export function createChatRoute(ctx: ToolContext) {
     const lastUserIndex = modelMessages.map((m) => m.role).lastIndexOf("user");
     modelMessages.splice(lastUserIndex === -1 ? modelMessages.length : lastUserIndex, 0, {
       role: "system",
-      content: buildLiveStateNote(bridge, config),
+      content: buildLiveStateNote(bridge, config, vibes),
     });
 
     // // Wrap tools to intercept tool calls and results

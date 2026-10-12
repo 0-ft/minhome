@@ -6,7 +6,7 @@ import type { ChatStore } from "./config/chats.js";
 import { ListStatusIdSchema, type ListStore } from "./config/lists.js";
 import type { AutomationEngine } from "./automations.js";
 import type { VibeStore } from "./config/vibes.js";
-import { applyVibe, captureVibeSettings, findUnknownSettings, normalizeSettingInput, VibeSettingInputSchema } from "./vibes.js";
+import { applyVibe, captureVibeSettings, findUnknownSettings, normalizeSettingInput, VibeSettingInputSchema, withActivity } from "./vibes.js";
 import {
   RoomDimensionsSchema,
   RoomLightSchema,
@@ -554,10 +554,10 @@ export function createTools(): Record<string, ToolDef> {
 
     get_vibe: {
       ...toolSchemas.get_vibe,
-      execute: async ({ id }, { vibes }) => {
+      execute: async ({ id }, { vibes, bridge }) => {
         const vibe = vibes.get(id);
         if (!vibe) throw new Error("Vibe not found");
-        return vibe;
+        return withActivity(bridge, [vibe])[0];
       },
     },
 

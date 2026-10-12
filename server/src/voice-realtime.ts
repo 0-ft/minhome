@@ -447,7 +447,7 @@ You are a voice-first smart-home assistant. Success means understanding the user
       item: {
         type: "message",
         role: "system",
-        content: [{ type: "input_text", text: buildLiveStateNote(this.toolCtx.bridge, this.toolCtx.config) }],
+        content: [{ type: "input_text", text: buildLiveStateNote(this.toolCtx.bridge, this.toolCtx.config, this.toolCtx.vibes) }],
       } as any,
     });
   }

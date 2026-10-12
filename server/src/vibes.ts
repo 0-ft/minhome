@@ -8,7 +8,7 @@ import {
   resolveEntityPayload,
   type ExtractedEntity,
 } from "./config/devices.js";
-import { VibeColorSchema, type Vibe, type VibeEntitySetting } from "./config/vibes.js";
+import { VibeColorSchema, type Vibe, type VibeEntitySetting, type VibeStore } from "./config/vibes.js";
 import { debugLog } from "./debug-log.js";
 
 interface ControllableEntity {
@@ -133,6 +133,83 @@ export function applyVibe(bridge: MqttBridge, vibe: Vibe): ApplyVibeResult {
   };
   debugLog.add("vibe_applied", `Vibe applied: ${vibe.name}`, result);
   return result;
+}
+
+// ── Is a vibe currently active? ──────────────────────────
+
+const BRIGHTNESS_TOLERANCE = 6;
+const COLOR_TEMP_TOLERANCE = 10;
+const HUE_TOLERANCE = 6;
+const SATURATION_TOLERANCE = 6;
+
+function hueDistance(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return Math.min(d, 360 - d);
+}
+
+function settingMatches(entity: ExtractedEntity, deviceState: Record<string, unknown>, setting: VibeEntitySetting): boolean {
+  const current = readCanonicalEntityState(entity, deviceState);
+  if (current.state !== setting.state) return false;
+  if (setting.state === "OFF") return true;
+
+  const { features } = entity;
+  if (setting.brightness !== undefined && features.brightnessProperty) {
+    if (current.brightness === undefined || Math.abs(current.brightness - setting.brightness) > BRIGHTNESS_TOLERANCE) return false;
+  }
+  if (setting.color && features.colorProperty) {
+    if (!current.color) return false;
+    if (hueDistance(current.color.hue, setting.color.hue) > HUE_TOLERANCE) return false;
+    if (Math.abs(current.color.saturation - setting.color.saturation) > SATURATION_TOLERANCE) return false;
+  }
+  if (setting.color_temp !== undefined && features.colorTempProperty) {
+    if (current.color_temp === undefined || Math.abs(current.color_temp - setting.color_temp) > COLOR_TEMP_TOLERANCE) return false;
+  }
+  return true;
+}
+
+/**
+ * Whether the room currently matches a vibe, within small tolerances (lights
+ * report back slightly different values than they were sent).
+ */
+export function isVibeActive(bridge: MqttBridge, vibe: Vibe): boolean {
+  const controllable = new Map(listControllableEntities(bridge).map((c) => [entityId(c.deviceId, c.entity.key), c]));
+  const specified = new Set<string>();
+  for (const setting of vibe.entities) {
+    const id = entityId(setting.device, setting.entity);
+    const target = controllable.get(id);
+    if (!target) continue; // device gone — applying skips it too
+    specified.add(id);
+    if (!settingMatches(target.entity, target.deviceState, setting)) return false;
+  }
+  if (specified.size === 0) return false;
+  if (vibe.offUnspecified) {
+    for (const [id, target] of controllable) {
+      if (!specified.has(id) && readCanonicalEntityState(target.entity, target.deviceState).state !== "OFF") return false;
+    }
+  }
+  return true;
+}
+
+/** Vibes with an `active` flag, as served by the API. */
+export function withActivity(bridge: MqttBridge, vibes: Vibe[]): Array<Vibe & { active: boolean }> {
+  return vibes.map((vibe) => ({ ...vibe, active: isVibeActive(bridge, vibe) }));
+}
+
+/**
+ * Calls `onChange` whenever the set of active vibes changes, re-checking on
+ * device state changes and vibe edits.
+ */
+export function watchActiveVibes(bridge: MqttBridge, vibes: VibeStore, onChange: () => void): void {
+  const signature = () => vibes.getAll().filter((v) => isVibeActive(bridge, v)).map((v) => v.id).join(",");
+  let last = signature();
+  const check = () => {
+    const next = signature();
+    if (next === last) return;
+    last = next;
+    onChange();
+  };
+  bridge.on("state_change", check);
+  vibes.onChanged(check);
 }
 
 /** Settings that target an entity which doesn't exist or can't be controlled. */

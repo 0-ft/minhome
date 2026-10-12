@@ -2,6 +2,7 @@ import type { MqttBridge } from "../mqtt.js";
 import type { ConfigStore } from "../config/config.js";
 import type { ListStore } from "../config/lists.js";
 import type { VibeStore } from "../config/vibes.js";
+import { isVibeActive } from "../vibes.js";
 import type { AutomationEngine } from "../automations.js";
 import type { VoiceDeviceInfo } from "../tools.js";
 import { extractEntitiesFromExposes, buildEntityResponses, entityCapabilities } from "../config/devices.js";
@@ -73,7 +74,7 @@ export function formatPromptTime(date: Date): string {
  * the latest user message (and never persisted) so the model weighs it above
  * anything in the conversation history.
  */
-export function buildLiveStateNote(bridge: MqttBridge, config: ConfigStore): string {
+export function buildLiveStateNote(bridge: MqttBridge, config: ConfigStore, vibes?: VibeStore): string {
   const devices = [...bridge.devices.values()]
     .filter((d) => d.type !== "Coordinator")
     .map((d) => {
@@ -94,8 +95,15 @@ export function buildLiveStateNote(bridge: MqttBridge, config: ConfigStore): str
       };
     });
 
+  const activeVibes = vibes
+    ?.getAll()
+    .filter((vibe) => isVibeActive(bridge, vibe))
+    .map((vibe) => `${vibe.name} (${vibe.id})`)
+    .join(", ");
+
   return `Live device state as of ${formatPromptTime(new Date())} (${TIME_ZONE}). This is the current time and the current state of every device; it supersedes anything earlier in the conversation. An empty state means the device has not reported yet.
-${JSON.stringify(devices)}`;
+${JSON.stringify(devices)}${activeVibes ? `
+Active vibe (the lights currently match it): ${activeVibes}` : ""}`;
 }
 
 /** Prefix a history message's text with the time it was sent, when known. */
