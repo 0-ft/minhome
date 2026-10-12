@@ -49,8 +49,11 @@ export function useEntityControls(entity: Entity, onSet: (payload: Record<string
   };
 
   const change = (next: Partial<LightValues>) => {
-    // Sliders echo synced values back, so only count values that actually moved
-    const moved = (key: keyof LightValues) => next[key] !== undefined && next[key] !== values[key];
+    // Sliders not being dragged re-sync to what the light reports, and report
+    // that back here. Only values that differ from both the current value and
+    // the reported one are the user moving a slider.
+    const moved = (key: keyof LightValues) =>
+      next[key] !== undefined && next[key] !== values[key] && next[key] !== serverValues[key];
     if (moved("hue") || moved("saturation")) setModeOverride("color");
     else if (moved("colorTemp")) setModeOverride("white");
     setValues((v) => ({ ...v, ...next }));
