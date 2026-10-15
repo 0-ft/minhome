@@ -202,7 +202,7 @@ export function RoomFullView() {
             {renderItems.map((item) => (
               item.kind === "text" ? (
                 <FloatingTextMessage key={item.id} id={item.id} role={item.role} text={item.text} />
-              ) : (
+              ) : item.kind === "extraInstructions" ? null : (
                 <div key={item.id} className="animate-float-in mb-5">
                   <ToolCallGroup parts={item.tools} variant="roomFull" />
                 </div>
