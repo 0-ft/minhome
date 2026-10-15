@@ -71,6 +71,11 @@ export const DisplayDeviceSchema = z.object({
    * drive a panel at something other than its native depth.
    */
   color_depth: z.number().int().min(1).max(4).optional(),
+  /**
+   * Framework text scale modifier (`screen--text-scale-<value>`): small 0.8x,
+   * regular 1x, large 1.25x, xlarge 1.5x. Scales text only, not spacing.
+   */
+  text_scale: z.enum(["small", "regular", "large", "xlarge"]).optional(),
   /** Screen contents, in the framework's view/layout/columns primitives. */
   layout: ScreenLayoutSchema,
 });

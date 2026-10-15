@@ -31,6 +31,11 @@ const MONTH_DAY_FORMATTER = new Intl.DateTimeFormat(undefined, { month: "short",
 const DAY_NUMBER_FORMATTER = new Intl.DateTimeFormat(undefined, { day: "numeric" });
 const WEEKDAY_SHORT_FORMATTER = new Intl.DateTimeFormat(undefined, { weekday: "short" });
 
+/** Inline font sizes bypass the framework's type scale, so follow --text-ui-scale by hand. */
+function textSize(px: number): string {
+  return `calc(${px}px * var(--text-ui-scale, 1))`;
+}
+
 const EINK_BACKGROUND = "#fff";
 const EINK_FOREGROUND = "#000";
 
@@ -253,7 +258,7 @@ function renderGrid(
               return (
                 <div key={`day-${rowIdx}-${dayIdx}`} style={{ flex: 1, padding: 4, display: "flex", flexDirection: "column", gap: 3, minWidth: 0, overflow: "hidden" }}>
                   <div
-                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, paddingBottom: 2, minHeight: 14, fontSize: isMonth ? 10 : 12 }}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700, paddingBottom: 2, minHeight: 14, fontSize: textSize(isMonth ? 10 : 12) }}
                   >
                     <div>{WEEKDAY_SHORT_FORMATTER.format(day)}</div>
                     <div>{DAY_NUMBER_FORMATTER.format(day)}</div>
@@ -264,14 +269,14 @@ function renderGrid(
                         {visible.map((event, eventIdx) => (
                           <div
                             key={`event-${eventIdx}`}
-                            style={{ lineHeight: 1.2, padding: "2px 3px", overflowWrap: "anywhere", overflow: "hidden", fontSize: isMonth ? 9 : 11 }}
+                            style={{ lineHeight: 1.2, padding: "2px 3px", overflowWrap: "anywhere", overflow: "hidden", fontSize: textSize(isMonth ? 9 : 11) }}
                           >
                             {formatGridEventText(event, config.show_location)}
                           </div>
                         ))}
                         {hiddenCount > 0 ? (
                           <div
-                            style={{ lineHeight: 1.2, fontWeight: 700, overflowWrap: "anywhere", overflow: "hidden", fontSize: isMonth ? 9 : 11 }}
+                            style={{ lineHeight: 1.2, fontWeight: 700, overflowWrap: "anywhere", overflow: "hidden", fontSize: textSize(isMonth ? 9 : 11) }}
                           >
                             {`+${hiddenCount} more`}
                           </div>
@@ -279,7 +284,7 @@ function renderGrid(
                       </div>
                     ) : (
                       <div
-                        style={{ lineHeight: 1.2, overflowWrap: "anywhere", overflow: "hidden", fontSize: isMonth ? 9 : 11, opacity: outsideCurrentMonth ? 0.35 : 0.55 }}
+                        style={{ lineHeight: 1.2, overflowWrap: "anywhere", overflow: "hidden", fontSize: textSize(isMonth ? 9 : 11), opacity: outsideCurrentMonth ? 0.35 : 0.55 }}
                       >
                         {outsideCurrentMonth ? "" : "No events"}
                       </div>

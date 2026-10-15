@@ -31,6 +31,8 @@ export type FrameworkScreen = {
   device: string;
   /** Bits per pixel; selects the screen--Nbit class. */
   colorDepth: number;
+  /** Selects the screen--text-scale-<value> modifier; omitted means the framework default. */
+  textScale?: string;
 };
 
 export type RenderSize = {
@@ -50,6 +52,12 @@ export type RenderSize = {
  *
  * Do not add the docs' `environment` class: its only rule is `background-color: gray`.
  */
+function screenClasses(screen: FrameworkScreen): string {
+  const classes = ["screen", `screen--${screen.device}`, `screen--${screen.colorDepth}bit`];
+  if (screen.textScale) classes.push(`screen--text-scale-${screen.textScale}`);
+  return classes.join(" ");
+}
+
 export function buildFrameworkDocument(bodyHtml: string, screen: FrameworkScreen): string {
   return `<!doctype html>
 <html>
@@ -59,7 +67,7 @@ export function buildFrameworkDocument(bodyHtml: string, screen: FrameworkScreen
 <style>html,body{margin:0;padding:0;background:#fff}</style>
 </head>
 <body class="trmnl">
-<div class="screen screen--${screen.device} screen--${screen.colorDepth}bit">${bodyHtml}</div>
+<div class="${screenClasses(screen)}">${bodyHtml}</div>
 <script src="file://${FRAMEWORK_JS}"></script>
 </body>
 </html>`;

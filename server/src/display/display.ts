@@ -173,6 +173,7 @@ async function generateImage(
   orientation: DisplayDeviceConfig["orientation"],
   colorDepth: number,
   frameworkDevice: keyof typeof FRAMEWORK_DEVICES,
+  textScale: DisplayDeviceConfig["text_scale"],
 ): Promise<{ png: Buffer; timings: ImageRenderTimings }> {
   const totalStart = Date.now();
 
@@ -182,7 +183,7 @@ async function generateImage(
     calendarService,
     listProvider,
   );
-  const document = buildFrameworkDocument(bodyHtml, { device: frameworkDevice, colorDepth });
+  const document = buildFrameworkDocument(bodyHtml, { device: frameworkDevice, colorDepth, textScale });
   const buildRootMs = Date.now() - buildStart;
 
   // Size comes from the framework profile, not the device's reported headers: the
@@ -395,6 +396,7 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
       orientation,
       colorDepth,
       frameworkDevice,
+      matchedDevice?.display.text_scale,
     );
     const paletteColours = getPaletteColourCount(colorDepth);
     const mem = process.memoryUsage();
@@ -464,7 +466,11 @@ export function createDisplayRoute(config: ConfigStore, lists: ListStore) {
     // Emit exactly the document the screenshot renders, so this endpoint is a
     // faithful debug view rather than a lookalike with its own styling.
     const { html: bodyHtml } = await buildScreenBodyHtml(matchedDevice, calendarService, listProvider);
-    const html = buildFrameworkDocument(bodyHtml, { device: frameworkDevice, colorDepth });
+    const html = buildFrameworkDocument(bodyHtml, {
+      device: frameworkDevice,
+      colorDepth,
+      textScale: matchedDevice?.display.text_scale,
+    });
 
     return c.html(html);
   });
