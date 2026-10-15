@@ -30,6 +30,9 @@ export type VoiceConfig = z.infer<typeof VoiceConfigSchema>;
 export const ICalCalendarSourceSchema = z.object({
   type: z.literal("ical"),
   source_url: z.string().url(),
+  /** HTTP Basic credentials, for feeds behind auth (fetch rejects them inline in the URL). */
+  username: z.string().optional(),
+  password: z.string().optional(),
 });
 export type ICalCalendarSourceConfig = z.infer<typeof ICalCalendarSourceSchema>;
 

@@ -35,11 +35,14 @@ export class ICalProvider implements CalendarProvider {
   ) {}
 
   async getEvents(): Promise<CalendarEvent[]> {
-    const response = await fetch(this.config.source_url, {
-      headers: {
-        Accept: "text/calendar, text/plain, */*",
-      },
-    });
+    const headers: Record<string, string> = {
+      Accept: "text/calendar, text/plain, */*",
+    };
+    if (this.config.username !== undefined || this.config.password !== undefined) {
+      const credentials = `${this.config.username ?? ""}:${this.config.password ?? ""}`;
+      headers.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
+    }
+    const response = await fetch(this.config.source_url, { headers });
 
     if (!response.ok) {
       throw new Error(`Calendar "${this.calendarId}" request failed (${response.status})`);
