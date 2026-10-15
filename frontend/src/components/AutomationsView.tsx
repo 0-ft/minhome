@@ -10,7 +10,7 @@ import type { Automation, Trigger, Condition, Action } from "@minhome/server/aut
 // ── Defaults ──────────────────────────────────────────────
 
 const TRIGGER_TYPES = ["device_state", "device_event", "mqtt", "cron", "time", "datetime", "interval"] as const;
-const CONDITION_TYPES = ["time_range", "day_of_week", "device_state", "and", "or", "xor"] as const;
+const CONDITION_TYPES = ["time_range", "day_of_week", "device_state", "vibe_active", "and", "or", "xor"] as const;
 const ACTION_TYPES = ["device_set", "mqtt_publish", "delay", "conditional", "tool"] as const;
 
 const TOOL_NAMES = [
@@ -39,6 +39,7 @@ function defaultCondition(type: string = "time_range"): Condition {
   switch (type) {
     case "day_of_week":  return { type: "day_of_week", days: [] };
     case "device_state": return { type: "device_state", device: "", entity: "main", property: "state", equals: "ON" };
+    case "vibe_active":  return { type: "vibe_active", vibe: "", active: true };
     case "and":          return { type: "and", conditions: [defaultCondition("time_range")] };
     case "or":           return { type: "or", conditions: [defaultCondition("time_range")] };
     case "xor":          return { type: "xor", conditions: [defaultCondition("time_range")] };
@@ -344,6 +345,24 @@ function ConditionEditor({ condition, onChange, onRemove, devices }: {
               </Field>
             </div>
           </>
+        )}
+
+        {condition.type === "vibe_active" && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Vibe">
+              <VibeSelect value={condition.vibe} onChange={(v) => onChange({ ...condition, vibe: v })} />
+            </Field>
+            <Field label="Passes when">
+              <select
+                value={condition.active === false ? "inactive" : "active"}
+                onChange={(e) => onChange({ ...condition, active: e.target.value === "active" })}
+                className={selectCls}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Not active</option>
+              </select>
+            </Field>
+          </div>
         )}
 
         {(condition.type === "and" || condition.type === "or" || condition.type === "xor") && (

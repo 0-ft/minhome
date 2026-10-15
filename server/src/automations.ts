@@ -5,6 +5,8 @@ import type { MqttBridge, DeviceState } from "./mqtt.js";
 import { extractEntitiesFromExposes, resolveCanonicalProperty, resolveEntityPayload, withTransition } from "./config/devices.js";
 import { toolSchemas } from "./tools.js";
 import { debugLog } from "./debug-log.js";
+import type { VibeStore } from "./config/vibes.js";
+import { isVibeActive } from "./vibes.js";
 
 // --- Zod schemas ---
 
@@ -79,7 +81,13 @@ const ConditionDeviceState = z.object({
   equals: z.unknown().describe("Required value of the property for the condition to pass, e.g. 'ON', 255"),
 }).describe("Condition that passes only when a device entity's state property equals a specific value");
 
-type Condition = z.infer<typeof ConditionTimeRange> | z.infer<typeof ConditionDayOfWeek> | z.infer<typeof ConditionDeviceState> | LogicCondition;
+const ConditionVibeActive = z.object({
+  type: z.literal("vibe_active").describe("Condition type: passes depending on whether a vibe is currently active"),
+  vibe: z.string().describe("Id of the vibe to check, e.g. 'late-night'"),
+  active: z.boolean().optional().describe("Pass when the vibe is active (true, the default) or when it is not (false)"),
+}).describe("Condition that passes when a vibe is (or is not) currently active, i.e. every light matches the vibe's settings");
+
+type Condition = z.infer<typeof ConditionTimeRange> | z.infer<typeof ConditionDayOfWeek> | z.infer<typeof ConditionDeviceState> | z.infer<typeof ConditionVibeActive> | LogicCondition;
 
 interface LogicCondition {
   type: "and" | "or" | "xor";
@@ -91,6 +99,7 @@ export const ConditionSchema: z.ZodType<Condition> = z.lazy(() =>
     ConditionTimeRange,
     ConditionDayOfWeek,
     ConditionDeviceState,
+    ConditionVibeActive,
     z.object({
       type: z.literal("and").describe("Condition type: passes only when ALL sub-conditions pass"),
       conditions: z.array(ConditionSchema).min(1).describe("Sub-conditions that must ALL be true"),
@@ -104,7 +113,7 @@ export const ConditionSchema: z.ZodType<Condition> = z.lazy(() =>
       conditions: z.array(ConditionSchema).min(1).describe("Sub-conditions where exactly one must be true"),
     }).describe("Logical XOR — passes when exactly one sub-condition is true"),
   ])
-).describe("A condition that must be true for the automation to proceed. Set 'type' to one of: 'time_range', 'day_of_week', 'device_state', 'and', 'or', 'xor'");
+).describe("A condition that must be true for the automation to proceed. Set 'type' to one of: 'time_range', 'day_of_week', 'device_state', 'vibe_active', 'and', 'or', 'xor'");
 
 const ActionDeviceSet = z.object({
   type: z.literal("device_set").describe("Action type: send a state command to a device entity"),
@@ -208,15 +217,18 @@ export class AutomationEngine {
   private changeListeners = new Set<() => void>();
 
   private executeTool?: (name: string, params: unknown) => Promise<unknown>;
+  private vibes?: VibeStore;
 
   constructor(filePath: string, bridge: MqttBridge, opts?: {
     onFire?: (id: string, trigger: string) => void;
     executeTool?: (name: string, params: unknown) => Promise<unknown>;
+    vibes?: VibeStore;
   }) {
     this.filePath = filePath;
     this.bridge = bridge;
     this.onFire = opts?.onFire;
     this.executeTool = opts?.executeTool;
+    this.vibes = opts?.vibes;
     this.load();
     this.setupMqttListeners();
   }
@@ -428,6 +440,12 @@ export class AutomationEngine {
         if (!actualProp) return false;
         const state = this.bridge.states.get(cond.device);
         return state?.[actualProp] === cond.equals;
+      }
+      case "vibe_active": {
+        const vibe = this.vibes?.get(cond.vibe);
+        // An unknown vibe is never active, so `active: false` still passes for it.
+        const active = vibe ? isVibeActive(this.bridge, vibe) : false;
+        return active === (cond.active ?? true);
       }
       case "and":
         return cond.conditions.every(c => this.evaluateCondition(c));

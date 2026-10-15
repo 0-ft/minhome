@@ -54,6 +54,7 @@ debugLog.init(debugLogPath, config.get().debugLogMaxSizeMB);
 
 const bridge = createMqttBridge(MQTT_URL);
 const automationEngine = new AutomationEngine(automationsPath, bridge, {
+  vibes,
   onFire: (id, trigger) => {
     console.log(`[auto] ${id} fired by ${trigger}`);
     debugLog.add("automation_fired", `Automation ${id} fired by ${trigger}`, { id, trigger });
